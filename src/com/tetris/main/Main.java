@@ -3,8 +3,6 @@ package com.tetris.main;
 import com.tetris.controller.GameEngine;
 import com.tetris.controller.InputHandler;
 import com.tetris.model.Board;
-import com.tetris.model.Piece;
-import com.tetris.model.Tetromino;
 import com.tetris.view.GamePanel;
 
 import javax.swing.JFrame;
@@ -20,18 +18,19 @@ public class Main {
 
     // Create and show GUI
     private static void createAndShowGUI() {
+        // Game Initialization
         Board board = new Board();
-        Piece testPiece = new Piece(Tetromino.T);
 
         GamePanel gamePanel = new GamePanel(board);
-        gamePanel.setCurrentPiece(testPiece); // Let Panel know which piece to draw
 
         GameEngine engine = new GameEngine(board, gamePanel);
+        gamePanel.setGameEngine(engine); // Link engine to panel for info display
+
         InputHandler inputHandler = new InputHandler(engine);
 
         // Set JFrame
         JFrame frame = new JFrame("Java Tetris Project");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); // Close when clicking "x"
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); // Close when clicking "X"
         frame.setResizable(false); // Fixed window size
 
         frame.add(gamePanel); // Add game panel to the frame
@@ -44,4 +43,5 @@ public class Main {
 
         engine.start();
     }
+
 }
