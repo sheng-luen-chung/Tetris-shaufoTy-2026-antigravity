@@ -58,18 +58,10 @@ public class GameEngine {
 
     private void updateScore(int lines) {
         switch (lines) {
-            case 1:
-                score += 100;
-                break;
-            case 2:
-                score += 300;
-                break;
-            case 3:
-                score += 500;
-                break;
-            case 4:
-                score += 800;
-                break;
+            case 1: score += 100; break;
+            case 2: score += 300; break;
+            case 3: score += 500; break;
+            case 4: score += 800; break;
         }
         panel.setScore(score);
     }
