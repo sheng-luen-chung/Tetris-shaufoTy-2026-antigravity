@@ -11,27 +11,55 @@ public class GameEngine {
     private Board board;
     private GamePanel panel;
     private Piece currentPiece;
-    private Timer timer;
+    private Piece nextPiece;
+    private Timer gameLoop;
+    private Timer secondTimer;
     private boolean isGameOver = false;
+    private boolean isPaused = false;
     private int score = 0;
+    private int secondsElapsed = 0;
 
     public GameEngine(Board board, GamePanel panel) {
         this.board = board;
         this.panel = panel;
+
+        // Initialize pieces
+        nextPiece = generateRandomPiece();
         spawnNewPiece();
 
-        // Set timer
-        timer = new Timer(500, e -> update());
+        // Set game loop (falling piece)
+        gameLoop = new Timer(500, e -> {
+            if (!isPaused) {
+                update();
+            }
+        });
+
+        // Set second timer (game time)
+        secondTimer = new Timer(1000, e -> {
+            if (!isGameOver && !isPaused) {
+                secondsElapsed++;
+                panel.repaint(); // Refresh UI to show timer
+            }
+        });
     }
 
     // Start the game
     public void start() {
-        timer.start();
+        gameLoop.start();
+        secondTimer.start();
+    }
+
+    // Toggle pause
+    public void togglePause() {
+        if (isGameOver)
+            return;
+        isPaused = !isPaused;
+        panel.repaint();
     }
 
     // Update the piece (down)
     public void update() {
-        if (isGameOver)
+        if (isGameOver || isPaused)
             return;
 
         // 1. Try to move down
@@ -58,20 +86,34 @@ public class GameEngine {
 
     private void updateScore(int lines) {
         switch (lines) {
-            case 1: score += 100; break;
-            case 2: score += 300; break;
-            case 3: score += 500; break;
-            case 4: score += 800; break;
+            case 1:
+                score += 100;
+                break;
+            case 2:
+                score += 300;
+                break;
+            case 3:
+                score += 500;
+                break;
+            case 4:
+                score += 800;
+                break;
         }
         panel.setScore(score);
     }
 
-    // Spawn new piece
-    private void spawnNewPiece() {
-        // Random type
+    // Generate a random piece
+    private Piece generateRandomPiece() {
         Tetromino[] types = Tetromino.values();
         Tetromino randomType = types[new Random().nextInt(types.length)];
-        currentPiece = new Piece(randomType);
+        return new Piece(randomType);
+    }
+
+    // Spawn new piece
+    private void spawnNewPiece() {
+        // Use nextPiece and generate new nextPiece
+        currentPiece = nextPiece;
+        nextPiece = generateRandomPiece();
 
         // Update view
         panel.setCurrentPiece(currentPiece);
@@ -79,23 +121,51 @@ public class GameEngine {
         // If new piece collision, game over
         if (!board.isValidMove(currentPiece)) {
             isGameOver = true;
-            timer.stop();
+            gameLoop.stop();
+            secondTimer.stop();
             System.out.println("Game Over!");
         }
     }
 
+    // Getters for UI
+    public int getScore() {
+        return score;
+    }
+
+    public int getSecondsElapsed() {
+        return secondsElapsed;
+    }
+
+    public Piece getNextPiece() {
+        return nextPiece;
+    }
+
+    public boolean isGameOver() {
+        return isGameOver;
+    }
+
+    public boolean isPaused() {
+        return isPaused;
+    }
+
     // Move piece left
     public void movePieceLeft() {
+        if (isGameOver || isPaused)
+            return;
         handleMove(0, -1);
     }
 
     // Move piece right
     public void movePieceRight() {
+        if (isGameOver || isPaused)
+            return;
         handleMove(0, 1);
     }
 
     // Rotate piece
     public void rotatePiece() {
+        if (isGameOver || isPaused)
+            return;
         currentPiece.rotate();
         if (!board.isValidMove(currentPiece)) {
             // If collision, cancel rotation
@@ -106,6 +176,8 @@ public class GameEngine {
 
     // Drop piece
     public void dropPiece() {
+        if (isGameOver || isPaused)
+            return;
         while (board.isValidMove(currentPiece)) {
             currentPiece.move(1, 0);
         }
@@ -122,4 +194,5 @@ public class GameEngine {
         }
         panel.repaint();
     }
+
 }

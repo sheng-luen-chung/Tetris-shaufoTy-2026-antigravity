@@ -34,6 +34,12 @@ public class InputHandler extends KeyAdapter {
             case KeyEvent.VK_SPACE:
                 engine.dropPiece();
                 break;
+
+            case KeyEvent.VK_P:
+            case KeyEvent.VK_ESCAPE:
+                engine.togglePause();
+                break;
         }
+
     }
 }

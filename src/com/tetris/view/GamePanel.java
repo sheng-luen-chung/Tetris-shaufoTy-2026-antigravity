@@ -12,20 +12,26 @@ import java.awt.Color;
 // Game panel
 public class GamePanel extends JPanel {
     public static final int TILE_SIZE = 30;
-    public static final int COLS = 10;
-    public static final int ROWS = 20;
+    private static final int COLS = 10;
+    private static final int ROWS = 20;
+    private static final int SIDEBAR_WIDTH = 150;
 
     private Board board;
     private Piece currentPiece;
-    private int score = 0;
+    private com.tetris.controller.GameEngine gameEngine;
 
     // Game panel constructor
     public GamePanel(Board board) {
         this.board = board;
 
-        // Set the size of the game panel
-        setPreferredSize(new Dimension(COLS * TILE_SIZE, ROWS * TILE_SIZE));
+        // Set the size of the game panel (grid + sidebar)
+        setPreferredSize(new Dimension(COLS * TILE_SIZE + SIDEBAR_WIDTH, ROWS * TILE_SIZE));
         setBackground(Color.BLACK);
+    }
+
+    // Set the game engine reference
+    public void setGameEngine(com.tetris.controller.GameEngine gameEngine) {
+        this.gameEngine = gameEngine;
     }
 
     // Set the current piece
@@ -33,29 +39,65 @@ public class GamePanel extends JPanel {
         this.currentPiece = piece;
     }
 
-    // Set the score
+    // Deprecated: Score is now retrieved from gameEngine
     public void setScore(int score) {
-        this.score = score;
+        // Keeping it for compatibility with existing calls, but will use engine's score
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
+        // Draw Game Area (Left)
         drawGrid(g);
         drawFixedBlocks(g);
         drawCurrentPiece(g);
-        drawScore(g);
+
+        // Draw Sidebar (Right)
+        drawSidebar(g);
+
+        // Draw Pause Overlay
+        if (gameEngine != null && gameEngine.isPaused()) {
+            drawPauseOverlay(g);
+        }
     }
+
+    // Draw Pause Overlay
+    private void drawPauseOverlay(Graphics g) {
+        int width = COLS * TILE_SIZE;
+        int height = ROWS * TILE_SIZE;
+
+        // Semi-transparent background
+        g.setColor(new Color(0, 0, 0, 150));
+        g.fillRect(0, 0, width, height);
+
+        // "PAUSED" Text
+        g.setColor(Color.YELLOW);
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 36));
+        java.awt.FontMetrics fm = g.getFontMetrics();
+        String text = "PAUSED";
+        int x = (width - fm.stringWidth(text)) / 2;
+        int y = (height - fm.getHeight()) / 2 + fm.getAscent();
+        g.drawString(text, x, y);
+
+        // Instructions
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 16));
+        fm = g.getFontMetrics();
+        String subText = "Press 'P' to Resume";
+        x = (width - fm.stringWidth(subText)) / 2;
+        y += 40;
+        g.drawString(subText, x, y);
+    }
+
 
     // Draw the grid
     private void drawGrid(Graphics g) {
-        g.setColor(Color.GRAY);
+        g.setColor(new Color(40, 40, 40));
         for (int i = 0; i <= COLS; i++) {
-            g.drawLine(i * TILE_SIZE, 0, i * TILE_SIZE, getHeight());
+            g.drawLine(i * TILE_SIZE, 0, i * TILE_SIZE, ROWS * TILE_SIZE);
         }
         for (int i = 0; i <= ROWS; i++) {
-            g.drawLine(0, i * TILE_SIZE, getWidth(), i * TILE_SIZE);
+            g.drawLine(0, i * TILE_SIZE, COLS * TILE_SIZE, i * TILE_SIZE);
         }
     }
 
@@ -84,11 +126,68 @@ public class GamePanel extends JPanel {
         }
     }
 
-    // Draw score
-    private void drawScore(Graphics g) {
+    // Draw Sidebar
+    private void drawSidebar(Graphics g) {
+        int startX = COLS * TILE_SIZE;
+
+        // Draw Sidebar Background
+        g.setColor(new Color(30, 30, 30));
+        g.fillRect(startX, 0, SIDEBAR_WIDTH, getHeight());
+
+        // Draw Sidebar Border
+        g.setColor(Color.GRAY);
+        g.drawLine(startX, 0, startX, getHeight());
+
+        if (gameEngine == null)
+            return;
+
         g.setColor(Color.WHITE);
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 20));
-        g.drawString("Score: " + score, 10, 30);
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
+
+        // 1. Draw Score
+        g.drawString("SCORE", startX + 20, 50);
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 24));
+        g.drawString(String.valueOf(gameEngine.getScore()), startX + 20, 80);
+
+        // 2. Draw Timer
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
+        g.drawString("TIME", startX + 20, 140);
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 24));
+        int seconds = gameEngine.getSecondsElapsed();
+        String timeStr = String.format("%02d:%02d", seconds / 60, seconds % 60);
+        g.drawString(timeStr, startX + 20, 170);
+
+        // 3. Draw Next Piece Preview
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
+        g.drawString("NEXT", startX + 20, 240);
+        drawNextPiecePreview(g, startX + 20, 260);
+
+        // 4. Game Over Message
+        if (gameEngine.isGameOver()) {
+            g.setColor(Color.RED);
+            g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
+            g.drawString("GAME OVER", startX + 10, ROWS * TILE_SIZE - 50);
+        }
+    }
+
+    // Draw Next Piece Preview
+    private void drawNextPiecePreview(Graphics g, int x, int y) {
+        Piece nextPiece = gameEngine.getNextPiece();
+        if (nextPiece != null) {
+            Color color = nextPiece.getType().getColor();
+            int[][] coords = nextPiece.getType().getCoords();
+
+            // Adjust scale for preview
+            int previewTileSize = 25;
+            for (int[] coord : coords) {
+                g.setColor(color);
+                g.fillRect(x + coord[0] * previewTileSize, y + coord[1] * previewTileSize, previewTileSize,
+                        previewTileSize);
+                g.setColor(color.darker());
+                g.drawRect(x + coord[0] * previewTileSize, y + coord[1] * previewTileSize, previewTileSize,
+                        previewTileSize);
+            }
+        }
     }
 
     // Helper method: To draw a square with a border
@@ -104,4 +203,5 @@ public class GamePanel extends JPanel {
         g.setColor(color.darker());
         g.drawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE); // Draw border
     }
+
 }
