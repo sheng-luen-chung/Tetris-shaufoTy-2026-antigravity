@@ -99,30 +99,56 @@ public class GameEngine {
 
     // Freeze and spawn piece
     private void freezeAndSpawn() {
+        int popupCol = getCurrentPieceCenterCol();
+        int popupRow = getCurrentPieceCenterRow();
         board.freezePiece(currentPiece); // Freeze
         int lines = board.clearLines(); // Clear lines
         if (lines > 0) {
-            updateScore(lines);
+            int points = getLineClearPoints(lines);
+            updateScore(points);
+            panel.addScorePopup(popupCol, popupRow, points);
         }
         spawnNewPiece(); // Spawn
     }
 
-    private void updateScore(int lines) {
+    private int getLineClearPoints(int lines) {
         switch (lines) {
             case 1:
-                score += 100;
-                break;
+                return 100;
             case 2:
-                score += 300;
-                break;
+                return 300;
             case 3:
-                score += 500;
-                break;
+                return 500;
             case 4:
-                score += 800;
-                break;
+                return 800;
+            default:
+                return 0;
         }
+    }
+
+    private void updateScore(int points) {
+        score += points;
         panel.setScore(score);
+    }
+
+    private int getCurrentPieceCenterCol() {
+        int sum = 0;
+        int count = 0;
+        for (int[] coord : currentPiece.getAbsoluteCoords()) {
+            sum += coord[0];
+            count++;
+        }
+        return count == 0 ? 0 : Math.round(sum / (float) count);
+    }
+
+    private int getCurrentPieceCenterRow() {
+        int sum = 0;
+        int count = 0;
+        for (int[] coord : currentPiece.getAbsoluteCoords()) {
+            sum += coord[1];
+            count++;
+        }
+        return count == 0 ? 0 : Math.round(sum / (float) count);
     }
 
     // Generate a random piece

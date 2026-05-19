@@ -7,7 +7,15 @@ import com.tetris.model.Piece;
 
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.AlphaComposite;
+import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Color;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Iterator;
+import javax.swing.Timer;
 
 // Game panel
 public class GamePanel extends JPanel {
@@ -19,10 +27,80 @@ public class GamePanel extends JPanel {
     private Board board;
     private Piece currentPiece;
     private com.tetris.controller.GameEngine gameEngine;
+    
+    // Active score popups
+    private final List<ScorePopup> scorePopups = new ArrayList<>();
+    private final Timer scorePopupTimer;
+
+    // Add a score popup at a grid cell (col, row)
+    public void addScorePopup(int gridCol, int gridRow, int score) {
+        String text = (score >= 0 ? "+" + score : String.valueOf(score));
+        int px = gridCol * TILE_SIZE + TILE_SIZE / 2;
+        int py = gridRow * TILE_SIZE + TILE_SIZE / 2;
+        synchronized (scorePopups) {
+            scorePopups.add(new ScorePopup(text, px, py));
+        }
+        if (!scorePopupTimer.isRunning()) {
+            scorePopupTimer.start();
+        }
+        // Request a repaint so animation starts immediately
+        repaint();
+    }
+
+    // Draw and update active score popups
+    private void drawScorePopups(Graphics g) {
+        if (scorePopups.isEmpty())
+            return;
+
+        Graphics2D g2 = (Graphics2D) g.create();
+        long now = System.currentTimeMillis();
+
+        synchronized (scorePopups) {
+            Iterator<ScorePopup> it = scorePopups.iterator();
+            while (it.hasNext()) {
+                ScorePopup sp = it.next();
+                float elapsed = now - sp.startTime;
+                float progress = Math.min(1.0f, elapsed / (float) sp.duration);
+
+                int y = (int) (sp.startY - sp.rise * progress);
+                float alpha = 1.0f - progress;
+
+                g2.setFont(sp.font);
+                FontMetrics fm = g2.getFontMetrics();
+                int textWidth = fm.stringWidth(sp.text);
+                int textHeight = fm.getAscent();
+
+                // Shadow
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+                g2.setColor(new Color(0, 0, 0, (int) (160 * alpha)));
+                g2.drawString(sp.text, sp.startX - textWidth / 2 + 1, y + textHeight / 2 + 1);
+
+                // Main text
+                g2.setColor(sp.color);
+                g2.drawString(sp.text, sp.startX - textWidth / 2, y + textHeight / 2);
+
+                if (progress >= 1.0f) {
+                    it.remove();
+                }
+            }
+        }
+
+        g2.dispose();
+    }
 
     // Game panel constructor
     public GamePanel(Board board) {
         this.board = board;
+
+        scorePopupTimer = new Timer(16, e -> {
+            synchronized (scorePopups) {
+                if (scorePopups.isEmpty()) {
+                    ((Timer) e.getSource()).stop();
+                    return;
+                }
+            }
+            repaint();
+        });
 
         // Set the size of the game panel (grid + sidebar)
         setPreferredSize(new Dimension(COLS * TILE_SIZE + SIDEBAR_WIDTH, ROWS * TILE_SIZE));
@@ -52,6 +130,9 @@ public class GamePanel extends JPanel {
         drawGrid(g);
         drawFixedBlocks(g);
         drawCurrentPiece(g);
+
+        // Draw active score popups on top of the grid
+        drawScorePopups(g);
 
         // Draw Sidebar (Right)
         drawSidebar(g);
@@ -262,6 +343,25 @@ public class GamePanel extends JPanel {
         // draw a dark border around each block.
         g.setColor(color.darker());
         g.drawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE); // Draw border
+    }
+
+    // Simple score popup structure
+    private static class ScorePopup {
+        final String text;
+        final int startX;
+        final int startY;
+        final long startTime;
+        final int duration = 900; // ms
+        final int rise = 36; // pixels to move up
+        final Color color = new Color(255, 235, 120);
+        final Font font = new Font("Arial", Font.BOLD, 18);
+
+        ScorePopup(String text, int startX, int startY) {
+            this.text = text;
+            this.startX = startX;
+            this.startY = startY;
+            this.startTime = System.currentTimeMillis();
+        }
     }
 
 }
