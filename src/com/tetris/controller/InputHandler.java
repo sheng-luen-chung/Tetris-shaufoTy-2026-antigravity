@@ -39,6 +39,18 @@ public class InputHandler extends KeyAdapter {
             case KeyEvent.VK_ESCAPE:
                 engine.togglePause();
                 break;
+
+            case KeyEvent.VK_1:
+                engine.setDifficulty(GameEngine.Difficulty.EASY);
+                break;
+
+            case KeyEvent.VK_2:
+                engine.setDifficulty(GameEngine.Difficulty.NORMAL);
+                break;
+
+            case KeyEvent.VK_3:
+                engine.setDifficulty(GameEngine.Difficulty.HARD);
+                break;
         }
 
     }
