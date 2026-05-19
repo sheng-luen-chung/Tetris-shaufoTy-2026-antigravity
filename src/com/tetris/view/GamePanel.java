@@ -117,12 +117,39 @@ public class GamePanel extends JPanel {
     // Draw current piece
     private void drawCurrentPiece(Graphics g) {
         if (currentPiece != null) {
+            // Draw ghost first
+            drawGhostPiece(g);
+
             Color color = currentPiece.getType().getColor();
 
             // Get the absolute coordinates of the current piece after rotation
             for (int[] coord : currentPiece.getAbsoluteCoords()) {
                 drawSquare(g, coord[0], coord[1], color);
             }
+        }
+    }
+
+    // Draw the ghost piece
+    private void drawGhostPiece(Graphics g) {
+        if (currentPiece == null)
+            return;
+
+        // Create a copy of the current piece at same pos/rotation
+        com.tetris.model.Piece ghost = new com.tetris.model.Piece(
+            currentPiece.getType(), currentPiece.getRow(),
+            currentPiece.getCol(), currentPiece.getRotationIndex()
+        );
+
+        // Move ghost down
+        while (board.isValidMove(ghost)) {
+            ghost.move(1, 0);
+        }
+        ghost.move(-1, 0);
+
+        // Draw ghost squares
+        Color ghostColor = new Color(255, 255, 255, 80);    // Translucent white
+        for (int[] coord : ghost.getAbsoluteCoords()) {
+            drawSquare(g, coord[0], coord[1], ghostColor);
         }
     }
 
