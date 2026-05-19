@@ -20,6 +20,14 @@ public class Piece {
         this.col = 3;
     }
 
+    // Create a piece with explicit position/rotation (ghost piece)
+    public Piece(Tetromino type, int row, int col, int rotationIndex) {
+        this.type = type;
+        this.row = row;
+        this.col = col;
+        this.rotationIndex = ((rotationIndex % 4) + 4) % 4;
+    }
+
     // Piece move methods
     public void move(int dr, int dc) {
         this.row += dr;
@@ -88,5 +96,17 @@ public class Piece {
             absolute[i][1] = this.row + relative[i][0];
         }
         return absolute;
+    }
+
+    public int getRow() {
+        return row;
+    }
+
+    public int getCol() {
+        return col;
+    }
+
+    public int getRotationIndex() {
+        return rotationIndex;
     }
 }

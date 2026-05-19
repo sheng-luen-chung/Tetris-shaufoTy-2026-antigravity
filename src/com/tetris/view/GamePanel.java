@@ -3,11 +3,20 @@ package com.tetris.view;
 import javax.swing.JPanel;
 
 import com.tetris.model.Board;
+import com.tetris.model.LeaderboardEntry;
 import com.tetris.model.Piece;
 
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.AlphaComposite;
+import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Color;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Iterator;
+import javax.swing.Timer;
 
 // Game panel
 public class GamePanel extends JPanel {
@@ -19,10 +28,80 @@ public class GamePanel extends JPanel {
     private Board board;
     private Piece currentPiece;
     private com.tetris.controller.GameEngine gameEngine;
+    
+    // Active score popups
+    private final List<ScorePopup> scorePopups = new ArrayList<>();
+    private final Timer scorePopupTimer;
+
+    // Add a score popup at a grid cell (col, row)
+    public void addScorePopup(int gridCol, int gridRow, int score) {
+        String text = (score >= 0 ? "+" + score : String.valueOf(score));
+        int px = gridCol * TILE_SIZE + TILE_SIZE / 2;
+        int py = gridRow * TILE_SIZE + TILE_SIZE / 2;
+        synchronized (scorePopups) {
+            scorePopups.add(new ScorePopup(text, px, py));
+        }
+        if (!scorePopupTimer.isRunning()) {
+            scorePopupTimer.start();
+        }
+        // Request a repaint so animation starts immediately
+        repaint();
+    }
+
+    // Draw and update active score popups
+    private void drawScorePopups(Graphics g) {
+        if (scorePopups.isEmpty())
+            return;
+
+        Graphics2D g2 = (Graphics2D) g.create();
+        long now = System.currentTimeMillis();
+
+        synchronized (scorePopups) {
+            Iterator<ScorePopup> it = scorePopups.iterator();
+            while (it.hasNext()) {
+                ScorePopup sp = it.next();
+                float elapsed = now - sp.startTime;
+                float progress = Math.min(1.0f, elapsed / (float) sp.duration);
+
+                int y = (int) (sp.startY - sp.rise * progress);
+                float alpha = 1.0f - progress;
+
+                g2.setFont(sp.font);
+                FontMetrics fm = g2.getFontMetrics();
+                int textWidth = fm.stringWidth(sp.text);
+                int textHeight = fm.getAscent();
+
+                // Shadow
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+                g2.setColor(new Color(0, 0, 0, (int) (160 * alpha)));
+                g2.drawString(sp.text, sp.startX - textWidth / 2 + 1, y + textHeight / 2 + 1);
+
+                // Main text
+                g2.setColor(sp.color);
+                g2.drawString(sp.text, sp.startX - textWidth / 2, y + textHeight / 2);
+
+                if (progress >= 1.0f) {
+                    it.remove();
+                }
+            }
+        }
+
+        g2.dispose();
+    }
 
     // Game panel constructor
     public GamePanel(Board board) {
         this.board = board;
+
+        scorePopupTimer = new Timer(16, e -> {
+            synchronized (scorePopups) {
+                if (scorePopups.isEmpty()) {
+                    ((Timer) e.getSource()).stop();
+                    return;
+                }
+            }
+            repaint();
+        });
 
         // Set the size of the game panel (grid + sidebar)
         setPreferredSize(new Dimension(COLS * TILE_SIZE + SIDEBAR_WIDTH, ROWS * TILE_SIZE));
@@ -52,6 +131,9 @@ public class GamePanel extends JPanel {
         drawGrid(g);
         drawFixedBlocks(g);
         drawCurrentPiece(g);
+
+        // Draw active score popups on top of the grid
+        drawScorePopups(g);
 
         // Draw Sidebar (Right)
         drawSidebar(g);
@@ -117,12 +199,39 @@ public class GamePanel extends JPanel {
     // Draw current piece
     private void drawCurrentPiece(Graphics g) {
         if (currentPiece != null) {
+            // Draw ghost first
+            drawGhostPiece(g);
+
             Color color = currentPiece.getType().getColor();
 
             // Get the absolute coordinates of the current piece after rotation
             for (int[] coord : currentPiece.getAbsoluteCoords()) {
                 drawSquare(g, coord[0], coord[1], color);
             }
+        }
+    }
+
+    // Draw the ghost piece
+    private void drawGhostPiece(Graphics g) {
+        if (currentPiece == null)
+            return;
+
+        // Create a copy of the current piece at same pos/rotation
+        com.tetris.model.Piece ghost = new com.tetris.model.Piece(
+            currentPiece.getType(), currentPiece.getRow(),
+            currentPiece.getCol(), currentPiece.getRotationIndex()
+        );
+
+        // Move ghost down
+        while (board.isValidMove(ghost)) {
+            ghost.move(1, 0);
+        }
+        ghost.move(-1, 0);
+
+        // Draw ghost squares
+        Color ghostColor = new Color(255, 255, 255, 80);    // Translucent white
+        for (int[] coord : ghost.getAbsoluteCoords()) {
+            drawSquare(g, coord[0], coord[1], ghostColor);
         }
     }
 
@@ -169,9 +278,12 @@ public class GamePanel extends JPanel {
         drawNextPiecePreview(g, startX + 20, 320);
 
         // 5. Draw Controls Hints
-        drawControlHints(g, startX + 10, 470);
+        drawControlHints(g, startX + 10, 430);
 
-        // 6. Game Over Message
+        // 6. Draw Leaderboard
+        drawLeaderboard(g, startX + 10, 480);
+
+        // 7. Game Over Message
         if (gameEngine.isGameOver()) {
             g.setColor(Color.RED);
             g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
@@ -181,25 +293,47 @@ public class GamePanel extends JPanel {
 
     // Draw Controls Hints
     private void drawControlHints(Graphics g, int x, int startY) {
-        String[] hints = {
-                "<- / -> : Move",
-                "^ : Rotate",
-                "v : Soft Drop",
-                "Space : Hard Drop",
-                "P / Esc : Pause",
-                "1 / 2 / 3 : Level"
-        };
-
         g.setColor(new Color(210, 210, 210));
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
         g.drawString("CONTROLS", x, startY);
 
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
-        int lineY = startY + 22;
-        int lineHeight = 20;
-        for (String hint : hints) {
-            g.drawString(hint, x, lineY);
-            lineY += lineHeight;
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 11));
+        g.drawString("Arrows Move | Up Rotate | Space Drop", x, startY + 18);
+        g.drawString("P / Esc Pause | 1 / 2 / 3 Level", x, startY + 34);
+    }
+
+    private void drawLeaderboard(Graphics g, int x, int startY) {
+        if (gameEngine == null) {
+            return;
+        }
+
+        List<LeaderboardEntry> entries = gameEngine.getLeaderboardEntries();
+
+        g.setColor(new Color(255, 215, 120));
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
+        g.drawString("LEADERBOARD", x, startY);
+
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 11));
+        int lineY = startY + 18;
+
+        if (entries.isEmpty()) {
+            g.setColor(new Color(210, 210, 210));
+            g.drawString("No scores yet", x, lineY);
+            return;
+        }
+
+        int rank = 1;
+        for (LeaderboardEntry entry : entries) {
+            if (rank > 5) {
+                break;
+            }
+
+            g.setColor(new Color(240, 240, 240));
+            String text = String.format("%d. %d pts | %s | %s", rank, entry.getScore(), entry.getDifficulty(),
+                    entry.getPlayedAtDisplay());
+            g.drawString(text, x, lineY);
+            lineY += 15;
+            rank++;
         }
     }
 
@@ -235,6 +369,25 @@ public class GamePanel extends JPanel {
         // draw a dark border around each block.
         g.setColor(color.darker());
         g.drawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE); // Draw border
+    }
+
+    // Simple score popup structure
+    private static class ScorePopup {
+        final String text;
+        final int startX;
+        final int startY;
+        final long startTime;
+        final int duration = 900; // ms
+        final int rise = 36; // pixels to move up
+        final Color color = new Color(255, 235, 120);
+        final Font font = new Font("Arial", Font.BOLD, 18);
+
+        ScorePopup(String text, int startX, int startY) {
+            this.text = text;
+            this.startX = startX;
+            this.startY = startY;
+            this.startTime = System.currentTimeMillis();
+        }
     }
 
 }

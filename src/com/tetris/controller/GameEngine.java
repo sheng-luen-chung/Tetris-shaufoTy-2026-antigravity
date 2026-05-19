@@ -1,11 +1,13 @@
 package com.tetris.controller;
 
 import com.tetris.model.Board;
+import com.tetris.model.LeaderboardEntry;
 import com.tetris.model.Piece;
 import com.tetris.model.Tetromino;
 import com.tetris.view.GamePanel;
 import javax.swing.Timer;
 import java.util.Random;
+import java.util.List;
 
 public class GameEngine {
     public enum Difficulty {
@@ -38,13 +40,16 @@ public class GameEngine {
     private Timer secondTimer;
     private boolean isGameOver = false;
     private boolean isPaused = false;
+    private boolean leaderboardRecorded = false;
     private int score = 0;
     private int secondsElapsed = 0;
     private Difficulty difficulty = Difficulty.NORMAL;
+    private final LeaderboardManager leaderboardManager;
 
     public GameEngine(Board board, GamePanel panel) {
         this.board = board;
         this.panel = panel;
+        this.leaderboardManager = new LeaderboardManager();
 
         // Initialize pieces
         nextPiece = generateRandomPiece();
@@ -99,30 +104,56 @@ public class GameEngine {
 
     // Freeze and spawn piece
     private void freezeAndSpawn() {
+        int popupCol = getCurrentPieceCenterCol();
+        int popupRow = getCurrentPieceCenterRow();
         board.freezePiece(currentPiece); // Freeze
         int lines = board.clearLines(); // Clear lines
         if (lines > 0) {
-            updateScore(lines);
+            int points = getLineClearPoints(lines);
+            updateScore(points);
+            panel.addScorePopup(popupCol, popupRow, points);
         }
         spawnNewPiece(); // Spawn
     }
 
-    private void updateScore(int lines) {
+    private int getLineClearPoints(int lines) {
         switch (lines) {
             case 1:
-                score += 100;
-                break;
+                return 100;
             case 2:
-                score += 300;
-                break;
+                return 300;
             case 3:
-                score += 500;
-                break;
+                return 500;
             case 4:
-                score += 800;
-                break;
+                return 800;
+            default:
+                return 0;
         }
+    }
+
+    private void updateScore(int points) {
+        score += points;
         panel.setScore(score);
+    }
+
+    private int getCurrentPieceCenterCol() {
+        int sum = 0;
+        int count = 0;
+        for (int[] coord : currentPiece.getAbsoluteCoords()) {
+            sum += coord[0];
+            count++;
+        }
+        return count == 0 ? 0 : Math.round(sum / (float) count);
+    }
+
+    private int getCurrentPieceCenterRow() {
+        int sum = 0;
+        int count = 0;
+        for (int[] coord : currentPiece.getAbsoluteCoords()) {
+            sum += coord[1];
+            count++;
+        }
+        return count == 0 ? 0 : Math.round(sum / (float) count);
     }
 
     // Generate a random piece
@@ -146,8 +177,18 @@ public class GameEngine {
             isGameOver = true;
             gameLoop.stop();
             secondTimer.stop();
+            recordFinalScore();
             System.out.println("Game Over!");
         }
+    }
+
+    private void recordFinalScore() {
+        if (leaderboardRecorded) {
+            return;
+        }
+
+        leaderboardRecorded = true;
+        leaderboardManager.recordScore(score, secondsElapsed, difficulty);
     }
 
     // Getters for UI
@@ -161,6 +202,10 @@ public class GameEngine {
 
     public Piece getNextPiece() {
         return nextPiece;
+    }
+
+    public List<LeaderboardEntry> getLeaderboardEntries() {
+        return leaderboardManager.getTopEntries();
     }
 
     public boolean isGameOver() {
