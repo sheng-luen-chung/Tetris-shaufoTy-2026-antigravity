@@ -3,6 +3,7 @@ package com.tetris.view;
 import javax.swing.JPanel;
 
 import com.tetris.model.Board;
+import com.tetris.model.LeaderboardEntry;
 import com.tetris.model.Piece;
 
 import java.awt.Dimension;
@@ -277,9 +278,12 @@ public class GamePanel extends JPanel {
         drawNextPiecePreview(g, startX + 20, 320);
 
         // 5. Draw Controls Hints
-        drawControlHints(g, startX + 10, 470);
+        drawControlHints(g, startX + 10, 430);
 
-        // 6. Game Over Message
+        // 6. Draw Leaderboard
+        drawLeaderboard(g, startX + 10, 480);
+
+        // 7. Game Over Message
         if (gameEngine.isGameOver()) {
             g.setColor(Color.RED);
             g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
@@ -289,25 +293,47 @@ public class GamePanel extends JPanel {
 
     // Draw Controls Hints
     private void drawControlHints(Graphics g, int x, int startY) {
-        String[] hints = {
-                "<- / -> : Move",
-                "^ : Rotate",
-                "v : Soft Drop",
-                "Space : Hard Drop",
-                "P / Esc : Pause",
-                "1 / 2 / 3 : Level"
-        };
-
         g.setColor(new Color(210, 210, 210));
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
         g.drawString("CONTROLS", x, startY);
 
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
-        int lineY = startY + 22;
-        int lineHeight = 20;
-        for (String hint : hints) {
-            g.drawString(hint, x, lineY);
-            lineY += lineHeight;
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 11));
+        g.drawString("Arrows Move | Up Rotate | Space Drop", x, startY + 18);
+        g.drawString("P / Esc Pause | 1 / 2 / 3 Level", x, startY + 34);
+    }
+
+    private void drawLeaderboard(Graphics g, int x, int startY) {
+        if (gameEngine == null) {
+            return;
+        }
+
+        List<LeaderboardEntry> entries = gameEngine.getLeaderboardEntries();
+
+        g.setColor(new Color(255, 215, 120));
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
+        g.drawString("LEADERBOARD", x, startY);
+
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 11));
+        int lineY = startY + 18;
+
+        if (entries.isEmpty()) {
+            g.setColor(new Color(210, 210, 210));
+            g.drawString("No scores yet", x, lineY);
+            return;
+        }
+
+        int rank = 1;
+        for (LeaderboardEntry entry : entries) {
+            if (rank > 5) {
+                break;
+            }
+
+            g.setColor(new Color(240, 240, 240));
+            String text = String.format("%d. %d pts | %s | %s", rank, entry.getScore(), entry.getDifficulty(),
+                    entry.getPlayedAtDisplay());
+            g.drawString(text, x, lineY);
+            lineY += 15;
+            rank++;
         }
     }
 

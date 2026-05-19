@@ -1,11 +1,13 @@
 package com.tetris.controller;
 
 import com.tetris.model.Board;
+import com.tetris.model.LeaderboardEntry;
 import com.tetris.model.Piece;
 import com.tetris.model.Tetromino;
 import com.tetris.view.GamePanel;
 import javax.swing.Timer;
 import java.util.Random;
+import java.util.List;
 
 public class GameEngine {
     public enum Difficulty {
@@ -38,13 +40,16 @@ public class GameEngine {
     private Timer secondTimer;
     private boolean isGameOver = false;
     private boolean isPaused = false;
+    private boolean leaderboardRecorded = false;
     private int score = 0;
     private int secondsElapsed = 0;
     private Difficulty difficulty = Difficulty.NORMAL;
+    private final LeaderboardManager leaderboardManager;
 
     public GameEngine(Board board, GamePanel panel) {
         this.board = board;
         this.panel = panel;
+        this.leaderboardManager = new LeaderboardManager();
 
         // Initialize pieces
         nextPiece = generateRandomPiece();
@@ -172,8 +177,18 @@ public class GameEngine {
             isGameOver = true;
             gameLoop.stop();
             secondTimer.stop();
+            recordFinalScore();
             System.out.println("Game Over!");
         }
+    }
+
+    private void recordFinalScore() {
+        if (leaderboardRecorded) {
+            return;
+        }
+
+        leaderboardRecorded = true;
+        leaderboardManager.recordScore(score, secondsElapsed, difficulty);
     }
 
     // Getters for UI
@@ -187,6 +202,10 @@ public class GameEngine {
 
     public Piece getNextPiece() {
         return nextPiece;
+    }
+
+    public List<LeaderboardEntry> getLeaderboardEntries() {
+        return leaderboardManager.getTopEntries();
     }
 
     public boolean isGameOver() {
