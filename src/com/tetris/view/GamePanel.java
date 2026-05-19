@@ -14,7 +14,7 @@ public class GamePanel extends JPanel {
     public static final int TILE_SIZE = 30;
     private static final int COLS = 10;
     private static final int ROWS = 20;
-    private static final int SIDEBAR_WIDTH = 150;
+    private static final int SIDEBAR_WIDTH = 170;
 
     private Board board;
     private Piece currentPiece;
@@ -159,14 +159,47 @@ public class GamePanel extends JPanel {
 
         // 3. Draw Next Piece Preview
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
-        g.drawString("NEXT", startX + 20, 240);
-        drawNextPiecePreview(g, startX + 20, 260);
+        g.drawString("LEVEL", startX + 20, 220);
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 20));
+        g.drawString(gameEngine.getDifficulty().getLabel(), startX + 20, 245);
 
-        // 4. Game Over Message
+        // 4. Draw Next Piece Preview
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
+        g.drawString("NEXT", startX + 20, 300);
+        drawNextPiecePreview(g, startX + 20, 320);
+
+        // 5. Draw Controls Hints
+        drawControlHints(g, startX + 10, 470);
+
+        // 6. Game Over Message
         if (gameEngine.isGameOver()) {
             g.setColor(Color.RED);
             g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
-            g.drawString("GAME OVER", startX + 10, ROWS * TILE_SIZE - 50);
+            g.drawString("GAME OVER", startX + 10, ROWS * TILE_SIZE - 170);
+        }
+    }
+
+    // Draw Controls Hints
+    private void drawControlHints(Graphics g, int x, int startY) {
+        String[] hints = {
+                "<- / -> : Move",
+                "^ : Rotate",
+                "v : Soft Drop",
+                "Space : Hard Drop",
+                "P / Esc : Pause",
+                "1 / 2 / 3 : Level"
+        };
+
+        g.setColor(new Color(210, 210, 210));
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
+        g.drawString("CONTROLS", x, startY);
+
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
+        int lineY = startY + 22;
+        int lineHeight = 20;
+        for (String hint : hints) {
+            g.drawString(hint, x, lineY);
+            lineY += lineHeight;
         }
     }
 

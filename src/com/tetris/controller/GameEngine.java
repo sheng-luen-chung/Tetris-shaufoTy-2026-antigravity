@@ -8,6 +8,28 @@ import javax.swing.Timer;
 import java.util.Random;
 
 public class GameEngine {
+    public enum Difficulty {
+        EASY("EASY", 700),
+        NORMAL("NORMAL", 500),
+        HARD("HARD", 300);
+
+        private final String label;
+        private final int fallDelayMs;
+
+        Difficulty(String label, int fallDelayMs) {
+            this.label = label;
+            this.fallDelayMs = fallDelayMs;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public int getFallDelayMs() {
+            return fallDelayMs;
+        }
+    }
+
     private Board board;
     private GamePanel panel;
     private Piece currentPiece;
@@ -18,6 +40,7 @@ public class GameEngine {
     private boolean isPaused = false;
     private int score = 0;
     private int secondsElapsed = 0;
+    private Difficulty difficulty = Difficulty.NORMAL;
 
     public GameEngine(Board board, GamePanel panel) {
         this.board = board;
@@ -28,7 +51,7 @@ public class GameEngine {
         spawnNewPiece();
 
         // Set game loop (falling piece)
-        gameLoop = new Timer(500, e -> {
+        gameLoop = new Timer(difficulty.getFallDelayMs(), e -> {
             if (!isPaused) {
                 update();
             }
@@ -146,6 +169,20 @@ public class GameEngine {
 
     public boolean isPaused() {
         return isPaused;
+    }
+
+    public Difficulty getDifficulty() {
+        return difficulty;
+    }
+
+    public void setDifficulty(Difficulty difficulty) {
+        if (difficulty == null || this.difficulty == difficulty) {
+            return;
+        }
+        this.difficulty = difficulty;
+        gameLoop.setDelay(difficulty.getFallDelayMs());
+        gameLoop.setInitialDelay(difficulty.getFallDelayMs());
+        panel.repaint();
     }
 
     // Move piece left
