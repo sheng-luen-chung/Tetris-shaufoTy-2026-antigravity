@@ -166,7 +166,7 @@ public class GameEngine {
         if (lines > 0) {
             int points = getLineClearPoints(lines);
             updateScore(points);
-            panel.addScorePopup(popupCol, popupRow, points);
+            panel.addScorePopup(popupCol, popupRow, points, lines);
         }
         spawnNewPiece(); // Spawn
         canHoldThisTurn = true; // Reset hold status for the next turn

@@ -14,6 +14,7 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Color;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
@@ -67,17 +68,48 @@ public class GamePanel extends JPanel {
     }
 
     // Add a score popup at a grid cell (col, row)
-    public void addScorePopup(int gridCol, int gridRow, int score) {
-        String text = (score >= 0 ? "+" + score : String.valueOf(score));
-        int px = gridCol * TILE_SIZE + TILE_SIZE / 2;
-        int py = gridRow * TILE_SIZE + TILE_SIZE / 2;
+    public void addScorePopup(int gridCol, int gridRow, int score, int lines) {
+        String scoreText = "+" + score;
+        String lineText = "";
+        Color popupColor = new Color(255, 235, 120); // Default gold
+        Font font = new Font("Arial", Font.BOLD, 24); // Font size
+
+        switch (lines) {
+            case 1:
+                lineText = "SINGLE";
+                popupColor = new Color(0, 255, 100); // Neon green
+                break;
+            case 2:
+                lineText = "DOUBLE";
+                popupColor = new Color(0, 255, 255); // Neon cyan
+                break;
+            case 3:
+                lineText = "TRIPLE";
+                popupColor = new Color(255, 100, 255); // Neon magenta
+                break;
+            case 4:
+                lineText = "TETRIS!";
+                popupColor = new Color(255, 215, 0); // Gold
+                font = new Font("Impact", Font.BOLD, 44); // Size 44 instead of 30!
+                break;
+            default:
+                lineText = "CLEAR";
+                break;
+        }
+
+        // Center popup horizontally in the grid
+        int px = (COLS * TILE_SIZE) / 2;
+        int py = gridRow * TILE_SIZE;
+        if (py < 120) {
+            py = 120; // Keep it low enough to not be cut off by top border
+        }
+
         synchronized (scorePopups) {
-            scorePopups.add(new ScorePopup(text, px, py));
+            scorePopups.add(new ScorePopup(lineText, scoreText, px, py, popupColor, font));
         }
         if (!scorePopupTimer.isRunning()) {
             scorePopupTimer.start();
         }
-        // Request a repaint so animation starts immediately
         repaint();
     }
 
@@ -87,6 +119,8 @@ public class GamePanel extends JPanel {
             return;
 
         Graphics2D g2 = (Graphics2D) g.create();
+        // Enable anti-aliasing for smooth rendering of text
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         long now = System.currentTimeMillis();
 
         synchronized (scorePopups) {
@@ -99,19 +133,33 @@ public class GamePanel extends JPanel {
                 int y = (int) (sp.startY - sp.rise * progress);
                 float alpha = 1.0f - progress;
 
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+
+                // 1. Draw Line clear text (e.g. TETRIS!)
                 g2.setFont(sp.font);
-                FontMetrics fm = g2.getFontMetrics();
-                int textWidth = fm.stringWidth(sp.text);
-                int textHeight = fm.getAscent();
+                FontMetrics fmLine = g2.getFontMetrics();
+                int lineW = fmLine.stringWidth(sp.lineText);
+                int lineH = fmLine.getAscent();
 
                 // Shadow
-                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
-                g2.setColor(new Color(0, 0, 0, (int) (160 * alpha)));
-                g2.drawString(sp.text, sp.startX - textWidth / 2 + 1, y + textHeight / 2 + 1);
-
-                // Main text
+                g2.setColor(new Color(0, 0, 0, (int) (200 * alpha)));
+                g2.drawString(sp.lineText, sp.startX - lineW / 2 + 2, y + 2);
+                // Main
                 g2.setColor(sp.color);
-                g2.drawString(sp.text, sp.startX - textWidth / 2, y + textHeight / 2);
+                g2.drawString(sp.lineText, sp.startX - lineW / 2, y);
+
+                // 2. Draw Score text (e.g. +800) right below it
+                g2.setFont(new Font("Arial", Font.BOLD, 22)); // Score font size
+                FontMetrics fmScore = g2.getFontMetrics();
+                int scoreW = fmScore.stringWidth(sp.scoreText);
+                int scoreY = y + lineH + 6;
+
+                // Shadow
+                g2.setColor(new Color(0, 0, 0, (int) (180 * alpha)));
+                g2.drawString(sp.scoreText, sp.startX - scoreW / 2 + 1, scoreY + 1);
+                // Main
+                g2.setColor(Color.WHITE);
+                g2.drawString(sp.scoreText, sp.startX - scoreW / 2, scoreY);
 
                 if (progress >= 1.0f) {
                     it.remove();
@@ -914,8 +962,8 @@ public class GamePanel extends JPanel {
 
         // 1. Draw Score
         g.drawString("SCORE", startX + 20, 45);
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 24));
-        g.drawString(String.valueOf(gameEngine.getScore()), startX + 20, 70);
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 30));
+        g.drawString(String.valueOf(gameEngine.getScore()), startX + 20, 72);
 
         // 2. Draw Timer
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
@@ -1059,20 +1107,24 @@ public class GamePanel extends JPanel {
 
     // Simple score popup structure
     private static class ScorePopup {
-        final String text;
+        final String lineText;
+        final String scoreText;
         final int startX;
         final int startY;
         final long startTime;
-        final int duration = 900; // ms
-        final int rise = 36; // pixels to move up
-        final Color color = new Color(255, 235, 120);
-        final Font font = new Font("Arial", Font.BOLD, 18);
+        final int duration = 1200; // ms (slightly longer for readability)
+        final int rise = 50; // pixels to move up
+        final Color color;
+        final Font font;
 
-        ScorePopup(String text, int startX, int startY) {
-            this.text = text;
+        ScorePopup(String lineText, String scoreText, int startX, int startY, Color color, Font font) {
+            this.lineText = lineText;
+            this.scoreText = scoreText;
             this.startX = startX;
             this.startY = startY;
             this.startTime = System.currentTimeMillis();
+            this.color = color;
+            this.font = font;
         }
     }
 
