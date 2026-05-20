@@ -35,9 +35,10 @@ public class GamePanel extends JPanel {
     private Piece currentPiece;
     private com.tetris.controller.GameEngine gameEngine;
     
-    // Active score popups
+    // Active score popups & particles
     private final List<ScorePopup> scorePopups = new ArrayList<>();
-    private final Timer scorePopupTimer;
+    private final List<Particle> particles = new ArrayList<>();
+    private final Timer animationTimer;
 
     // Menu properties
     private int selectedMenuIndex = 0;
@@ -68,33 +69,69 @@ public class GamePanel extends JPanel {
     }
 
     // Add a score popup at a grid cell (col, row)
-    public void addScorePopup(int gridCol, int gridRow, int score, int lines) {
+    public void addScorePopup(int gridCol, int gridRow, int score, int lines, boolean isTSpin, int comboCount) {
         String scoreText = "+" + score;
         String lineText = "";
+        String comboText = (comboCount >= 1) ? ((comboCount + 1) + " COMBO!") : "";
         Color popupColor = new Color(255, 235, 120); // Default gold
         Font font = new Font("Arial", Font.BOLD, 24); // Font size
 
-        switch (lines) {
-            case 1:
-                lineText = "SINGLE";
-                popupColor = new Color(0, 255, 100); // Neon green
-                break;
-            case 2:
-                lineText = "DOUBLE";
-                popupColor = new Color(0, 255, 255); // Neon cyan
-                break;
-            case 3:
-                lineText = "TRIPLE";
-                popupColor = new Color(255, 100, 255); // Neon magenta
-                break;
-            case 4:
-                lineText = "TETRIS!";
-                popupColor = new Color(255, 215, 0); // Gold
-                font = new Font("Impact", Font.BOLD, 44); // Size 44 instead of 30!
-                break;
-            default:
-                lineText = "CLEAR";
-                break;
+        if (isTSpin) {
+            switch (lines) {
+                case 0:
+                    lineText = "T-SPIN";
+                    popupColor = new Color(255, 0, 255); // Neon Purple
+                    font = new Font("Impact", Font.BOLD, 28);
+                    break;
+                case 1:
+                    lineText = "T-SPIN SINGLE!";
+                    popupColor = new Color(255, 100, 255); // Neon Magenta
+                    font = new Font("Impact", Font.BOLD, 28);
+                    break;
+                case 2:
+                    lineText = "T-SPIN DOUBLE!!";
+                    popupColor = new Color(255, 215, 0); // Neon Gold
+                    font = new Font("Impact", Font.BOLD, 32);
+                    break;
+                case 3:
+                    lineText = "T-SPIN TRIPLE!!!";
+                    popupColor = new Color(255, 50, 50); // Neon Red
+                    font = new Font("Impact", Font.BOLD, 36);
+                    break;
+                default:
+                    lineText = "T-SPIN CLEAR";
+                    popupColor = new Color(255, 0, 255);
+                    font = new Font("Impact", Font.BOLD, 28);
+                    break;
+            }
+        } else {
+            switch (lines) {
+                case 1:
+                    lineText = "SINGLE";
+                    popupColor = new Color(0, 255, 100); // Neon green
+                    break;
+                case 2:
+                    lineText = "DOUBLE";
+                    popupColor = new Color(0, 255, 255); // Neon cyan
+                    break;
+                case 3:
+                    lineText = "TRIPLE";
+                    popupColor = new Color(255, 100, 255); // Neon magenta
+                    break;
+                case 4:
+                    lineText = "TETRIS!";
+                    popupColor = new Color(255, 215, 0); // Gold
+                    font = new Font("Impact", Font.BOLD, 44); // Size 44 instead of 30!
+                    break;
+                default:
+                    lineText = "";
+                    break;
+            }
+        }
+
+        // If no lines cleared and not a T-spin, we don't display anything unless it's a raw T-Spin
+        if (lineText.isEmpty() && score <= 0) {
+            return;
         }
 
         // Center popup horizontally in the grid
@@ -105,10 +142,10 @@ public class GamePanel extends JPanel {
         }
 
         synchronized (scorePopups) {
-            scorePopups.add(new ScorePopup(lineText, scoreText, px, py, popupColor, font));
+            scorePopups.add(new ScorePopup(lineText, scoreText, comboText, px, py, popupColor, font));
         }
-        if (!scorePopupTimer.isRunning()) {
-            scorePopupTimer.start();
+        if (!animationTimer.isRunning()) {
+            animationTimer.start();
         }
         repaint();
     }
@@ -161,6 +198,21 @@ public class GamePanel extends JPanel {
                 g2.setColor(Color.WHITE);
                 g2.drawString(sp.scoreText, sp.startX - scoreW / 2, scoreY);
 
+                // 3. Draw Combo text if present
+                if (sp.comboText != null && !sp.comboText.isEmpty()) {
+                    g2.setFont(new Font("Impact", Font.ITALIC, 22));
+                    FontMetrics fmCombo = g2.getFontMetrics();
+                    int comboW = fmCombo.stringWidth(sp.comboText);
+                    int comboY = scoreY + fmScore.getAscent() + 10;
+
+                    // Shadow
+                    g2.setColor(new Color(0, 0, 0, (int) (180 * alpha)));
+                    g2.drawString(sp.comboText, sp.startX - comboW / 2 + 1, comboY + 1);
+                    // Main - Neon Orange/Gold
+                    g2.setColor(new Color(255, 140, 0));
+                    g2.drawString(sp.comboText, sp.startX - comboW / 2, comboY);
+                }
+
                 if (progress >= 1.0f) {
                     it.remove();
                 }
@@ -174,14 +226,31 @@ public class GamePanel extends JPanel {
     public GamePanel(Board board) {
         this.board = board;
 
-        scorePopupTimer = new Timer(16, e -> {
+        animationTimer = new Timer(16, e -> {
+            boolean active = false;
             synchronized (scorePopups) {
-                if (scorePopups.isEmpty()) {
-                    ((Timer) e.getSource()).stop();
-                    return;
+                if (!scorePopups.isEmpty()) {
+                    active = true;
                 }
             }
-            repaint();
+            synchronized (particles) {
+                if (!particles.isEmpty()) {
+                    active = true;
+                    Iterator<Particle> it = particles.iterator();
+                    while (it.hasNext()) {
+                        Particle p = it.next();
+                        p.update();
+                        if (p.life <= 0) {
+                            it.remove();
+                        }
+                    }
+                }
+            }
+            if (!active) {
+                ((Timer) e.getSource()).stop();
+            } else {
+                repaint();
+            }
         });
 
         // Initialize floating pieces for the menu background
@@ -324,6 +393,9 @@ public class GamePanel extends JPanel {
                 drawGrid(g);
                 drawFixedBlocks(g);
                 drawCurrentPiece(g);
+
+                // Draw particles inside the grid area
+                drawParticles(g);
 
                 // Draw active score popups on top of the grid
                 drawScorePopups(g);
@@ -1126,6 +1198,7 @@ public class GamePanel extends JPanel {
     private static class ScorePopup {
         final String lineText;
         final String scoreText;
+        final String comboText;
         final int startX;
         final int startY;
         final long startTime;
@@ -1134,14 +1207,117 @@ public class GamePanel extends JPanel {
         final Color color;
         final Font font;
 
-        ScorePopup(String lineText, String scoreText, int startX, int startY, Color color, Font font) {
+        ScorePopup(String lineText, String scoreText, String comboText, int startX, int startY, Color color, Font font) {
             this.lineText = lineText;
             this.scoreText = scoreText;
+            this.comboText = comboText;
             this.startX = startX;
             this.startY = startY;
             this.startTime = System.currentTimeMillis();
             this.color = color;
             this.font = font;
+        }
+    }
+
+    // Particle structure for visual effects
+    private static class Particle {
+        double x, y;
+        double vx, vy;
+        Color color;
+        float life = 1.0f;
+        float decay;
+        int size;
+
+        Particle(double x, double y, Color color, int size, double angle, double speed, float decay) {
+            this.x = x;
+            this.y = y;
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed;
+            this.color = color;
+            this.size = size;
+            this.decay = decay;
+        }
+
+        void update() {
+            x += vx;
+            y += vy;
+            vy += 0.08; // subtle gravity downwards
+            vx *= 0.98; // slight drag
+            life -= decay;
+        }
+    }
+
+    // Spawns particles for row clears
+    public void spawnRowClearParticles(int gridRow, Color[] rowColors) {
+        int py = gridRow * TILE_SIZE + TILE_SIZE / 2;
+        Random rand = new Random();
+        synchronized (particles) {
+            for (int col = 0; col < COLS; col++) {
+                int px = col * TILE_SIZE + TILE_SIZE / 2;
+                Color colColor = rowColors[col];
+                if (colColor == null) {
+                    colColor = Color.CYAN;
+                }
+                
+                // Spawn 6 particles per column cell
+                for (int i = 0; i < 6; i++) {
+                    double angle = rand.nextDouble() * Math.PI * 2;
+                    double speed = 0.8 + rand.nextDouble() * 3.8;
+                    float decay = 0.015f + rand.nextFloat() * 0.02f;
+                    int size = 3 + rand.nextInt(5);
+                    
+                    particles.add(new Particle(px, py, colColor, size, angle, speed, decay));
+                }
+            }
+        }
+        if (!animationTimer.isRunning()) {
+            animationTimer.start();
+        }
+    }
+
+    // Spawns particles when a piece lands/hard drops
+    public void spawnDropParticles(Piece piece) {
+        if (piece == null) return;
+        Color color = piece.getType().getColor();
+        Random rand = new Random();
+        synchronized (particles) {
+            for (int[] coord : piece.getAbsoluteCoords()) {
+                int col = coord[0];
+                int row = coord[1];
+                
+                int px = col * TILE_SIZE + TILE_SIZE / 2;
+                int py = (row + 1) * TILE_SIZE; // bottom edge of the block
+                
+                // Spawn 4 dust/spark particles per block
+                for (int i = 0; i < 4; i++) {
+                    double angle = -Math.PI / 4.0 - rand.nextDouble() * (Math.PI / 2.0);
+                    double speed = 0.5 + rand.nextDouble() * 2.2;
+                    float decay = 0.035f + rand.nextFloat() * 0.025f;
+                    int size = 2 + rand.nextInt(3);
+                    
+                    particles.add(new Particle(px, py, color, size, angle, speed, decay));
+                }
+            }
+        }
+        if (!animationTimer.isRunning()) {
+            animationTimer.start();
+        }
+    }
+
+    // Draw active particles in the grid area
+    private void drawParticles(Graphics g) {
+        synchronized (particles) {
+            if (particles.isEmpty()) return;
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            
+            for (Particle p : particles) {
+                if (p.life <= 0) continue;
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, p.life));
+                g2.setColor(p.color);
+                g2.fillOval((int) (p.x - p.size / 2.0), (int) (p.y - p.size / 2.0), p.size, p.size);
+            }
+            g2.dispose();
         }
     }
 

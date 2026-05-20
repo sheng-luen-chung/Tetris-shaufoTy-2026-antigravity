@@ -51,6 +51,8 @@ public class GameEngine {
     private boolean leaderboardRecorded = false;
     private int score = 0;
     private int secondsElapsed = 0;
+    private int comboCount = -1; // -1 means no combo, 0+ means consecutive clears
+    private boolean lastMoveWasRotation = false;
     private Difficulty difficulty = Difficulty.NORMAL;
     private final LeaderboardManager leaderboardManager;
     private GameState gameState = GameState.MENU;
@@ -93,6 +95,7 @@ public class GameEngine {
         board.clear();
         score = 0;
         secondsElapsed = 0;
+        comboCount = -1;
         isGameOver = false;
         isPaused = false;
         leaderboardRecorded = false;
@@ -151,7 +154,10 @@ public class GameEngine {
         // 2. Check collision
         if (!board.isValidMove(currentPiece)) { // Collision
             currentPiece.move(-1, 0); // Reposition (move back up)
+            panel.spawnDropParticles(currentPiece); // Landing particles
             freezeAndSpawn(); // Freeze and spawn
+        } else {
+            lastMoveWasRotation = false; // Successfully moved down
         }
 
         panel.repaint(); // Repaint
@@ -162,28 +168,102 @@ public class GameEngine {
         int popupCol = getCurrentPieceCenterCol();
         int popupRow = getCurrentPieceCenterRow();
         board.freezePiece(currentPiece); // Freeze
+
+        // Check full rows before clearing to spawn block-colored particles
+        java.util.List<Integer> fullRows = new java.util.ArrayList<>();
+        java.awt.Color[][] grid = board.getGrid();
+        for (int r = 0; r < Board.ROWS; r++) {
+            boolean isFull = true;
+            for (int c = 0; c < Board.COLS; c++) {
+                if (grid[r][c] == null) {
+                    isFull = false;
+                    break;
+                }
+            }
+            if (isFull) {
+                fullRows.add(r);
+            }
+        }
+
+        // Spawn particles for each full row!
+        if (!fullRows.isEmpty()) {
+            for (int r : fullRows) {
+                java.awt.Color[] rowColors = new java.awt.Color[Board.COLS];
+                for (int c = 0; c < Board.COLS; c++) {
+                    rowColors[c] = grid[r][c];
+                }
+                panel.spawnRowClearParticles(r, rowColors);
+            }
+        }
+
+        // Detect T-Spin before clearing lines but after piece is in final position
+        boolean isTSpin = checkTSpin();
+
         int lines = board.clearLines(); // Clear lines
+        
+        // Update Combo
         if (lines > 0) {
-            int points = getLineClearPoints(lines);
+            comboCount++;
+        } else {
+            comboCount = -1;
+        }
+
+        if (lines > 0 || isTSpin) {
+            int points = getLineClearPoints(lines, isTSpin);
+            
+            // Add Combo Bonus
+            if (comboCount > 0) {
+                points += 50 * comboCount;
+            }
+            
             updateScore(points);
-            panel.addScorePopup(popupCol, popupRow, points, lines);
+            panel.addScorePopup(popupCol, popupRow, points, lines, isTSpin, comboCount);
         }
         spawnNewPiece(); // Spawn
         canHoldThisTurn = true; // Reset hold status for the next turn
     }
 
-    private int getLineClearPoints(int lines) {
-        switch (lines) {
-            case 1:
-                return 100;
-            case 2:
-                return 300;
-            case 3:
-                return 500;
-            case 4:
-                return 800;
-            default:
-                return 0;
+    private boolean checkTSpin() {
+        if (currentPiece.getType() != Tetromino.T || !lastMoveWasRotation) {
+            return false;
+        }
+
+        int r = currentPiece.getRow();
+        int c = currentPiece.getCol();
+
+        // 4 corners relative to (1,1) center: (0,0), (0,2), (2,0), (2,2)
+        int[][] corners = {
+            {r + 0, c + 0}, {r + 0, c + 2},
+            {r + 2, c + 0}, {r + 2, c + 2}
+        };
+
+        int count = 0;
+        for (int[] corner : corners) {
+            if (board.isOccupied(corner[0], corner[1])) {
+                count++;
+            }
+        }
+
+        return count >= 3;
+    }
+
+    private int getLineClearPoints(int lines, boolean isTSpin) {
+        if (isTSpin) {
+            switch (lines) {
+                case 0: return 400;
+                case 1: return 800;
+                case 2: return 1200;
+                case 3: return 1600;
+                default: return 0;
+            }
+        } else {
+            switch (lines) {
+                case 1: return 100;
+                case 2: return 300;
+                case 3: return 500;
+                case 4: return 800;
+                default: return 0;
+            }
         }
     }
 
@@ -354,14 +434,18 @@ public class GameEngine {
     public void movePieceLeft() {
         if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
-        handleMove(0, -1);
+        if (handleMove(0, -1)) {
+            lastMoveWasRotation = false;
+        }
     }
 
     // Move piece right
     public void movePieceRight() {
         if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
-        handleMove(0, 1);
+        if (handleMove(0, 1)) {
+            lastMoveWasRotation = false;
+        }
     }
 
     // Rotate piece
@@ -372,6 +456,8 @@ public class GameEngine {
         if (!board.isValidMove(currentPiece)) {
             // If collision, cancel rotation
             currentPiece.undoRotate();
+        } else {
+            lastMoveWasRotation = true;
         }
         panel.repaint();
     }
@@ -380,11 +466,19 @@ public class GameEngine {
     public void dropPiece() {
         if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
+        int startRow = currentPiece.getRow();
         while (board.isValidMove(currentPiece)) {
             currentPiece.move(1, 0);
         }
         // Move back to last valid position
         currentPiece.move(-1, 0);
+
+        int endRow = currentPiece.getRow();
+        if (endRow > startRow) {
+            panel.spawnDropParticles(currentPiece);
+            lastMoveWasRotation = false;
+        }
+
         freezeAndSpawn();
         panel.repaint();
     }
@@ -421,12 +515,14 @@ public class GameEngine {
     }
 
     // Handle move
-    private void handleMove(int dx, int dy) {
+    private boolean handleMove(int dx, int dy) {
         currentPiece.move(dx, dy);
         if (!board.isValidMove(currentPiece)) {
             currentPiece.move(-dx, -dy); // Collision
+            return false;
         }
         panel.repaint();
+        return true;
     }
 
 }
