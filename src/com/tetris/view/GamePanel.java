@@ -29,7 +29,7 @@ public class GamePanel extends JPanel {
     public static final int TILE_SIZE = 30;
     private static final int COLS = 10;
     private static final int ROWS = 20;
-    private static final int SIDEBAR_WIDTH = 170;
+    private static final int SIDEBAR_WIDTH = 200;
 
     private Board board;
     private Piece currentPiece;
@@ -967,51 +967,111 @@ public class GamePanel extends JPanel {
 
         // 2. Draw Timer
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
-        g.drawString("TIME", startX + 20, 110);
+        g.drawString("TIME", startX + 20, 108);
         g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 24));
         int seconds = gameEngine.getSecondsElapsed();
         String timeStr = String.format("%02d:%02d", seconds / 60, seconds % 60);
-        g.drawString(timeStr, startX + 20, 135);
+        g.drawString(timeStr, startX + 20, 133);
 
         // 3. Draw Level
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
-        g.drawString("LEVEL", startX + 20, 175);
+        g.drawString("LEVEL", startX + 20, 170);
         g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 20));
-        g.drawString(gameEngine.getDifficulty().getLabel(), startX + 20, 200);
+        g.drawString(gameEngine.getDifficulty().getLabel(), startX + 20, 195);
 
-        // 4. Draw Next Piece Preview
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
-        g.drawString("NEXT", startX + 20, 240);
-        drawNextPiecePreview(g, startX + 35, 260);
+        // 4. Previews Side-by-Side (NEXT & HOLD)
+        int boxY = 215;
+        int boxW = 80;
+        int boxH = 85;
 
-        // 5. Draw Held Piece Preview
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
-        g.drawString("HOLD", startX + 20, 335);
-        drawHeldPiecePreview(g, startX + 35, 355);
+        // Next Box
+        int nextBoxX = startX + 15;
+        g.setColor(new Color(255, 255, 255, 15));
+        g.fillRoundRect(nextBoxX, boxY, boxW, boxH, 8, 8);
+        g.setColor(new Color(255, 255, 255, 45));
+        g.drawRoundRect(nextBoxX, boxY, boxW, boxH, 8, 8);
 
-        // 6. Draw Controls Hints
-        drawControlHints(g, startX + 10, 430);
+        g.setColor(new Color(0, 255, 255)); // Cyan title for NEXT
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
+        g.drawString("NEXT", nextBoxX + 8, boxY + 18);
 
-        // 7. Draw Leaderboard
-        drawLeaderboard(g, startX + 10, 485);
+        Piece nextPiece = gameEngine.getNextPiece();
+        if (nextPiece != null) {
+            drawCenteredPiece(g, nextPiece.getType(), nextBoxX, boxY + 20, boxW, boxH - 22);
+        }
 
-        // 8. Game Over Message
+        // Hold Box
+        int holdBoxX = startX + 105;
+        g.setColor(new Color(255, 255, 255, 15));
+        g.fillRoundRect(holdBoxX, boxY, boxW, boxH, 8, 8);
+        g.setColor(new Color(255, 255, 255, 45));
+        g.drawRoundRect(holdBoxX, boxY, boxW, boxH, 8, 8);
+
+        g.setColor(new Color(255, 100, 255)); // Neon magenta title for HOLD
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
+        g.drawString("HOLD", holdBoxX + 8, boxY + 18);
+
+        Piece heldPiece = gameEngine.getHeldPiece();
+        if (heldPiece != null) {
+            drawCenteredPiece(g, heldPiece.getType(), holdBoxX, boxY + 20, boxW, boxH - 22);
+        } else {
+            g.setColor(new Color(150, 150, 180));
+            g.setFont(new java.awt.Font("Arial", java.awt.Font.ITALIC, 11));
+            int emptyW = g.getFontMetrics().stringWidth("[Empty]");
+            g.drawString("[Empty]", holdBoxX + (boxW - emptyW) / 2, boxY + 20 + (boxH - 22)/2 + 4);
+        }
+
+        // 5. Draw Leaderboard (Controls hints deleted to free up space)
+        drawLeaderboard(g, startX + 15, 330);
+
+        // 6. Game Over Message
         if (gameEngine.isGameOver()) {
             g.setColor(Color.RED);
             g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
-            g.drawString("GAME OVER", startX + 10, ROWS * TILE_SIZE - 170);
+            g.drawString("GAME OVER", startX + 15, 435);
         }
     }
 
-    // Draw Controls Hints
-    private void drawControlHints(Graphics g, int x, int startY) {
-        g.setColor(new Color(210, 210, 210));
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
-        g.drawString("CONTROLS", x, startY);
+    // Helper: Draw centered piece in preview boxes
+    private void drawCenteredPiece(Graphics g, com.tetris.model.Tetromino type, int boxX, int boxY, int boxW, int boxH) {
+        if (type == null) return;
+        int[][] coords = type.getCoords();
 
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 11));
-        g.drawString("Arrows Move | Up Rotate", x, startY + 16);
-        g.drawString("Space Drop | C/Shift Hold | P/Esc Pause", x, startY + 30);
+        int minX = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int maxY = Integer.MIN_VALUE;
+
+        for (int[] cell : coords) {
+            int cx = cell[0];
+            int cy = cell[1];
+            if (cx < minX) minX = cx;
+            if (cx > maxX) maxX = cx;
+            if (cy < minY) minY = cy;
+            if (cy > maxY) maxY = cy;
+        }
+
+        int spanX = maxX - minX + 1;
+        int spanY = maxY - minY + 1;
+
+        int tileSize = 16;
+        int pieceW = spanX * tileSize;
+        int pieceH = spanY * tileSize;
+
+        int offsetX = boxX + (boxW - pieceW) / 2 - minX * tileSize;
+        int offsetY = boxY + (boxH - pieceH) / 2 - minY * tileSize;
+
+        Color color = type.getColor();
+        for (int[] cell : coords) {
+            int px = offsetX + cell[0] * tileSize;
+            int py = offsetY + cell[1] * tileSize;
+
+            g.setColor(color);
+            g.fillRect(px, py, tileSize, tileSize);
+
+            g.setColor(color.darker());
+            g.drawRect(px, py, tileSize, tileSize);
+        }
     }
 
     private void drawLeaderboard(Graphics g, int x, int startY) {
@@ -1045,49 +1105,6 @@ public class GamePanel extends JPanel {
             g.drawString(text, x, lineY);
             lineY += 13;
             rank++;
-        }
-    }
-
-    // Draw Next Piece Preview
-    private void drawNextPiecePreview(Graphics g, int x, int y) {
-        Piece nextPiece = gameEngine.getNextPiece();
-        if (nextPiece != null) {
-            Color color = nextPiece.getType().getColor();
-            int[][] coords = nextPiece.getType().getCoords();
-
-            // Adjust scale for preview
-            int previewTileSize = 25;
-            for (int[] coord : coords) {
-                g.setColor(color);
-                g.fillRect(x + coord[0] * previewTileSize, y + coord[1] * previewTileSize, previewTileSize,
-                        previewTileSize);
-                g.setColor(color.darker());
-                g.drawRect(x + coord[0] * previewTileSize, y + coord[1] * previewTileSize, previewTileSize,
-                        previewTileSize);
-            }
-        }
-    }
-
-    // Draw Held Piece Preview
-    private void drawHeldPiecePreview(Graphics g, int x, int y) {
-        Piece heldPiece = gameEngine.getHeldPiece();
-        if (heldPiece != null) {
-            Color color = heldPiece.getType().getColor();
-            int[][] coords = heldPiece.getType().getCoords();
-
-            int previewTileSize = 25;
-            for (int[] coord : coords) {
-                g.setColor(color);
-                g.fillRect(x + coord[0] * previewTileSize, y + coord[1] * previewTileSize, previewTileSize,
-                        previewTileSize);
-                g.setColor(color.darker());
-                g.drawRect(x + coord[0] * previewTileSize, y + coord[1] * previewTileSize, previewTileSize,
-                        previewTileSize);
-            }
-        } else {
-            g.setColor(new Color(150, 150, 150));
-            g.setFont(new java.awt.Font("Arial", java.awt.Font.ITALIC, 13));
-            g.drawString("[Empty]", x, y + 15);
         }
     }
 
