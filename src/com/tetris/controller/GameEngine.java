@@ -274,7 +274,11 @@ public class GameEngine {
     }
 
     public List<LeaderboardEntry> getLeaderboardEntries() {
-        return leaderboardManager.getTopEntries();
+        return leaderboardManager.getTopEntries(difficulty);
+    }
+
+    public List<LeaderboardEntry> getLeaderboardEntriesForDifficulty(Difficulty diff) {
+        return leaderboardManager.getTopEntries(diff);
     }
 
     public boolean isGameOver() {
@@ -337,6 +341,12 @@ public class GameEngine {
     public void selectPauseMenuItem() {
         if (gameState == GameState.PLAYING && isPaused) {
             panel.selectPauseMenuItem();
+        }
+    }
+
+    public void navigateLeaderboardTabs(int dir) {
+        if (gameState == GameState.LEADERBOARD) {
+            panel.navigateLeaderboardTabs(dir);
         }
     }
 

@@ -38,6 +38,12 @@ public class InputHandler extends KeyAdapter {
                 case KeyEvent.VK_ESCAPE:
                     engine.returnToMenu();
                     break;
+                case KeyEvent.VK_LEFT:
+                    engine.navigateLeaderboardTabs(-1);
+                    break;
+                case KeyEvent.VK_RIGHT:
+                    engine.navigateLeaderboardTabs(1);
+                    break;
             }
         } else if (state == GameEngine.GameState.PLAYING) {
             if (engine.isGameOver()) {
