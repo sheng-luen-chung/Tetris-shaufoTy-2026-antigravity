@@ -13,45 +13,86 @@ public class InputHandler extends KeyAdapter {
     @Override
     public void keyPressed(KeyEvent e) {
         int keyCode = e.getKeyCode();
+        GameEngine.GameState state = engine.getGameState();
 
-        switch (keyCode) {
-            case KeyEvent.VK_LEFT:
-                engine.movePieceLeft();
-                break;
+        if (state == GameEngine.GameState.MENU) {
+            switch (keyCode) {
+                case KeyEvent.VK_UP:
+                    engine.navigateMenuUp();
+                    break;
+                case KeyEvent.VK_DOWN:
+                    engine.navigateMenuDown();
+                    break;
+                case KeyEvent.VK_ENTER:
+                case KeyEvent.VK_SPACE:
+                    engine.selectMenuItem();
+                    break;
+                case KeyEvent.VK_ESCAPE:
+                    System.exit(0);
+                    break;
+            }
+        } else if (state == GameEngine.GameState.LEADERBOARD) {
+            switch (keyCode) {
+                case KeyEvent.VK_ENTER:
+                case KeyEvent.VK_SPACE:
+                case KeyEvent.VK_ESCAPE:
+                    engine.returnToMenu();
+                    break;
+            }
+        } else if (state == GameEngine.GameState.PLAYING) {
+            if (engine.isGameOver()) {
+                if (keyCode == KeyEvent.VK_ENTER || keyCode == KeyEvent.VK_ESCAPE || keyCode == KeyEvent.VK_SPACE) {
+                    engine.returnToMenu();
+                }
+                return;
+            }
 
-            case KeyEvent.VK_RIGHT:
-                engine.movePieceRight();
-                break;
+            if (engine.isPaused()) {
+                switch (keyCode) {
+                    case KeyEvent.VK_UP:
+                        engine.navigatePauseMenu(-1);
+                        break;
+                    case KeyEvent.VK_DOWN:
+                        engine.navigatePauseMenu(1);
+                        break;
+                    case KeyEvent.VK_ENTER:
+                    case KeyEvent.VK_SPACE:
+                        engine.selectPauseMenuItem();
+                        break;
+                    case KeyEvent.VK_P:
+                    case KeyEvent.VK_ESCAPE:
+                        engine.togglePause();
+                        break;
+                }
+                return;
+            }
 
-            case KeyEvent.VK_UP:
-                engine.rotatePiece();
-                break;
+            switch (keyCode) {
+                case KeyEvent.VK_LEFT:
+                    engine.movePieceLeft();
+                    break;
 
-            case KeyEvent.VK_DOWN:
-                engine.update();
-                break;
-                
-            case KeyEvent.VK_SPACE:
-                engine.dropPiece();
-                break;
+                case KeyEvent.VK_RIGHT:
+                    engine.movePieceRight();
+                    break;
 
-            case KeyEvent.VK_P:
-            case KeyEvent.VK_ESCAPE:
-                engine.togglePause();
-                break;
+                case KeyEvent.VK_UP:
+                    engine.rotatePiece();
+                    break;
 
-            case KeyEvent.VK_1:
-                engine.setDifficulty(GameEngine.Difficulty.EASY);
-                break;
+                case KeyEvent.VK_DOWN:
+                    engine.update();
+                    break;
 
-            case KeyEvent.VK_2:
-                engine.setDifficulty(GameEngine.Difficulty.NORMAL);
-                break;
+                case KeyEvent.VK_SPACE:
+                    engine.dropPiece();
+                    break;
 
-            case KeyEvent.VK_3:
-                engine.setDifficulty(GameEngine.Difficulty.HARD);
-                break;
+                case KeyEvent.VK_P:
+                case KeyEvent.VK_ESCAPE:
+                    engine.togglePause();
+                    break;
+            }
         }
-
     }
 }

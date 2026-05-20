@@ -10,6 +10,12 @@ import java.util.Random;
 import java.util.List;
 
 public class GameEngine {
+    public enum GameState {
+        MENU,
+        PLAYING,
+        LEADERBOARD
+    }
+
     public enum Difficulty {
         EASY("EASY", 700),
         NORMAL("NORMAL", 500),
@@ -45,6 +51,7 @@ public class GameEngine {
     private int secondsElapsed = 0;
     private Difficulty difficulty = Difficulty.NORMAL;
     private final LeaderboardManager leaderboardManager;
+    private GameState gameState = GameState.MENU;
 
     public GameEngine(Board board, GamePanel panel) {
         this.board = board;
@@ -73,12 +80,54 @@ public class GameEngine {
 
     // Start the game
     public void start() {
+        if (gameState == GameState.PLAYING) {
+            gameLoop.start();
+            secondTimer.start();
+        }
+    }
+
+    // Start a new game session
+    public void startGame() {
+        board.clear();
+        score = 0;
+        secondsElapsed = 0;
+        isGameOver = false;
+        isPaused = false;
+        leaderboardRecorded = false;
+        nextPiece = generateRandomPiece();
+        spawnNewPiece();
+        gameState = GameState.PLAYING;
+
+        // Restart loops
+        gameLoop.stop();
+        gameLoop.setDelay(difficulty.getFallDelayMs());
+        gameLoop.setInitialDelay(difficulty.getFallDelayMs());
         gameLoop.start();
+
+        secondTimer.stop();
         secondTimer.start();
+
+        panel.repaint();
+    }
+
+    // Return to main menu
+    public void returnToMenu() {
+        gameLoop.stop();
+        secondTimer.stop();
+        gameState = GameState.MENU;
+        panel.repaint();
+    }
+
+    // Go to leaderboard screen
+    public void showLeaderboard() {
+        gameState = GameState.LEADERBOARD;
+        panel.repaint();
     }
 
     // Toggle pause
     public void togglePause() {
+        if (gameState != GameState.PLAYING)
+            return;
         if (isGameOver)
             return;
         isPaused = !isPaused;
@@ -87,6 +136,8 @@ public class GameEngine {
 
     // Update the piece (down)
     public void update() {
+        if (gameState != GameState.PLAYING)
+            return;
         if (isGameOver || isPaused)
             return;
 
@@ -230,23 +281,64 @@ public class GameEngine {
         panel.repaint();
     }
 
+    public GameState getGameState() {
+        return gameState;
+    }
+
+    public void setGameState(GameState gameState) {
+        this.gameState = gameState;
+        panel.repaint();
+    }
+
+    public void navigateMenuUp() {
+        if (gameState == GameState.MENU) {
+            panel.navigateMenu(-1);
+        }
+    }
+
+    public void navigateMenuDown() {
+        if (gameState == GameState.MENU) {
+            panel.navigateMenu(1);
+        }
+    }
+
+    public void selectMenuItem() {
+        if (gameState == GameState.MENU) {
+            panel.selectCurrentOption();
+        } else if (gameState == GameState.LEADERBOARD) {
+            returnToMenu();
+        }
+    }
+
+    public void navigatePauseMenu(int dir) {
+        if (gameState == GameState.PLAYING && isPaused) {
+            panel.navigatePauseMenu(dir);
+        }
+    }
+
+    public void selectPauseMenuItem() {
+        if (gameState == GameState.PLAYING && isPaused) {
+            panel.selectPauseMenuItem();
+        }
+    }
+
     // Move piece left
     public void movePieceLeft() {
-        if (isGameOver || isPaused)
+        if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
         handleMove(0, -1);
     }
 
     // Move piece right
     public void movePieceRight() {
-        if (isGameOver || isPaused)
+        if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
         handleMove(0, 1);
     }
 
     // Rotate piece
     public void rotatePiece() {
-        if (isGameOver || isPaused)
+        if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
         currentPiece.rotate();
         if (!board.isValidMove(currentPiece)) {
@@ -258,7 +350,7 @@ public class GameEngine {
 
     // Drop piece
     public void dropPiece() {
-        if (isGameOver || isPaused)
+        if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
         while (board.isValidMove(currentPiece)) {
             currentPiece.move(1, 0);
