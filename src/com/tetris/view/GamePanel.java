@@ -839,36 +839,41 @@ public class GamePanel extends JPanel {
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
 
         // 1. Draw Score
-        g.drawString("SCORE", startX + 20, 50);
+        g.drawString("SCORE", startX + 20, 45);
         g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 24));
-        g.drawString(String.valueOf(gameEngine.getScore()), startX + 20, 80);
+        g.drawString(String.valueOf(gameEngine.getScore()), startX + 20, 70);
 
         // 2. Draw Timer
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
-        g.drawString("TIME", startX + 20, 140);
+        g.drawString("TIME", startX + 20, 110);
         g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 24));
         int seconds = gameEngine.getSecondsElapsed();
         String timeStr = String.format("%02d:%02d", seconds / 60, seconds % 60);
-        g.drawString(timeStr, startX + 20, 170);
+        g.drawString(timeStr, startX + 20, 135);
 
-        // 3. Draw Next Piece Preview
+        // 3. Draw Level
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
-        g.drawString("LEVEL", startX + 20, 220);
+        g.drawString("LEVEL", startX + 20, 175);
         g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 20));
-        g.drawString(gameEngine.getDifficulty().getLabel(), startX + 20, 245);
+        g.drawString(gameEngine.getDifficulty().getLabel(), startX + 20, 200);
 
         // 4. Draw Next Piece Preview
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
-        g.drawString("NEXT", startX + 20, 300);
-        drawNextPiecePreview(g, startX + 20, 320);
+        g.drawString("NEXT", startX + 20, 240);
+        drawNextPiecePreview(g, startX + 35, 260);
 
-        // 5. Draw Controls Hints
+        // 5. Draw Held Piece Preview
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
+        g.drawString("HOLD", startX + 20, 335);
+        drawHeldPiecePreview(g, startX + 35, 355);
+
+        // 6. Draw Controls Hints
         drawControlHints(g, startX + 10, 430);
 
-        // 6. Draw Leaderboard
-        drawLeaderboard(g, startX + 10, 480);
+        // 7. Draw Leaderboard
+        drawLeaderboard(g, startX + 10, 485);
 
-        // 7. Game Over Message
+        // 8. Game Over Message
         if (gameEngine.isGameOver()) {
             g.setColor(Color.RED);
             g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
@@ -883,8 +888,8 @@ public class GamePanel extends JPanel {
         g.drawString("CONTROLS", x, startY);
 
         g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 11));
-        g.drawString("Arrows Move | Up Rotate | Space Drop", x, startY + 18);
-        g.drawString("P / Esc Pause", x, startY + 34);
+        g.drawString("Arrows Move | Up Rotate", x, startY + 16);
+        g.drawString("Space Drop | C/Shift Hold | P/Esc Pause", x, startY + 30);
     }
 
     private void drawLeaderboard(Graphics g, int x, int startY) {
@@ -899,7 +904,7 @@ public class GamePanel extends JPanel {
         g.drawString("LEADERBOARD", x, startY);
 
         g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 11));
-        int lineY = startY + 18;
+        int lineY = startY + 16;
 
         if (entries.isEmpty()) {
             g.setColor(new Color(210, 210, 210));
@@ -909,15 +914,14 @@ public class GamePanel extends JPanel {
 
         int rank = 1;
         for (LeaderboardEntry entry : entries) {
-            if (rank > 5) {
+            if (rank > 3) {
                 break;
             }
 
             g.setColor(new Color(240, 240, 240));
-            String text = String.format("%d. %d pts | %s | %s", rank, entry.getScore(), entry.getDifficulty(),
-                    entry.getPlayedAtDisplay());
+            String text = String.format("%d. %d pts | %s", rank, entry.getScore(), entry.getDifficulty());
             g.drawString(text, x, lineY);
-            lineY += 15;
+            lineY += 13;
             rank++;
         }
     }
@@ -939,6 +943,29 @@ public class GamePanel extends JPanel {
                 g.drawRect(x + coord[0] * previewTileSize, y + coord[1] * previewTileSize, previewTileSize,
                         previewTileSize);
             }
+        }
+    }
+
+    // Draw Held Piece Preview
+    private void drawHeldPiecePreview(Graphics g, int x, int y) {
+        Piece heldPiece = gameEngine.getHeldPiece();
+        if (heldPiece != null) {
+            Color color = heldPiece.getType().getColor();
+            int[][] coords = heldPiece.getType().getCoords();
+
+            int previewTileSize = 25;
+            for (int[] coord : coords) {
+                g.setColor(color);
+                g.fillRect(x + coord[0] * previewTileSize, y + coord[1] * previewTileSize, previewTileSize,
+                        previewTileSize);
+                g.setColor(color.darker());
+                g.drawRect(x + coord[0] * previewTileSize, y + coord[1] * previewTileSize, previewTileSize,
+                        previewTileSize);
+            }
+        } else {
+            g.setColor(new Color(150, 150, 150));
+            g.setFont(new java.awt.Font("Arial", java.awt.Font.ITALIC, 13));
+            g.drawString("[Empty]", x, y + 15);
         }
     }
 

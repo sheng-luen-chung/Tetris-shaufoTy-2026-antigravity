@@ -42,6 +42,8 @@ public class GameEngine {
     private GamePanel panel;
     private Piece currentPiece;
     private Piece nextPiece;
+    private Piece heldPiece = null;
+    private boolean canHoldThisTurn = true;
     private Timer gameLoop;
     private Timer secondTimer;
     private boolean isGameOver = false;
@@ -94,6 +96,8 @@ public class GameEngine {
         isGameOver = false;
         isPaused = false;
         leaderboardRecorded = false;
+        heldPiece = null;
+        canHoldThisTurn = true;
         nextPiece = generateRandomPiece();
         spawnNewPiece();
         gameState = GameState.PLAYING;
@@ -165,6 +169,7 @@ public class GameEngine {
             panel.addScorePopup(popupCol, popupRow, points);
         }
         spawnNewPiece(); // Spawn
+        canHoldThisTurn = true; // Reset hold status for the next turn
     }
 
     private int getLineClearPoints(int lines) {
@@ -223,11 +228,20 @@ public class GameEngine {
         // Update view
         panel.setCurrentPiece(currentPiece);
 
+        // Restart gravity timer to give player a full tick window
+        if (gameLoop != null) {
+            gameLoop.restart();
+        }
+
         // If new piece collision, game over
         if (!board.isValidMove(currentPiece)) {
             isGameOver = true;
-            gameLoop.stop();
-            secondTimer.stop();
+            if (gameLoop != null) {
+                gameLoop.stop();
+            }
+            if (secondTimer != null) {
+                secondTimer.stop();
+            }
             recordFinalScore();
             System.out.println("Game Over!");
         }
@@ -253,6 +267,10 @@ public class GameEngine {
 
     public Piece getNextPiece() {
         return nextPiece;
+    }
+
+    public Piece getHeldPiece() {
+        return heldPiece;
     }
 
     public List<LeaderboardEntry> getLeaderboardEntries() {
@@ -358,6 +376,38 @@ public class GameEngine {
         // Move back to last valid position
         currentPiece.move(-1, 0);
         freezeAndSpawn();
+        panel.repaint();
+    }
+
+    // Hold the current piece
+    public void holdPiece() {
+        if (gameState != GameState.PLAYING || isGameOver || isPaused)
+            return;
+        if (!canHoldThisTurn)
+            return;
+
+        if (heldPiece == null) {
+            // Store current piece type as held
+            heldPiece = new Piece(currentPiece.getType());
+            // Spawn next piece as current piece
+            spawnNewPiece();
+        } else {
+            // Swap current piece and held piece
+            Piece temp = heldPiece;
+            heldPiece = new Piece(currentPiece.getType());
+            
+            // Reset current piece properties to spawn at the top
+            currentPiece = temp;
+            panel.setCurrentPiece(currentPiece);
+            
+            // Restart the gravity timer
+            if (gameLoop != null) {
+                gameLoop.restart();
+            }
+        }
+        
+        canHoldThisTurn = false;
+        panel.repaint();
     }
 
     // Handle move
