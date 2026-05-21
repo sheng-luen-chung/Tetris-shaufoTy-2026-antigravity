@@ -1115,8 +1115,8 @@ public class GamePanel extends JPanel {
         int maxY = Integer.MIN_VALUE;
 
         for (int[] cell : coords) {
-            int cx = cell[0];
-            int cy = cell[1];
+            int cx = cell[1]; // Swap 0 and 1: 0 is row, 1 is col
+            int cy = cell[0];
             if (cx < minX) minX = cx;
             if (cx > maxX) maxX = cx;
             if (cy < minY) minY = cy;
@@ -1135,8 +1135,9 @@ public class GamePanel extends JPanel {
 
         Color color = type.getColor();
         for (int[] cell : coords) {
-            int px = offsetX + cell[0] * tileSize;
-            int py = offsetY + cell[1] * tileSize;
+            // cell[0] is row, cell[1] is col
+            int px = offsetX + cell[1] * tileSize; 
+            int py = offsetY + cell[0] * tileSize;
 
             g.setColor(color);
             g.fillRect(px, py, tileSize, tileSize);
