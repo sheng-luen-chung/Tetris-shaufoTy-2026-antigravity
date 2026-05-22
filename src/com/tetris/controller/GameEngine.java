@@ -8,6 +8,7 @@ import com.tetris.view.GamePanel;
 import javax.swing.Timer;
 import java.util.Random;
 import java.util.List;
+import com.tetris.util.SoundManager;
 
 public class GameEngine {
     public enum GameState {
@@ -18,7 +19,7 @@ public class GameEngine {
 
     public enum Difficulty {
         EASY("EASY", 700),
-        NORMAL("NORMAL", 500),
+        NORMAL("MEDIUM", 500),
         HARD("HARD", 300);
 
         private final String label;
@@ -114,6 +115,9 @@ public class GameEngine {
         secondTimer.stop();
         secondTimer.start();
 
+        // Play BGM
+        SoundManager.playBGM("/resources/bgm.wav");
+
         panel.repaint();
     }
 
@@ -122,6 +126,7 @@ public class GameEngine {
         gameLoop.stop();
         secondTimer.stop();
         gameState = GameState.MENU;
+        SoundManager.stopBGM();
         panel.repaint();
     }
 
@@ -138,6 +143,11 @@ public class GameEngine {
         if (isGameOver)
             return;
         isPaused = !isPaused;
+        if (isPaused) {
+            SoundManager.pauseBGM();
+        } else {
+            SoundManager.resumeBGM();
+        }
         panel.repaint();
     }
 
@@ -204,6 +214,7 @@ public class GameEngine {
         // Update Combo
         if (lines > 0) {
             comboCount++;
+            SoundManager.playSFX("/resources/clear.wav");
         } else {
             comboCount = -1;
         }
@@ -322,6 +333,7 @@ public class GameEngine {
             if (secondTimer != null) {
                 secondTimer.stop();
             }
+            SoundManager.stopBGM();
             recordFinalScore();
             System.out.println("Game Over!");
         }
