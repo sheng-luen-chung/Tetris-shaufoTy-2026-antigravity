@@ -35,6 +35,7 @@ public class InputHandler extends KeyAdapter {
             if (engine.getGameState() == GameEngine.GameState.PLAYING && 
                 !engine.isGameOver() && !engine.isPaused()) {
                 updateInputs();
+                engine.tickLockDelay(); // Tick lock delay every frame
             } else {
                 resetKeyStates();
             }

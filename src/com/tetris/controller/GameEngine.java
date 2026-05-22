@@ -18,16 +18,18 @@ public class GameEngine {
     }
 
     public enum Difficulty {
-        EASY("EASY", 700),
-        NORMAL("MEDIUM", 500),
-        HARD("HARD", 300);
+        EASY("EASY", 700, 500),
+        NORMAL("MEDIUM", 500, 350),
+        HARD("HARD", 300, 250);
 
         private final String label;
         private final int fallDelayMs;
+        private final int lockDelayMs;
 
-        Difficulty(String label, int fallDelayMs) {
+        Difficulty(String label, int fallDelayMs, int lockDelayMs) {
             this.label = label;
             this.fallDelayMs = fallDelayMs;
+            this.lockDelayMs = lockDelayMs;
         }
 
         public String getLabel() {
@@ -36,6 +38,10 @@ public class GameEngine {
 
         public int getFallDelayMs() {
             return fallDelayMs;
+        }
+
+        public int getLockDelayMs() {
+            return lockDelayMs;
         }
     }
 
@@ -54,6 +60,13 @@ public class GameEngine {
     private int secondsElapsed = 0;
     private int comboCount = -1; // -1 means no combo, 0+ means consecutive clears
     private boolean lastMoveWasRotation = false;
+    
+    // Lock Delay Mechanism
+    private boolean isLocking = false;
+    private long lockStartTime = 0;
+    private int lockMoveResets = 0;
+    private static final int MAX_LOCK_RESETS = 15;
+
     private Difficulty difficulty = Difficulty.NORMAL;
     private final LeaderboardManager leaderboardManager;
     private GameState gameState = GameState.MENU;
@@ -151,6 +164,62 @@ public class GameEngine {
         panel.repaint();
     }
 
+    // Lock Delay Logic
+    private void startLockDelay() {
+        if (!isLocking) {
+            isLocking = true;
+            lockStartTime = System.currentTimeMillis();
+            lockMoveResets = 0;
+        }
+    }
+
+    private void stopLockDelay() {
+        isLocking = false;
+        lockMoveResets = 0;
+    }
+
+    private void resetLockDelay() {
+        if (lockMoveResets < MAX_LOCK_RESETS) {
+            // Check if the piece is actually on the ground
+            currentPiece.move(1, 0);
+            boolean onGround = !board.isValidMove(currentPiece);
+            currentPiece.move(-1, 0);
+
+            if (onGround) {
+                if (!isLocking) {
+                    startLockDelay();
+                } else {
+                    lockStartTime = System.currentTimeMillis();
+                    lockMoveResets++;
+                }
+            } else {
+                // If it moved/rotated to a floating position, stop the lock timer
+                stopLockDelay();
+            }
+        }
+    }
+
+    public void tickLockDelay() {
+        if (gameState != GameState.PLAYING || isGameOver || isPaused)
+            return;
+
+        if (isLocking) {
+            if (System.currentTimeMillis() - lockStartTime >= difficulty.getLockDelayMs()) {
+                // Time's up, check if still on ground
+                currentPiece.move(1, 0);
+                if (!board.isValidMove(currentPiece)) {
+                    currentPiece.move(-1, 0);
+                    freezeAndSpawn();
+                    stopLockDelay();
+                    panel.repaint();
+                } else {
+                    currentPiece.move(-1, 0);
+                    stopLockDelay();
+                }
+            }
+        }
+    }
+
     // Update the piece (down)
     public void update() {
         if (gameState != GameState.PLAYING)
@@ -165,9 +234,15 @@ public class GameEngine {
         if (!board.isValidMove(currentPiece)) { // Collision
             currentPiece.move(-1, 0); // Reposition (move back up)
             panel.spawnDropParticles(currentPiece); // Landing particles
-            freezeAndSpawn(); // Freeze and spawn
+            
+            // Instead of immediate freeze, start lock delay
+            if (!isLocking) {
+                startLockDelay();
+            }
         } else {
-            lastMoveWasRotation = false; // Successfully moved down
+            // Successfully moved down
+            stopLockDelay();
+            lastMoveWasRotation = false; 
         }
 
         panel.repaint(); // Repaint
@@ -312,6 +387,9 @@ public class GameEngine {
 
     // Spawn new piece
     private void spawnNewPiece() {
+        // Reset lock delay state for the new piece
+        stopLockDelay();
+
         // Use nextPiece and generate new nextPiece
         currentPiece = nextPiece;
         nextPiece = generateRandomPiece();
@@ -399,6 +477,10 @@ public class GameEngine {
         return gameState;
     }
 
+    public boolean isLocking() {
+        return isLocking;
+    }
+
     public void setGameState(GameState gameState) {
         this.gameState = gameState;
         panel.repaint();
@@ -448,6 +530,7 @@ public class GameEngine {
             return;
         if (handleMove(0, -1)) {
             lastMoveWasRotation = false;
+            resetLockDelay();
         }
     }
 
@@ -457,6 +540,7 @@ public class GameEngine {
             return;
         if (handleMove(0, 1)) {
             lastMoveWasRotation = false;
+            resetLockDelay();
         }
     }
 
@@ -470,6 +554,7 @@ public class GameEngine {
             currentPiece.undoRotate();
         } else {
             lastMoveWasRotation = true;
+            resetLockDelay();
         }
         panel.repaint();
     }
@@ -491,7 +576,8 @@ public class GameEngine {
             lastMoveWasRotation = false;
         }
 
-        freezeAndSpawn();
+        // Instead of immediate freeze, trigger lock delay for space bar too
+        startLockDelay();
         panel.repaint();
     }
 
@@ -501,6 +587,8 @@ public class GameEngine {
             return;
         if (!canHoldThisTurn)
             return;
+
+        stopLockDelay(); // Stop lock delay when holding
 
         if (heldPiece == null) {
             // Store current piece type as held

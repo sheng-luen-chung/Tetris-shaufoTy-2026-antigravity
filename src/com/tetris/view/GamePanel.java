@@ -17,7 +17,7 @@ import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionAdapter;
+// import java.awt.event.MouseMotionAdapter;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -1138,6 +1138,23 @@ public class GamePanel extends JPanel {
             }
 
             Color color = currentPiece.getType().getColor();
+
+            // Flash effect for Lock Delay
+            if (gameEngine.isLocking()) {
+                // Flash every 100ms for more urgency
+                if ((System.currentTimeMillis() / 100) % 2 == 0) {
+                    // Switch to a semi-transparent version or white tint
+                    color = new Color(color.getRed(), color.getGreen(), color.getBlue(), 120);
+                } else {
+                    // Strong white tint to make it pop
+                    color = new Color(
+                        Math.min(255, color.getRed() + 100),
+                        Math.min(255, color.getGreen() + 100),
+                        Math.min(255, color.getBlue() + 100),
+                        255
+                    );
+                }
+            }
 
             // Get the absolute coordinates of the current piece after rotation
             for (int[] coord : currentPiece.getAbsoluteCoords()) {
