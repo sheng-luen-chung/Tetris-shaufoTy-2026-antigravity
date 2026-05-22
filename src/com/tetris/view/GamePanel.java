@@ -42,17 +42,18 @@ public class GamePanel extends JPanel {
 
     // Menu properties
     private int selectedMenuIndex = 0;
-    private final Rectangle[] menuOptionBounds = new Rectangle[4];
+    private final Rectangle[] menuOptionBounds = new Rectangle[5];
     private Rectangle backButtonBounds = new Rectangle();
     private final List<FloatingPiece> floatingPieces = new ArrayList<>();
     private Timer menuAnimationTimer;
 
     // Pause menu properties
     private int selectedPauseIndex = 0;
-    private final Rectangle[] pauseOptionBounds = new Rectangle[3];
+    private final Rectangle[] pauseOptionBounds = new Rectangle[4];
     private boolean showSettingsInPause = false;
     private boolean showGhostPiece = true;
     private boolean showGridLines = true;
+    private long lastSaveTime = 0;
 
     // Volume Settings controls properties
     private boolean showSettingsInMenu = false;
@@ -308,7 +309,7 @@ public class GamePanel extends JPanel {
                         // BACK button click
                         if (menuSettingsBackButtonBounds != null && menuSettingsBackButtonBounds.contains(e.getPoint())) {
                             showSettingsInMenu = false;
-                            selectedMenuIndex = 1; // Return Indicator to SETTINGS
+                            selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 2 : 1; // Return Indicator to SETTINGS
                             repaint();
                             return;
                         }
@@ -336,7 +337,8 @@ public class GamePanel extends JPanel {
                             }
                         }
                     } else {
-                        for (int i = 0; i < 4; i++) {
+                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 5 : 4;
+                        for (int i = 0; i < numOptions; i++) {
                             if (menuOptionBounds[i] != null && menuOptionBounds[i].contains(e.getPoint())) {
                                 selectedMenuIndex = i;
                                 selectCurrentOption();
@@ -379,7 +381,8 @@ public class GamePanel extends JPanel {
                                 return;
                             }
                         }
-                        for (int i = 0; i < 3; i++) {
+                        int numPauseOptions = showSettingsInPause ? 3 : 4;
+                        for (int i = 0; i < numPauseOptions; i++) {
                             if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
                                 selectedPauseIndex = i;
                                 selectPauseMenuItem();
@@ -414,7 +417,8 @@ public class GamePanel extends JPanel {
                             }
                         }
                     } else {
-                        for (int i = 0; i < 4; i++) {
+                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 5 : 4;
+                        for (int i = 0; i < numOptions; i++) {
                             if (menuOptionBounds[i] != null && menuOptionBounds[i].contains(e.getPoint())) {
                                 if (selectedMenuIndex != i) {
                                     selectedMenuIndex = i;
@@ -425,7 +429,8 @@ public class GamePanel extends JPanel {
                         }
                     }
                 } else if (state == com.tetris.controller.GameEngine.GameState.PLAYING && gameEngine.isPaused()) {
-                    for (int i = 0; i < 3; i++) {
+                    int numPauseOptions = showSettingsInPause ? 3 : 4;
+                    for (int i = 0; i < numPauseOptions; i++) {
                         if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
                             if (selectedPauseIndex != i) {
                                 selectedPauseIndex = i;
@@ -459,6 +464,41 @@ public class GamePanel extends JPanel {
     // Set the game engine reference
     public void setGameEngine(com.tetris.controller.GameEngine gameEngine) {
         this.gameEngine = gameEngine;
+    }
+
+    public boolean isShowSettingsInMenu() {
+        return showSettingsInMenu;
+    }
+
+    public void setShowSettingsInMenu(boolean show) {
+        this.showSettingsInMenu = show;
+        repaint();
+    }
+
+    public boolean isShowDifficultySelectInMenu() {
+        return showDifficultySelectInMenu;
+    }
+
+    public void setShowDifficultySelectInMenu(boolean show) {
+        this.showDifficultySelectInMenu = show;
+        repaint();
+    }
+
+    public boolean isShowSettingsInPause() {
+        return showSettingsInPause;
+    }
+
+    public void setShowSettingsInPause(boolean show) {
+        this.showSettingsInPause = show;
+        repaint();
+    }
+
+    public void resetUIState() {
+        showSettingsInMenu = false;
+        showSettingsInPause = false;
+        showDifficultySelectInMenu = false;
+        selectedPauseIndex = 0;
+        repaint();
     }
 
     // Set the current piece
@@ -518,7 +558,8 @@ public class GamePanel extends JPanel {
         if (showDifficultySelectInMenu) {
             selectedDifficultyIndex = (selectedDifficultyIndex + dir + 4) % 4;
         } else {
-            selectedMenuIndex = (selectedMenuIndex + dir + 4) % 4;
+            int numOptions = com.tetris.util.SaveManager.hasSave() ? 5 : 4;
+            selectedMenuIndex = (selectedMenuIndex + dir + numOptions) % numOptions;
         }
         repaint();
     }
@@ -528,20 +569,42 @@ public class GamePanel extends JPanel {
         if (showDifficultySelectInMenu) {
             triggerDifficultySelection();
         } else {
-            switch (selectedMenuIndex) {
-                case 0:
-                    showDifficultySelectInMenu = true;
-                    selectedDifficultyIndex = 0; // Default to EASY
-                    break;
-                case 1:
-                    showSettingsInMenu = true;
-                    break;
-                case 2:
-                    gameEngine.showLeaderboard();
-                    break;
-                case 3:
-                    System.exit(0);
-                    break;
+            boolean hasSave = com.tetris.util.SaveManager.hasSave();
+            if (hasSave) {
+                switch (selectedMenuIndex) {
+                    case 0:
+                        gameEngine.loadGame();
+                        break;
+                    case 1:
+                        showDifficultySelectInMenu = true;
+                        selectedDifficultyIndex = 0; // Default to EASY
+                        break;
+                    case 2:
+                        showSettingsInMenu = true;
+                        break;
+                    case 3:
+                        gameEngine.showLeaderboard();
+                        break;
+                    case 4:
+                        System.exit(0);
+                        break;
+                }
+            } else {
+                switch (selectedMenuIndex) {
+                    case 0:
+                        showDifficultySelectInMenu = true;
+                        selectedDifficultyIndex = 0; // Default to EASY
+                        break;
+                    case 1:
+                        showSettingsInMenu = true;
+                        break;
+                    case 2:
+                        gameEngine.showLeaderboard();
+                        break;
+                    case 3:
+                        System.exit(0);
+                        break;
+                }
             }
         }
         repaint();
@@ -566,7 +629,7 @@ public class GamePanel extends JPanel {
                 break;
             case 3:
                 showDifficultySelectInMenu = false;
-                selectedMenuIndex = 0; // Return to Play Game
+                selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 1 : 0; // Return to Play Game
                 break;
         }
         repaint();
@@ -698,18 +761,30 @@ public class GamePanel extends JPanel {
         g2d.drawString(subtitle, subX, 155);
 
         // Options
-        int startY = 280;
-        int gap = 55;
+        boolean hasSave = com.tetris.util.SaveManager.hasSave();
+        int numOptions = hasSave ? 5 : 4;
+        int startY = hasSave ? 260 : 280;
+        int gap = hasSave ? 50 : 55;
         g2d.setFont(new Font("Arial", Font.BOLD, 22));
         FontMetrics fmOption = g2d.getFontMetrics();
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < numOptions; i++) {
             String label = "";
-            switch (i) {
-                case 0: label = "PLAY GAME"; break;
-                case 1: label = "SETTINGS"; break;
-                case 2: label = "LEADERBOARD"; break;
-                case 3: label = "EXIT"; break;
+            if (hasSave) {
+                switch (i) {
+                    case 0: label = "CONTINUE"; break;
+                    case 1: label = "PLAY GAME"; break;
+                    case 2: label = "SETTINGS"; break;
+                    case 3: label = "LEADERBOARD"; break;
+                    case 4: label = "EXIT"; break;
+                }
+            } else {
+                switch (i) {
+                    case 0: label = "PLAY GAME"; break;
+                    case 1: label = "SETTINGS"; break;
+                    case 2: label = "LEADERBOARD"; break;
+                    case 3: label = "EXIT"; break;
+                }
             }
 
             int textWidth = fmOption.stringWidth(label);
@@ -957,7 +1032,8 @@ public class GamePanel extends JPanel {
 
     // Pause menu navigation helper
     public void navigatePauseMenu(int dir) {
-        selectedPauseIndex = (selectedPauseIndex + dir + 3) % 3;
+        int numOptions = showSettingsInPause ? 3 : 4;
+        selectedPauseIndex = (selectedPauseIndex + dir + numOptions) % numOptions;
         repaint();
     }
 
@@ -968,11 +1044,15 @@ public class GamePanel extends JPanel {
                 case 0: // RESUME
                     gameEngine.togglePause();
                     break;
-                case 1: // SETTINGS
+                case 1: // SAVE GAME
+                    gameEngine.saveGame();
+                    lastSaveTime = System.currentTimeMillis();
+                    break;
+                case 2: // SETTINGS
                     showSettingsInPause = true;
                     selectedPauseIndex = 0;
                     break;
-                case 2: // BACK TO MAIN
+                case 3: // BACK TO MAIN
                     showSettingsInPause = false;
                     gameEngine.togglePause(); // Unpause first!
                     gameEngine.returnToMenu();
@@ -988,7 +1068,7 @@ public class GamePanel extends JPanel {
                     break;
                 case 2: // BACK
                     showSettingsInPause = false;
-                    selectedPauseIndex = 1; // return cursor to settings option
+                    selectedPauseIndex = 2; // return cursor to settings option (index 2 now, because SETTINGS is index 2!)
                     break;
             }
         }
@@ -1022,7 +1102,7 @@ public class GamePanel extends JPanel {
 
         // Selection container card
         int cardW = 340;
-        int cardH = showSettingsInPause ? 340 : 250;
+        int cardH = showSettingsInPause ? 340 : 310;
         int cardX = (width - cardW) / 2;
         int cardY = 160;
 
@@ -1034,8 +1114,9 @@ public class GamePanel extends JPanel {
         // Draw Options
         g2d.setFont(new Font("Arial", Font.BOLD, 18));
         FontMetrics fmOption = g2d.getFontMetrics();
+        int numPauseOptions = showSettingsInPause ? 3 : 4;
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < numPauseOptions; i++) {
             String label = "";
             int x = 0, y = 0;
             int textHeight = fmOption.getHeight();
@@ -1044,12 +1125,13 @@ public class GamePanel extends JPanel {
             if (!showSettingsInPause) {
                 switch (i) {
                     case 0: label = "RESUME GAME"; break;
-                    case 1: label = "SETTINGS"; break;
-                    case 2: label = "BACK TO MAIN"; break;
+                    case 1: label = "SAVE GAME"; break;
+                    case 2: label = "SETTINGS"; break;
+                    case 3: label = "BACK TO MAIN"; break;
                 }
                 textWidth = fmOption.stringWidth(label);
                 x = cardX + (cardW - textWidth) / 2;
-                y = cardY + 60 + i * 65;
+                y = cardY + 50 + i * 65;
                 pauseOptionBounds[i] = new Rectangle(cardX + 15, y - textHeight + 5, cardW - 30, textHeight + 15);
             } else {
                 switch (i) {
@@ -1095,6 +1177,15 @@ public class GamePanel extends JPanel {
 
         if (showSettingsInPause) {
             drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 140, 55);
+        } else {
+            // Draw temporary "Progress Saved!" text if it was saved within 3 seconds
+            if (System.currentTimeMillis() - lastSaveTime < 3000) {
+                g2d.setFont(new Font("Arial", Font.BOLD, 14));
+                g2d.setColor(new Color(0, 255, 100)); // Green confirmation
+                String savedText = "Progress Saved!";
+                int savedW = g2d.getFontMetrics().stringWidth(savedText);
+                g2d.drawString(savedText, cardX + (cardW - savedW) / 2, cardY + cardH - 15);
+            }
         }
 
         // Control Hints

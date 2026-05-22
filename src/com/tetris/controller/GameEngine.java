@@ -9,6 +9,8 @@ import javax.swing.Timer;
 import java.util.Random;
 import java.util.List;
 import com.tetris.util.SoundManager;
+import com.tetris.util.SaveManager;
+import java.awt.Color;
 
 public class GameEngine {
     public enum GameState {
@@ -107,6 +109,7 @@ public class GameEngine {
     // Start a new game session
     public void startGame() {
         board.clear();
+        SaveManager.deleteSave();
         score = 0;
         secondsElapsed = 0;
         comboCount = -1;
@@ -140,6 +143,7 @@ public class GameEngine {
         secondTimer.stop();
         gameState = GameState.MENU;
         SoundManager.stopBGM();
+        panel.resetUIState();
         panel.repaint();
     }
 
@@ -160,6 +164,7 @@ public class GameEngine {
             SoundManager.pauseBGM();
         } else {
             SoundManager.resumeBGM();
+            panel.resetUIState();
         }
         panel.repaint();
     }
@@ -405,6 +410,7 @@ public class GameEngine {
         // If new piece collision, game over
         if (!board.isValidMove(currentPiece)) {
             isGameOver = true;
+            SaveManager.deleteSave();
             if (gameLoop != null) {
                 gameLoop.stop();
             }
@@ -424,6 +430,66 @@ public class GameEngine {
 
         leaderboardRecorded = true;
         leaderboardManager.recordScore(score, secondsElapsed, difficulty);
+    }
+
+    // Save current game state
+    public void saveGame() {
+        if (gameState != GameState.PLAYING || isGameOver) {
+            return;
+        }
+        SaveManager.save(score, secondsElapsed, difficulty, canHoldThisTurn, currentPiece, nextPiece, heldPiece, board);
+    }
+
+    // Load game state from save file
+    public void loadGame() {
+        if (!SaveManager.hasSave()) {
+            return;
+        }
+        SaveManager.SaveState state = SaveManager.load();
+        if (state == null) {
+            return;
+        }
+
+        // Restore fields
+        this.score = state.score;
+        this.secondsElapsed = state.secondsElapsed;
+        this.difficulty = state.difficulty;
+        this.canHoldThisTurn = state.canHoldThisTurn;
+        this.currentPiece = state.currentPiece;
+        this.nextPiece = state.nextPiece;
+        this.heldPiece = state.heldPiece;
+        this.comboCount = -1;
+        this.isGameOver = false;
+        this.isPaused = true; // Start paused for safety
+        this.leaderboardRecorded = false;
+        this.isLocking = false;
+        this.lastMoveWasRotation = false;
+
+        // Sync view with restored piece
+        panel.setCurrentPiece(currentPiece);
+
+        // Restore board grid
+        Color[][] currentGrid = board.getGrid();
+        for (int r = 0; r < Board.ROWS; r++) {
+            System.arraycopy(state.grid[r], 0, currentGrid[r], 0, Board.COLS);
+        }
+
+        this.gameState = GameState.PLAYING;
+
+        // Restart loops
+        gameLoop.stop();
+        gameLoop.setDelay(difficulty.getFallDelayMs());
+        gameLoop.setInitialDelay(difficulty.getFallDelayMs());
+        gameLoop.start();
+
+        secondTimer.stop();
+        secondTimer.start();
+
+        // Play BGM but immediately pause it
+        SoundManager.playBGM("/resources/bgm.wav");
+        SoundManager.pauseBGM();
+
+        panel.repaint();
     }
 
     // Getters for UI
@@ -515,6 +581,26 @@ public class GameEngine {
     public void selectPauseMenuItem() {
         if (gameState == GameState.PLAYING && isPaused) {
             panel.selectPauseMenuItem();
+        }
+    }
+
+    public void handleBackAction() {
+        if (gameState == GameState.PLAYING && isPaused) {
+            if (panel.isShowSettingsInPause()) {
+                panel.setShowSettingsInPause(false);
+            } else {
+                togglePause();
+            }
+        } else if (gameState == GameState.MENU) {
+            if (panel.isShowSettingsInMenu()) {
+                panel.setShowSettingsInMenu(false);
+            } else if (panel.isShowDifficultySelectInMenu()) {
+                panel.setShowDifficultySelectInMenu(false);
+            } else {
+                System.exit(0);
+            }
+        } else if (gameState == GameState.LEADERBOARD) {
+            returnToMenu();
         }
     }
 

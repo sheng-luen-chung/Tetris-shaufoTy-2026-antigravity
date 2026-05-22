@@ -115,7 +115,7 @@ public class InputHandler extends KeyAdapter {
                     engine.selectMenuItem();
                     break;
                 case KeyEvent.VK_ESCAPE:
-                    System.exit(0);
+                    engine.handleBackAction();
                     break;
             }
         } else if (state == GameEngine.GameState.LEADERBOARD) {
@@ -123,7 +123,7 @@ public class InputHandler extends KeyAdapter {
                 case KeyEvent.VK_ENTER:
                 case KeyEvent.VK_SPACE:
                 case KeyEvent.VK_ESCAPE:
-                    engine.returnToMenu();
+                    engine.handleBackAction();
                     break;
                 case KeyEvent.VK_LEFT:
                     engine.navigateLeaderboardTabs(-1);
@@ -153,8 +153,11 @@ public class InputHandler extends KeyAdapter {
                         engine.selectPauseMenuItem();
                         break;
                     case KeyEvent.VK_P:
-                    case KeyEvent.VK_ESCAPE:
                         engine.togglePause();
+                        resetKeyStates();
+                        break;
+                    case KeyEvent.VK_ESCAPE:
+                        engine.handleBackAction();
                         resetKeyStates();
                         break;
                 }
