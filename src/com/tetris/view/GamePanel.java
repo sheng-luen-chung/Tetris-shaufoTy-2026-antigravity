@@ -1097,11 +1097,11 @@ public class GamePanel extends JPanel {
         drawLeaderboard(g, startX + 15, 330);
 
         // 6. Game Over Message
-        if (gameEngine.isGameOver()) {
-            g.setColor(Color.RED);
-            g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
-            g.drawString("GAME OVER", startX + 15, 435);
-        }
+        // if (gameEngine.isGameOver()) {
+        //     g.setColor(Color.RED);
+        //     g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
+        //     g.drawString("GAME OVER", startX + 15, 435);
+        // }
     }
 
     // Helper: Draw centered piece in preview boxes
