@@ -572,18 +572,18 @@ public class GamePanel extends JPanel {
         repaint();
     }
 
-    private com.tetris.controller.GameEngine.Difficulty getNextDifficulty(com.tetris.controller.GameEngine.Difficulty current) {
-        switch (current) {
-            case EASY:
-                return com.tetris.controller.GameEngine.Difficulty.NORMAL;
-            case NORMAL:
-                return com.tetris.controller.GameEngine.Difficulty.HARD;
-            case HARD:
-                return com.tetris.controller.GameEngine.Difficulty.EASY;
-            default:
-                return com.tetris.controller.GameEngine.Difficulty.NORMAL;
-        }
-    }
+    // private com.tetris.controller.GameEngine.Difficulty getNextDifficulty(com.tetris.controller.GameEngine.Difficulty current) {
+    //     switch (current) {
+    //         case EASY:
+    //             return com.tetris.controller.GameEngine.Difficulty.NORMAL;
+    //         case NORMAL:
+    //             return com.tetris.controller.GameEngine.Difficulty.HARD;
+    //         case HARD:
+    //             return com.tetris.controller.GameEngine.Difficulty.EASY;
+    //         default:
+    //             return com.tetris.controller.GameEngine.Difficulty.NORMAL;
+    //     }
+    // }
 
     // Update floating particle positions
     private void updateFloatingPieces() {
