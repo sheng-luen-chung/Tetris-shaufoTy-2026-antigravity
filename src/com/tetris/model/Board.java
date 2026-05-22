@@ -13,9 +13,29 @@ public class Board {
         grid = new Color[ROWS][COLS];
     }
 
+    // Clear the board grid
+    public void clear() {
+        for (int r = 0; r < ROWS; r++) {
+            for (int c = 0; c < COLS; c++) {
+                grid[r][c] = null;
+            }
+        }
+    }
+
     // Color getter for grid
     public Color[][] getGrid() {
         return grid;
+    }
+
+    // Check if a cell is occupied (out of bounds or colored)
+    public boolean isOccupied(int row, int col) {
+        if (col < 0 || col >= COLS || row >= ROWS) {
+            return true; // Walls and floor count as occupied
+        }
+        if (row < 0) {
+            return false; // Ceiling is not occupied
+        }
+        return grid[row][col] != null;
     }
 
     // Check if the move is valid

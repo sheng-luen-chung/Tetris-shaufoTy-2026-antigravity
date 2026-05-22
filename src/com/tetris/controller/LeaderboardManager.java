@@ -12,23 +12,73 @@ import java.util.Comparator;
 import java.util.List;
 
 public class LeaderboardManager {
-    private static final int MAX_ENTRIES = 5;
-    private final Path leaderboardFile;
+    private static final int MAX_ENTRIES = 10;
 
     public LeaderboardManager() {
-        this.leaderboardFile = Paths.get(System.getProperty("user.home"), ".tetris", "leaderboard.csv");
+        // Perform migration if old single leaderboard file exists
+        Path oldFile = Paths.get(System.getProperty("user.home"), ".tetris", "leaderboard.csv");
+        if (Files.exists(oldFile)) {
+            List<LeaderboardEntry> allEntries = loadEntries(oldFile);
+            if (!allEntries.isEmpty()) {
+                List<LeaderboardEntry> easy = new ArrayList<>();
+                List<LeaderboardEntry> normal = new ArrayList<>();
+                List<LeaderboardEntry> hard = new ArrayList<>();
+
+                for (LeaderboardEntry entry : allEntries) {
+                    String diff = entry.getDifficulty().toUpperCase();
+                    if (diff.contains("EASY")) {
+                        easy.add(entry);
+                    } else if (diff.contains("HARD")) {
+                        hard.add(entry);
+                    } else {
+                        normal.add(entry);
+                    }
+                }
+
+                Path easyFile = getLeaderboardFile("EASY");
+                Path normalFile = getLeaderboardFile("NORMAL");
+                Path hardFile = getLeaderboardFile("HARD");
+
+                if (!Files.exists(easyFile) && !easy.isEmpty()) {
+                    easy.sort(entryComparator());
+                    saveEntries(easyFile, easy);
+                }
+                if (!Files.exists(normalFile) && !normal.isEmpty()) {
+                    normal.sort(entryComparator());
+                    saveEntries(normalFile, normal);
+                }
+                if (!Files.exists(hardFile) && !hard.isEmpty()) {
+                    hard.sort(entryComparator());
+                    saveEntries(hardFile, hard);
+                }
+            }
+
+            try {
+                Files.move(oldFile, oldFile.resolveSibling("leaderboard.csv.bak"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                System.err.println("Failed to backup old leaderboard: " + e.getMessage());
+            }
+        }
+    }
+
+    private Path getLeaderboardFile(String difficultyLabel) {
+        String fileName = "leaderboard_" + difficultyLabel.toLowerCase() + ".csv";
+        return Paths.get(System.getProperty("user.home"), ".tetris", fileName);
     }
 
     public synchronized void recordScore(int score, int secondsElapsed, GameEngine.Difficulty difficulty) {
-        List<LeaderboardEntry> entries = loadEntries();
-        entries.add(new LeaderboardEntry(score, secondsElapsed,
-                difficulty == null ? "UNKNOWN" : difficulty.getLabel(), System.currentTimeMillis()));
+        String label = (difficulty == null ? "NORMAL" : difficulty.name());
+        Path file = getLeaderboardFile(label);
+        List<LeaderboardEntry> entries = loadEntries(file);
+        entries.add(new LeaderboardEntry(score, secondsElapsed, label, System.currentTimeMillis()));
         entries.sort(entryComparator());
-        saveEntries(entries);
+        saveEntries(file, entries);
     }
 
-    public synchronized List<LeaderboardEntry> getTopEntries() {
-        List<LeaderboardEntry> entries = loadEntries();
+    public synchronized List<LeaderboardEntry> getTopEntries(GameEngine.Difficulty difficulty) {
+        String label = (difficulty == null ? "NORMAL" : difficulty.name());
+        Path file = getLeaderboardFile(label);
+        List<LeaderboardEntry> entries = loadEntries(file);
         entries.sort(entryComparator());
         if (entries.size() > MAX_ENTRIES) {
             return new ArrayList<>(entries.subList(0, MAX_ENTRIES));
@@ -42,14 +92,14 @@ public class LeaderboardManager {
                 .thenComparing(Comparator.comparingLong(LeaderboardEntry::getPlayedAt).reversed());
     }
 
-    private List<LeaderboardEntry> loadEntries() {
+    private List<LeaderboardEntry> loadEntries(Path file) {
         List<LeaderboardEntry> entries = new ArrayList<>();
-        if (!Files.exists(leaderboardFile)) {
+        if (!Files.exists(file)) {
             return entries;
         }
 
         try {
-            for (String line : Files.readAllLines(leaderboardFile, StandardCharsets.UTF_8)) {
+            for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
                 LeaderboardEntry entry = parseLine(line);
                 if (entry != null) {
                     entries.add(entry);
@@ -61,7 +111,7 @@ public class LeaderboardManager {
         return entries;
     }
 
-    private void saveEntries(List<LeaderboardEntry> entries) {
+    private void saveEntries(Path file, List<LeaderboardEntry> entries) {
         List<String> lines = new ArrayList<>();
         int limit = Math.min(entries.size(), MAX_ENTRIES);
         for (int i = 0; i < limit; i++) {
@@ -71,8 +121,8 @@ public class LeaderboardManager {
         }
 
         try {
-            Files.createDirectories(leaderboardFile.getParent());
-            Files.write(leaderboardFile, lines, StandardCharsets.UTF_8);
+            Files.createDirectories(file.getParent());
+            Files.write(file, lines, StandardCharsets.UTF_8);
         } catch (IOException e) {
             System.err.println("Failed to save leaderboard: " + e.getMessage());
         }
