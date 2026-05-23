@@ -21,9 +21,9 @@ public class InputHandler extends KeyAdapter {
     private int rightRepeatCounter = 0;
 
     // Professional Tetris Tuning Constants
-    private static final int DAS_DELAY_MS = 160;        // Reduced from 180 for better responsiveness
-    private static final int ARR_RATE_MS = 30;          // Reduced from 40 for smoother movement
-    private static final int SOFT_DROP_INTERVAL_MS = 30; // Reduced from 45 for faster soft drop
+    private static final int DAS_DELAY_MS = 170;        // Slightly increased for better control
+    private static final int ARR_RATE_MS = 45;          // Increased to slow down horizontal movement
+    private static final int SOFT_DROP_INTERVAL_MS = 30; // Kept fast for soft drop responsiveness
 
     private final javax.swing.Timer inputTimer;
     private long lastTickTime = System.currentTimeMillis();
