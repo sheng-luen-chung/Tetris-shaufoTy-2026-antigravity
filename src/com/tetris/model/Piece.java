@@ -52,13 +52,23 @@ public class Piece {
     // Get the relative coordinates of the tetromino
     public int[][] getRotatedCoords() {
         int[][] baseCoords = type.getCoords();
-        int[][] rotated = new int[4][2];
 
         if (type == Tetromino.O) { // Special case: O (doesn't rotate)
             return baseCoords;
         }
 
-        // Rotate algorithm
+        if (type == Tetromino.I) { // Special case: I (Standard SRS rotation to prevent wobble)
+            int[][][] iRotations = {
+                { { 1, 0 }, { 1, 1 }, { 1, 2 }, { 1, 3 } }, // 0
+                { { 0, 2 }, { 1, 2 }, { 2, 2 }, { 3, 2 } }, // 90 CW
+                { { 2, 0 }, { 2, 1 }, { 2, 2 }, { 2, 3 } }, // 180
+                { { 0, 1 }, { 1, 1 }, { 2, 1 }, { 3, 1 } }  // 270 CW
+            };
+            return iRotations[rotationIndex];
+        }
+
+        int[][] rotated = new int[4][2];
+        // Rotate algorithm for 3x3 pieces (T, J, L, S, Z) around (1,1)
         for (int i = 0; i < 4; i++) {
             int newR = baseCoords[i][0];
             int newC = baseCoords[i][1];

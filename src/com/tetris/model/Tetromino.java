@@ -11,11 +11,11 @@ public enum Tetromino {
 
     // Shape definition (relative coordinates)
     I(new int[][] { { 1, 0 }, { 1, 1 }, { 1, 2 }, { 1, 3 } }, Color.CYAN),
-    J(new int[][] { { 0, 2 }, { 1, 2 }, { 2, 1 }, { 2, 2 } }, Color.BLUE),
-    L(new int[][] { { 0, 1 }, { 1, 1 }, { 2, 1 }, { 2, 2 } }, Color.ORANGE),
-    O(new int[][] { { 1, 1 }, { 1, 2 }, { 2, 1 }, { 2, 2 } }, Color.YELLOW),
+    J(new int[][] { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 1, 2 } }, Color.BLUE),
+    L(new int[][] { { 0, 2 }, { 1, 0 }, { 1, 1 }, { 1, 2 } }, Color.ORANGE),
+    O(new int[][] { { 0, 1 }, { 0, 2 }, { 1, 1 }, { 1, 2 } }, Color.YELLOW),
     S(new int[][] { { 0, 1 }, { 0, 2 }, { 1, 0 }, { 1, 1 } }, Color.GREEN),
-    T(new int[][] { { 0, 0 }, { 0, 1 }, { 0, 2 }, { 1, 1 } }, Color.MAGENTA),
+    T(new int[][] { { 0, 1 }, { 1, 0 }, { 1, 1 }, { 1, 2 } }, Color.MAGENTA),
     Z(new int[][] { { 0, 0 }, { 0, 1 }, { 1, 1 }, { 1, 2 } }, Color.RED);
 
     // Tetromino properties
