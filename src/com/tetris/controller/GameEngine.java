@@ -83,6 +83,7 @@ public class GameEngine {
 
     // AI Autoplay Mechanism
     private boolean aiPlay = false;
+    private boolean usedAiThisSession = false;
     private Timer aiTimer;
     private int targetRotation = 0;
     private int targetCol = 0;
@@ -152,6 +153,7 @@ public class GameEngine {
         maxCombo = 0;
         nextPiece = generateRandomPiece();
         spawnNewPiece();
+        usedAiThisSession = false;
         gameState = GameState.PLAYING;
 
         // Restart loops
@@ -518,7 +520,9 @@ public class GameEngine {
         }
 
         leaderboardRecorded = true;
-        leaderboardManager.recordScore(score, secondsElapsed, difficulty);
+        if (!usedAiThisSession) {
+            leaderboardManager.recordScore(score, secondsElapsed, difficulty);
+        }
     }
 
     // Save current game state
@@ -850,9 +854,14 @@ public class GameEngine {
         return aiPlay;
     }
 
+    public boolean hasUsedAiThisSession() {
+        return usedAiThisSession;
+    }
+
     public void setAiPlay(boolean active) {
         this.aiPlay = active;
         if (active) {
+            this.usedAiThisSession = true;
             needsAiCalculation = true;
             if (aiTimer != null && !aiTimer.isRunning()) {
                 aiTimer.start();

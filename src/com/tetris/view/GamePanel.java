@@ -1550,7 +1550,7 @@ public class GamePanel extends JPanel {
         // 5. Draw Leaderboard (Controls hints deleted to free up space)
         drawLeaderboard(g, startX + 15, 330);
 
-        // 6. AI Autoplay Status Overlay
+        // 6. AI Autoplay Status Overlay / Score Disqualification Warning
         if (gameEngine.isAiPlay()) {
             int aiX = startX + 15;
             int aiY = 405;
@@ -1580,6 +1580,28 @@ public class GamePanel extends JPanel {
             g2d.setColor(new Color(185, 175, 200));
             g2d.drawString("AI is playing the game.", aiX + 15, aiY + 44);
             g2d.drawString("Press [A] to manual control", aiX + 15, aiY + 59);
+        } else if (gameEngine.hasUsedAiThisSession()) {
+            int warnX = startX + 15;
+            int warnY = 405;
+            int warnW = 170;
+            int warnH = 65;
+
+            // Semi-transparent warm warning background
+            g2d.setColor(new Color(255, 69, 0, 25));
+            g2d.fillRoundRect(warnX, warnY, warnW, warnH, 8, 8);
+
+            // Orange-red border
+            g2d.setColor(new Color(255, 100, 0, 160));
+            g2d.drawRoundRect(warnX, warnY, warnW, warnH, 8, 8);
+
+            g2d.setFont(new java.awt.Font("Microsoft JhengHei", java.awt.Font.BOLD, 11));
+            g2d.setColor(new Color(255, 160, 122));
+            g2d.drawString("不納入排行榜紀錄", warnX + 10, warnY + 22);
+
+            g2d.setFont(new java.awt.Font("Microsoft JhengHei", java.awt.Font.PLAIN, 10));
+            g2d.setColor(new Color(230, 200, 185));
+            g2d.drawString("本局曾使用自動遊玩", warnX + 10, warnY + 40);
+            g2d.drawString("分數將不寫入排行榜", warnX + 10, warnY + 53);
         }
     }
 
