@@ -782,13 +782,45 @@ public class GameEngine {
         if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
         totalActions++;
+        
         currentPiece.rotate();
-        if (!board.isValidMove(currentPiece)) {
-            // If collision, cancel rotation
-            currentPiece.undoRotate();
-        } else {
+        
+        // 1. Check if the rotated position is immediately valid
+        if (board.isValidMove(currentPiece)) {
             lastMoveWasRotation = true;
             resetLockDelay();
+            panel.repaint();
+            return;
+        }
+        
+        // 2. Wall Kick / Floor Kick Mechanism
+        // Try common offset kicks: Left 1, Right 1, Up 1 (floor kick), Left 2, Right 2, Up-Left, Up-Right
+        int[][] kickOffsets = {
+            {0, -1}, {0, 1}, {-1, 0},
+            {0, -2}, {0, 2},
+            {-1, -1}, {-1, 1}
+        };
+        
+        boolean kickSuccessful = false;
+        for (int[] offset : kickOffsets) {
+            int dr = offset[0];
+            int dc = offset[1];
+            
+            currentPiece.move(dr, dc);
+            if (board.isValidMove(currentPiece)) {
+                kickSuccessful = true;
+                break;
+            }
+            // Undo this kick attempt before trying next
+            currentPiece.move(-dr, -dc);
+        }
+        
+        if (kickSuccessful) {
+            lastMoveWasRotation = true;
+            resetLockDelay();
+        } else {
+            // All kicks failed, undo rotation
+            currentPiece.undoRotate();
         }
         panel.repaint();
     }
@@ -808,7 +840,7 @@ public class GameEngine {
         int endRow = currentPiece.getRow();
         if (endRow > startRow) {
             panel.spawnDropParticles(currentPiece);
-            lastMoveWasRotation = false;
+            // Do NOT set lastMoveWasRotation = false here, so T-Spins can be triggered on Hard Drop
         }
 
         // Hard drop = immediate lock, no delay window.
