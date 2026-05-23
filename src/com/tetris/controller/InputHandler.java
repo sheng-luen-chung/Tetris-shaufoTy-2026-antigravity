@@ -182,6 +182,19 @@ public class InputHandler extends KeyAdapter {
                 return;
             }
 
+            if (keyCode == KeyEvent.VK_A) {
+                engine.setAiPlay(!engine.isAiPlay());
+                return;
+            }
+
+            if (engine.isAiPlay()) {
+                if (keyCode == KeyEvent.VK_P || keyCode == KeyEvent.VK_ESCAPE) {
+                    engine.togglePause();
+                    resetKeyStates();
+                }
+                return;
+            }
+
             switch (keyCode) {
                 case KeyEvent.VK_LEFT:
                     if (!leftPressed) {

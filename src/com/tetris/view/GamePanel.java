@@ -42,7 +42,7 @@ public class GamePanel extends JPanel {
 
     // Menu properties
     private int selectedMenuIndex = 0;
-    private final Rectangle[] menuOptionBounds = new Rectangle[5];
+    private final Rectangle[] menuOptionBounds = new Rectangle[6];
     private Rectangle backButtonBounds = new Rectangle();
     private final List<FloatingPiece> floatingPieces = new ArrayList<>();
     private Timer menuAnimationTimer;
@@ -310,7 +310,7 @@ public class GamePanel extends JPanel {
                         // BACK button click
                         if (menuSettingsBackButtonBounds != null && menuSettingsBackButtonBounds.contains(e.getPoint())) {
                             showSettingsInMenu = false;
-                            selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 2 : 1; // Return Indicator to SETTINGS
+                            selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 3 : 2; // Return Indicator to SETTINGS
                             repaint();
                             return;
                         }
@@ -345,7 +345,7 @@ public class GamePanel extends JPanel {
                             }
                         }
                     } else {
-                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 5 : 4;
+                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 6 : 5;
                         for (int i = 0; i < numOptions; i++) {
                             if (menuOptionBounds[i] != null && menuOptionBounds[i].contains(e.getPoint())) {
                                 selectedMenuIndex = i;
@@ -429,7 +429,7 @@ public class GamePanel extends JPanel {
                             }
                         }
                     } else {
-                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 5 : 4;
+                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 6 : 5;
                         for (int i = 0; i < numOptions; i++) {
                             if (menuOptionBounds[i] != null && menuOptionBounds[i].contains(e.getPoint())) {
                                 if (selectedMenuIndex != i) {
@@ -570,7 +570,7 @@ public class GamePanel extends JPanel {
         if (showDifficultySelectInMenu) {
             selectedDifficultyIndex = (selectedDifficultyIndex + dir + 4) % 4;
         } else {
-            int numOptions = com.tetris.util.SaveManager.hasSave() ? 5 : 4;
+            int numOptions = com.tetris.util.SaveManager.hasSave() ? 6 : 5;
             selectedMenuIndex = (selectedMenuIndex + dir + numOptions) % numOptions;
         }
         repaint();
@@ -592,12 +592,19 @@ public class GamePanel extends JPanel {
                         selectedDifficultyIndex = 0; // Default to EASY
                         break;
                     case 2:
-                        showSettingsInMenu = true;
+                        // AI DEMO Option
+                        gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
+                        showDifficultySelectInMenu = false;
+                        gameEngine.startGame();
+                        gameEngine.setAiPlay(true);
                         break;
                     case 3:
-                        gameEngine.showLeaderboard();
+                        showSettingsInMenu = true;
                         break;
                     case 4:
+                        gameEngine.showLeaderboard();
+                        break;
+                    case 5:
                         System.exit(0);
                         break;
                 }
@@ -608,12 +615,19 @@ public class GamePanel extends JPanel {
                         selectedDifficultyIndex = 0; // Default to EASY
                         break;
                     case 1:
-                        showSettingsInMenu = true;
+                        // AI DEMO Option
+                        gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
+                        showDifficultySelectInMenu = false;
+                        gameEngine.startGame();
+                        gameEngine.setAiPlay(true);
                         break;
                     case 2:
-                        gameEngine.showLeaderboard();
+                        showSettingsInMenu = true;
                         break;
                     case 3:
+                        gameEngine.showLeaderboard();
+                        break;
+                    case 4:
                         System.exit(0);
                         break;
                 }
@@ -775,9 +789,9 @@ public class GamePanel extends JPanel {
 
         // Options
         boolean hasSave = com.tetris.util.SaveManager.hasSave();
-        int numOptions = hasSave ? 5 : 4;
-        int startY = hasSave ? 260 : 280;
-        int gap = hasSave ? 50 : 55;
+        int numOptions = hasSave ? 6 : 5;
+        int startY = hasSave ? 230 : 255;
+        int gap = 45;
         g2d.setFont(new Font("Arial", Font.BOLD, 22));
         FontMetrics fmOption = g2d.getFontMetrics();
 
@@ -787,16 +801,18 @@ public class GamePanel extends JPanel {
                 switch (i) {
                     case 0: label = "CONTINUE"; break;
                     case 1: label = "PLAY GAME"; break;
-                    case 2: label = "SETTINGS"; break;
-                    case 3: label = "LEADERBOARD"; break;
-                    case 4: label = "EXIT"; break;
+                    case 2: label = "AI DEMO"; break;
+                    case 3: label = "SETTINGS"; break;
+                    case 4: label = "LEADERBOARD"; break;
+                    case 5: label = "EXIT"; break;
                 }
             } else {
                 switch (i) {
                     case 0: label = "PLAY GAME"; break;
-                    case 1: label = "SETTINGS"; break;
-                    case 2: label = "LEADERBOARD"; break;
-                    case 3: label = "EXIT"; break;
+                    case 1: label = "AI DEMO"; break;
+                    case 2: label = "SETTINGS"; break;
+                    case 3: label = "LEADERBOARD"; break;
+                    case 4: label = "EXIT"; break;
                 }
             }
 
@@ -1453,11 +1469,12 @@ public class GamePanel extends JPanel {
 
     // Draw Sidebar
     private void drawSidebar(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
         int startX = COLS * TILE_SIZE;
 
         // Draw Sidebar Background
-        g.setColor(new Color(30, 30, 30));
-        g.fillRect(startX, 0, SIDEBAR_WIDTH, getHeight());
+        g2d.setColor(new Color(30, 30, 30));
+        g2d.fillRect(startX, 0, SIDEBAR_WIDTH, getHeight());
 
         // Draw Sidebar Border
         g.setColor(Color.GRAY);
@@ -1533,12 +1550,37 @@ public class GamePanel extends JPanel {
         // 5. Draw Leaderboard (Controls hints deleted to free up space)
         drawLeaderboard(g, startX + 15, 330);
 
-        // 6. Game Over Message
-        // if (gameEngine.isGameOver()) {
-        //     g.setColor(Color.RED);
-        //     g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
-        //     g.drawString("GAME OVER", startX + 15, 435);
-        // }
+        // 6. AI Autoplay Status Overlay
+        if (gameEngine.isAiPlay()) {
+            int aiX = startX + 15;
+            int aiY = 405;
+            int aiW = 170;
+            int aiH = 80;
+
+            long now = System.currentTimeMillis();
+            int alpha = 130 + (int)(60 * Math.sin(now / 150.0));
+
+            // Semi-transparent container
+            g2d.setColor(new Color(160, 32, 240, 25));
+            g2d.fillRoundRect(aiX, aiY, aiW, aiH, 8, 8);
+
+            // Glowing border
+            g2d.setColor(new Color(180, 50, 255, alpha));
+            g2d.drawRoundRect(aiX, aiY, aiW, aiH, 8, 8);
+
+            // Pulsing dot
+            g2d.setColor(new Color(180, 50, 255, alpha));
+            g2d.fillOval(aiX + 15, aiY + 16, 8, 8);
+
+            g2d.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
+            g2d.setColor(new Color(230, 200, 255));
+            g2d.drawString("AUTO PLAY", aiX + 30, aiY + 24);
+
+            g2d.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 10));
+            g2d.setColor(new Color(185, 175, 200));
+            g2d.drawString("AI is playing the game.", aiX + 15, aiY + 44);
+            g2d.drawString("Press [A] to manual control", aiX + 15, aiY + 59);
+        }
     }
 
     // Helper: Draw centered piece in preview boxes

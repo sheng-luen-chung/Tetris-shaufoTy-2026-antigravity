@@ -81,6 +81,13 @@ public class GameEngine {
     // after it first touched the ground, regardless of move resets.
     private static final int LOCK_HARD_CAP_MULTIPLIER = 3;
 
+    // AI Autoplay Mechanism
+    private boolean aiPlay = false;
+    private Timer aiTimer;
+    private int targetRotation = 0;
+    private int targetCol = 0;
+    private boolean needsAiCalculation = true;
+
     private Difficulty difficulty = Difficulty.NORMAL;
     private final LeaderboardManager leaderboardManager;
     private GameState gameState = GameState.MENU;
@@ -106,6 +113,13 @@ public class GameEngine {
             if (!isGameOver && !isPaused) {
                 secondsElapsed++;
                 panel.repaint(); // Refresh UI to show timer
+            }
+        });
+
+        // Set AI autoplay timer (ticks every 80ms)
+        aiTimer = new Timer(80, e -> {
+            if (gameState == GameState.PLAYING && !isPaused && !isGameOver && aiPlay) {
+                runAIStep();
             }
         });
     }
@@ -159,6 +173,7 @@ public class GameEngine {
     public void returnToMenu() {
         gameLoop.stop();
         secondTimer.stop();
+        setAiPlay(false); // Stop AI Autoplay
         gameState = GameState.MENU;
         SoundManager.stopBGM();
         panel.resetUIState();
@@ -180,9 +195,13 @@ public class GameEngine {
         isPaused = !isPaused;
         if (isPaused) {
             SoundManager.pauseBGM();
+            if (aiTimer != null) aiTimer.stop();
         } else {
             SoundManager.resumeBGM();
             panel.resetUIState();
+            if (aiPlay && aiTimer != null && !aiTimer.isRunning()) {
+                aiTimer.start();
+            }
         }
         panel.repaint();
     }
@@ -462,6 +481,7 @@ public class GameEngine {
         lockTotalStartTime = 0;
 
         piecesSpawned++;
+        needsAiCalculation = true; // Request AI path recalculation
 
         // Use nextPiece and generate new nextPiece
         currentPiece = nextPiece;
@@ -478,6 +498,7 @@ public class GameEngine {
         // If new piece collision, game over
         if (!board.isValidMove(currentPiece)) {
             isGameOver = true;
+            setAiPlay(false); // Stop AI Autoplay
             SaveManager.deleteSave();
             if (gameLoop != null) {
                 gameLoop.stop();
@@ -774,6 +795,7 @@ public class GameEngine {
         }
         
         canHoldThisTurn = false;
+        needsAiCalculation = true; // Request AI path recalculation
         panel.repaint();
     }
 
@@ -822,6 +844,65 @@ public class GameEngine {
         }
         panel.repaint();
         return true;
+    }
+
+    public boolean isAiPlay() {
+        return aiPlay;
+    }
+
+    public void setAiPlay(boolean active) {
+        this.aiPlay = active;
+        if (active) {
+            needsAiCalculation = true;
+            if (aiTimer != null && !aiTimer.isRunning()) {
+                aiTimer.start();
+            }
+        } else {
+            if (aiTimer != null) {
+                aiTimer.stop();
+            }
+        }
+        panel.repaint();
+    }
+
+    // AI step execution
+    private void runAIStep() {
+        if (gameState != GameState.PLAYING || isPaused || isGameOver) {
+            return;
+        }
+
+        if (needsAiCalculation) {
+            com.tetris.util.TetrisAI.Move bestMove = com.tetris.util.TetrisAI.findBestMove(board, currentPiece, heldPiece, canHoldThisTurn);
+            if (bestMove != null) {
+                if (bestMove.useHold) {
+                    holdPiece();
+                    needsAiCalculation = true;
+                    return;
+                }
+                targetRotation = bestMove.rotationIndex;
+                targetCol = bestMove.targetCol;
+                needsAiCalculation = false;
+            } else {
+                dropPiece();
+                return;
+            }
+        }
+
+        // Align rotation first
+        if (currentPiece.getRotationIndex() != targetRotation) {
+            rotatePiece();
+        }
+        // Align column position next
+        else if (currentPiece.getCol() < targetCol) {
+            movePieceRight();
+        }
+        else if (currentPiece.getCol() > targetCol) {
+            movePieceLeft();
+        }
+        // If aligned, perform Hard Drop!
+        else {
+            dropPiece();
+        }
     }
 
 }
