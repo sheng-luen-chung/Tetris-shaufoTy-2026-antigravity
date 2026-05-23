@@ -380,6 +380,47 @@ public class GameEngine {
             comboCount = -1;
         }
 
+        // Check for Perfect Clear
+        boolean isPerfectClear = false;
+        if (lines > 0) {
+            isPerfectClear = true;
+            Color[][] boardGrid = board.getGrid();
+            for (int r = 0; r < Board.ROWS; r++) {
+                for (int c = 0; c < Board.COLS; c++) {
+                    if (boardGrid[r][c] != null) {
+                        isPerfectClear = false;
+                        break;
+                    }
+                }
+                if (!isPerfectClear) break;
+            }
+        }
+
+        // Trigger screenshake based on clears, T-spins, or high combos
+        if (lines > 0 || isTSpin) {
+            int intensity = 0;
+            int duration = 0;
+            if (lines > 0) {
+                switch (lines) {
+                    case 1: intensity = 2; duration = 100; break;
+                    case 2: intensity = 4; duration = 150; break;
+                    case 3: intensity = 6; duration = 200; break;
+                    case 4: intensity = 10; duration = 300; break;
+                }
+            }
+            if (isTSpin) {
+                intensity += 4;
+                duration = Math.max(duration, 180);
+            }
+            if (comboCount >= 2) {
+                intensity += 2;
+                duration += 50;
+            }
+            if (intensity > 0) {
+                panel.triggerScreenshake(intensity, duration);
+            }
+        }
+
         if (isTSpin) {
             tSpins++;
         }
@@ -392,8 +433,17 @@ public class GameEngine {
                 points += 50 * comboCount;
             }
             
+            // Add Perfect Clear Bonus
+            if (isPerfectClear) {
+                points += 2000;
+            }
+            
             updateScore(points);
             panel.addScorePopup(popupCol, popupRow, points, lines, isTSpin, comboCount);
+
+            if (isPerfectClear) {
+                panel.triggerPerfectClear();
+            }
         }
         spawnNewPiece(); // Spawn
         canHoldThisTurn = true; // Reset hold status for the next turn

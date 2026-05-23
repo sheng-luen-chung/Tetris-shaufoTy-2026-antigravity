@@ -55,6 +55,15 @@ public class GamePanel extends JPanel {
     private boolean showGridLines = true;
     private long lastSaveTime = 0;
 
+    // Screenshake properties
+    private int shakeIntensity = 0;
+    private int shakeDuration = 100;
+    private long shakeEndTime = 0;
+
+    // Perfect Clear properties
+    private long perfectClearStartTime = 0;
+    private static final int PERFECT_CLEAR_DURATION = 2500;
+
     // Volume Settings controls properties
     private boolean showSettingsInMenu = false;
     private Rectangle bgmTrackBounds = new Rectangle();
@@ -262,6 +271,12 @@ public class GamePanel extends JPanel {
                         }
                     }
                 }
+            }
+            if (System.currentTimeMillis() < shakeEndTime) {
+                active = true;
+            }
+            if (System.currentTimeMillis() - perfectClearStartTime < PERFECT_CLEAR_DURATION) {
+                active = true;
             }
             if (!active) {
                 ((Timer) e.getSource()).stop();
@@ -538,29 +553,54 @@ public class GamePanel extends JPanel {
                 break;
             case PLAYING:
             default:
+                Graphics2D g2d = (Graphics2D) g;
+                java.awt.geom.AffineTransform oldTransform = g2d.getTransform();
+
+                int currentShakeX = 0;
+                int currentShakeY = 0;
+                if (System.currentTimeMillis() < shakeEndTime) {
+                    double progress = (shakeEndTime - System.currentTimeMillis()) / (double) shakeDuration;
+                    if (progress > 0) {
+                        int currentMaxOffset = (int) (shakeIntensity * progress);
+                        if (currentMaxOffset > 0) {
+                            currentShakeX = (int) (Math.random() * currentMaxOffset * 2 - currentMaxOffset);
+                            currentShakeY = (int) (Math.random() * currentMaxOffset * 2 - currentMaxOffset);
+                        }
+                    }
+                }
+
+                if (currentShakeX != 0 || currentShakeY != 0) {
+                    g2d.translate(currentShakeX, currentShakeY);
+                }
+
                 // Draw Game Area (Left)
-                drawGrid(g);
-                drawFixedBlocks(g);
-                drawCurrentPiece(g);
+                drawGrid(g2d);
+                drawFixedBlocks(g2d);
+                drawCurrentPiece(g2d);
 
                 // Draw particles inside the grid area
-                drawParticles(g);
+                drawParticles(g2d);
 
                 // Draw active score popups on top of the grid
-                drawScorePopups(g);
+                drawScorePopups(g2d);
 
                 // Draw Sidebar (Right)
-                drawSidebar(g);
+                drawSidebar(g2d);
 
                 // Draw Pause Overlay
                 if (gameEngine.isPaused()) {
-                    drawPauseOverlay(g);
+                    drawPauseOverlay(g2d);
                 }
 
                 // Draw Game Over Overlay
                 if (gameEngine.isGameOver()) {
-                    drawGameOverOverlay(g);
+                    drawGameOverOverlay(g2d);
                 }
+
+                // Draw Perfect Clear Overlay
+                drawPerfectClearOverlay(g2d);
+
+                g2d.setTransform(oldTransform);
                 break;
         }
     }
@@ -1781,6 +1821,7 @@ public class GamePanel extends JPanel {
         float life = 1.0f;
         float decay;
         int size;
+        int shapeType = 0; // 0: circle, 1: star
 
         Particle(double x, double y, Color color, int size, double angle, double speed, float decay) {
             this.x = x;
@@ -1790,6 +1831,11 @@ public class GamePanel extends JPanel {
             this.color = color;
             this.size = size;
             this.decay = decay;
+        }
+
+        Particle(double x, double y, Color color, int size, double angle, double speed, float decay, int shapeType) {
+            this(x, y, color, size, angle, speed, decay);
+            this.shapeType = shapeType;
         }
 
         void update() {
@@ -1858,6 +1904,125 @@ public class GamePanel extends JPanel {
         }
     }
 
+
+    // Triggers a screenshake with intensity and duration
+    public void triggerScreenshake(int intensity, int durationMs) {
+        this.shakeIntensity = intensity;
+        this.shakeDuration = durationMs;
+        this.shakeEndTime = System.currentTimeMillis() + durationMs;
+        if (!animationTimer.isRunning()) {
+            animationTimer.start();
+        }
+    }
+
+    // Trigger Perfect Clear visual explosion and text display
+    public void triggerPerfectClear() {
+        this.perfectClearStartTime = System.currentTimeMillis();
+
+        int boardW = COLS * TILE_SIZE;
+        int boardH = ROWS * TILE_SIZE;
+        int cx = boardW / 2;
+        int cy = boardH / 2;
+
+        Random rand = new Random();
+        synchronized (particles) {
+            for (int i = 0; i < 80; i++) {
+                double angle = rand.nextDouble() * Math.PI * 2;
+                double speed = 1.0 + rand.nextDouble() * 5.0;
+                float decay = 0.008f + rand.nextFloat() * 0.012f; // slower decay for star particles
+                int size = 5 + rand.nextInt(8);
+                Color goldColor = new Color(255, 200 + rand.nextInt(56), 0); // golden colors
+
+                particles.add(new Particle(cx, cy, goldColor, size, angle, speed, decay, 1));
+            }
+        }
+
+        // Heavy screenshake shockwave!
+        triggerScreenshake(12, 400);
+
+        if (!animationTimer.isRunning()) {
+            animationTimer.start();
+        }
+    }
+
+    // Draws a beautiful 5-pointed star
+    private void drawStar(Graphics2D g2d, int cx, int cy, int size) {
+        int r1 = size / 2;
+        int r2 = size / 4;
+        int[] xPoints = new int[10];
+        int[] yPoints = new int[10];
+        for (int i = 0; i < 10; i++) {
+            double angle = i * Math.PI / 5.0 - Math.PI / 2.0;
+            int r = (i % 2 == 0) ? r1 : r2;
+            xPoints[i] = cx + (int) (r * Math.cos(angle));
+            yPoints[i] = cy + (int) (r * Math.sin(angle));
+        }
+        g2d.fillPolygon(xPoints, yPoints, 10);
+    }
+
+    // Render expanding gold ring and pulsing golden text for Perfect Clear
+    private void drawPerfectClearOverlay(Graphics2D g2d) {
+        long elapsed = System.currentTimeMillis() - perfectClearStartTime;
+        if (elapsed >= PERFECT_CLEAR_DURATION) {
+            return;
+        }
+
+        double progress = elapsed / (double) PERFECT_CLEAR_DURATION;
+        Graphics2D g2 = (Graphics2D) g2d.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        int boardW = COLS * TILE_SIZE;
+        int boardH = ROWS * TILE_SIZE;
+        int cx = boardW / 2;
+        int cy = boardH / 2;
+
+        // 1. Expanding Golden Ring
+        double ringProgress = progress * 2.0; // expand fast in the first half
+        if (ringProgress <= 1.0) {
+            int maxRadius = Math.max(boardW, boardH);
+            int currentRadius = (int) (maxRadius * ringProgress);
+            float ringAlpha = (float) (1.0 - ringProgress);
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, ringAlpha));
+            g2.setColor(new Color(255, 215, 0)); // Gold
+            g2.setStroke(new java.awt.BasicStroke(4.0f));
+            g2.drawOval(cx - currentRadius, cy - currentRadius, currentRadius * 2, currentRadius * 2);
+        }
+
+        // 2. Pulsing/Floating Text
+        float textAlpha = 1.0f;
+        if (progress > 0.8) {
+            textAlpha = (float) ((1.0 - progress) / 0.2); // fade out
+        }
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.max(0f, Math.min(1f, textAlpha))));
+
+        // Main Text: PERFECT CLEAR!
+        g2.setFont(new Font("Impact", Font.BOLD, 36));
+        FontMetrics fmMain = g2.getFontMetrics();
+        String mainText = "PERFECT CLEAR!";
+
+        // Scale pulse based on time
+        double pulse = 1.0 + 0.15 * Math.sin(progress * Math.PI * 4.0);
+        g2.translate(cx, cy - 30);
+        g2.scale(pulse, pulse);
+
+        // Draw shadow
+        g2.setColor(new Color(0, 0, 0, 150));
+        g2.drawString(mainText, -fmMain.stringWidth(mainText) / 2 + 2, 2);
+        // Draw fill
+        g2.setColor(new Color(255, 215, 0));
+        g2.drawString(mainText, -fmMain.stringWidth(mainText) / 2, 0);
+
+        // Sub Text: +2000 PTS
+        g2.scale(1.0 / pulse, 1.0 / pulse); // reset scale
+        g2.setFont(new Font("Arial", Font.BOLD, 18));
+        FontMetrics fmSub = g2.getFontMetrics();
+        String subText = "+2000 BONUS";
+        g2.setColor(Color.WHITE);
+        g2.drawString(subText, -fmSub.stringWidth(subText) / 2, 40);
+
+        g2.dispose();
+    }
+
     // Draw active particles in the grid area
     private void drawParticles(Graphics g) {
         synchronized (particles) {
@@ -1869,7 +2034,11 @@ public class GamePanel extends JPanel {
                 if (p.life <= 0) continue;
                 g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, p.life));
                 g2d.setColor(p.color);
-                g2d.fillOval((int) (p.x - p.size / 2.0), (int) (p.y - p.size / 2.0), p.size, p.size);
+                if (p.shapeType == 1) {
+                    drawStar(g2d, (int) p.x, (int) p.y, p.size);
+                } else {
+                    g2d.fillOval((int) (p.x - p.size / 2.0), (int) (p.y - p.size / 2.0), p.size, p.size);
+                }
             }
             g2d.dispose();
         }
