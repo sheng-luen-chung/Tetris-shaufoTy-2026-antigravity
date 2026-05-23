@@ -65,9 +65,13 @@ public class GameEngine {
     
     // Lock Delay Mechanism
     private boolean isLocking = false;
-    private long lockStartTime = 0;
+    private long lockStartTime = 0;      // resets each time the player moves
+    private long lockTotalStartTime = 0; // set once when piece FIRST touches ground; never reset
     private int lockMoveResets = 0;
     private static final int MAX_LOCK_RESETS = 15;
+    // Hard cap: piece locks no later than lockDelayMs * LOCK_HARD_CAP_MULTIPLIER
+    // after it first touched the ground, regardless of move resets.
+    private static final int LOCK_HARD_CAP_MULTIPLIER = 3;
 
     private Difficulty difficulty = Difficulty.NORMAL;
     private final LeaderboardManager leaderboardManager;
@@ -173,34 +177,50 @@ public class GameEngine {
     private void startLockDelay() {
         if (!isLocking) {
             isLocking = true;
-            lockStartTime = System.currentTimeMillis();
-            lockMoveResets = 0;
+            long now = System.currentTimeMillis();
+
+            // Record the very first moment this piece touched the ground.
+            // This timestamp is NEVER reset — it is the hard-cap anchor.
+            if (lockTotalStartTime == 0) {
+                lockTotalStartTime = now;
+            }
+
+            // Only give a fresh per-move window when within the reset budget.
+            // Once the budget is exhausted we keep the stale lockStartTime so
+            // the remaining portion of the last window ticks down naturally.
+            if (lockMoveResets < MAX_LOCK_RESETS) {
+                lockStartTime = now;
+            }
         }
     }
 
     private void stopLockDelay() {
         isLocking = false;
-        lockMoveResets = 0;
+        // NOTE: do NOT reset lockMoveResets here.
+        // The counter must persist across mid-air intervals so players cannot
+        // bypass MAX_LOCK_RESETS by briefly lifting the piece and re-landing it.
     }
 
     private void resetLockDelay() {
-        if (lockMoveResets < MAX_LOCK_RESETS) {
-            // Check if the piece is actually on the ground
-            currentPiece.move(1, 0);
-            boolean onGround = !board.isValidMove(currentPiece);
-            currentPiece.move(-1, 0);
+        // Check if the piece is actually on the ground
+        currentPiece.move(1, 0);
+        boolean onGround = !board.isValidMove(currentPiece);
+        currentPiece.move(-1, 0);
 
-            if (onGround) {
-                if (!isLocking) {
-                    startLockDelay();
-                } else {
-                    lockStartTime = System.currentTimeMillis();
-                    lockMoveResets++;
-                }
-            } else {
-                // If it moved/rotated to a floating position, stop the lock timer
-                stopLockDelay();
+        if (onGround) {
+            if (!isLocking) {
+                // Piece just landed – start the timer (respects the cap inside startLockDelay)
+                startLockDelay();
+            } else if (lockMoveResets < MAX_LOCK_RESETS) {
+                // Still within the allowed reset budget: refresh the timer
+                lockStartTime = System.currentTimeMillis();
+                lockMoveResets++;
             }
+            // If the cap is already reached we simply do nothing, letting the
+            // existing timer tick down to zero and lock the piece naturally.
+        } else {
+            // Piece moved/rotated to a floating position – pause the timer
+            stopLockDelay();
         }
     }
 
@@ -209,8 +229,17 @@ public class GameEngine {
             return;
 
         if (isLocking) {
-            if (System.currentTimeMillis() - lockStartTime >= difficulty.getLockDelayMs()) {
-                // Time's up, check if still on ground
+            long now = System.currentTimeMillis();
+            long hardCap = difficulty.getLockDelayMs() * LOCK_HARD_CAP_MULTIPLIER;
+
+            // Two independent expiry conditions:
+            // 1. Per-move window: time since last reset exceeded lockDelayMs
+            // 2. Hard cap: total time since first ground contact exceeded hardCap
+            boolean perMoveExpired = (now - lockStartTime >= difficulty.getLockDelayMs());
+            boolean hardCapExpired = (lockTotalStartTime > 0 && now - lockTotalStartTime >= hardCap);
+
+            if (perMoveExpired || hardCapExpired) {
+                // Verify the piece is still on the ground before locking
                 currentPiece.move(1, 0);
                 if (!board.isValidMove(currentPiece)) {
                     currentPiece.move(-1, 0);
@@ -392,8 +421,10 @@ public class GameEngine {
 
     // Spawn new piece
     private void spawnNewPiece() {
-        // Reset lock delay state for the new piece
+        // Fully reset all lock-delay state for the incoming piece
         stopLockDelay();
+        lockMoveResets = 0;
+        lockTotalStartTime = 0;
 
         // Use nextPiece and generate new nextPiece
         currentPiece = nextPiece;
@@ -645,7 +676,7 @@ public class GameEngine {
         panel.repaint();
     }
 
-    // Drop piece
+    // Drop piece (Hard Drop)
     public void dropPiece() {
         if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
@@ -662,8 +693,10 @@ public class GameEngine {
             lastMoveWasRotation = false;
         }
 
-        // Instead of immediate freeze, trigger lock delay for space bar too
-        startLockDelay();
+        // Hard drop = immediate lock, no delay window.
+        // Lock delay (with time to rotate/shift) only applies to gravity & soft drop.
+        stopLockDelay();
+        freezeAndSpawn();
         panel.repaint();
     }
 

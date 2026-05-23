@@ -83,21 +83,34 @@ public class SoundManager {
 
     /**
      * 暫停背景音樂 (BGM)。
-     * 僅停止播放，不釋放資源也不重設播放位置。
+     * 停止播放（立即生效），不釋放資源也不重設播放位置。
      */
     public static synchronized void pauseBGM() {
         if (bgmClip != null && bgmClip.isRunning()) {
-            bgmClip.stop();
+            bgmClip.stop(); // Immediate: halts audio output at the OS/driver level
         }
     }
 
     /**
      * 恢復播放背景音樂 (BGM)。
-     * 如果背景音樂已被暫停，將從暫停處繼續播放。
+     * 從暫停處繼續播放（立即生效）。
      */
     public static synchronized void resumeBGM() {
         if (bgmClip != null && !bgmClip.isRunning()) {
+            setClipVolume(bgmClip, bgmVolume, bgmMuted); // ensure correct volume before starting
             bgmClip.start();
+        }
+    }
+
+    /**
+     * 暂時啟動 BGM Clip 供設定區預聴音量。
+     * 僅在「暫停狀態下開啟設定」時呼叫，讓使用者拉動滑桿時能即時聽到 BGM 的變化。
+     * 關閉設定區後應呼叫 pauseBGM() 再次停止。
+     */
+    public static synchronized void previewBGM() {
+        if (bgmClip != null && !bgmClip.isRunning()) {
+            setClipVolume(bgmClip, bgmVolume, bgmMuted);
+            bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
         }
     }
 
