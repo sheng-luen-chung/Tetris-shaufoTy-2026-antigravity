@@ -16,7 +16,8 @@ public class GameEngine {
     public enum GameState {
         MENU,
         PLAYING,
-        LEADERBOARD
+        LEADERBOARD,
+        TUTORIAL
     }
 
     public enum Difficulty {
@@ -47,6 +48,12 @@ public class GameEngine {
         }
     }
 
+    public enum TSpinType {
+        NONE,
+        MINI,
+        REGULAR
+    }
+
     private Board board;
     private GamePanel panel;
     private Piece currentPiece;
@@ -62,6 +69,12 @@ public class GameEngine {
     private int secondsElapsed = 0;
     private int comboCount = -1; // -1 means no combo, 0+ means consecutive clears
     private boolean lastMoveWasRotation = false;
+    private int[] lastRotationKickOffset = {0, 0};
+
+    // Tutorial Mode fields
+    private int tutorialLevel = 1;
+    private boolean isTransitioning = false;
+    private boolean lastTutorialSuccess = false;
 
     // Stats tracking
     private int piecesSpawned = 0;
@@ -190,7 +203,7 @@ public class GameEngine {
 
     // Toggle pause
     public void togglePause() {
-        if (gameState != GameState.PLAYING)
+        if (gameState != GameState.PLAYING && gameState != GameState.TUTORIAL)
             return;
         if (isGameOver)
             return;
@@ -260,7 +273,7 @@ public class GameEngine {
     }
 
     public void tickLockDelay() {
-        if (gameState != GameState.PLAYING || isGameOver || isPaused)
+        if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused)
             return;
 
         if (isLocking) {
@@ -291,7 +304,7 @@ public class GameEngine {
 
     // Soft drop piece (down)
     public void softDrop() {
-        if (gameState != GameState.PLAYING || isGameOver || isPaused)
+        if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
         update();
@@ -303,9 +316,9 @@ public class GameEngine {
 
     // Update the piece (down)
     public void update() {
-        if (gameState != GameState.PLAYING)
+        if (gameState != GameState.PLAYING && gameState != GameState.TUTORIAL)
             return;
-        if (isGameOver || isPaused)
+        if (isGameOver || isPaused || isTransitioning)
             return;
 
         // 1. Try to move down
@@ -335,6 +348,27 @@ public class GameEngine {
         int popupRow = getCurrentPieceCenterRow();
         board.freezePiece(currentPiece); // Freeze
 
+        if (gameState == GameState.TUTORIAL) {
+            TSpinType tSpinType = checkTSpinType();
+            // A regular T-spin is required to pass
+            if (tSpinType == TSpinType.REGULAR) {
+                // Clear the lines, which clears the row blocks
+                int lines = board.clearLines();
+                tSpins++;
+                SoundManager.playSFX("/resources/clear.wav");
+                if (lines > 0) {
+                    java.awt.Color[] rowColors = new java.awt.Color[Board.COLS];
+                    java.util.Arrays.fill(rowColors, Tetromino.T.getColor());
+                    panel.spawnRowClearParticles(popupRow, rowColors);
+                    panel.triggerScreenshake(lines * 3, 200);
+                }
+                tutorialSuccess();
+            } else {
+                tutorialFail();
+            }
+            return;
+        }
+
         // Check full rows before clearing to spawn block-colored particles
         java.util.List<Integer> fullRows = new java.util.ArrayList<>();
         java.awt.Color[][] grid = board.getGrid();
@@ -363,7 +397,8 @@ public class GameEngine {
         }
 
         // Detect T-Spin before clearing lines but after piece is in final position
-        boolean isTSpin = checkTSpin();
+        TSpinType tSpinType = checkTSpinType();
+        boolean isTSpin = (tSpinType != TSpinType.NONE);
 
         int lines = board.clearLines(); // Clear lines
         
@@ -426,7 +461,7 @@ public class GameEngine {
         }
 
         if (lines > 0 || isTSpin) {
-            int points = getLineClearPoints(lines, isTSpin);
+            int points = getLineClearPoints(lines, tSpinType);
             
             // Add Combo Bonus
             if (comboCount > 0) {
@@ -439,7 +474,7 @@ public class GameEngine {
             }
             
             updateScore(points);
-            panel.addScorePopup(popupCol, popupRow, points, lines, isTSpin, comboCount);
+            panel.addScorePopup(popupCol, popupRow, points, lines, tSpinType, comboCount);
 
             if (isPerfectClear) {
                 panel.triggerPerfectClear();
@@ -449,37 +484,86 @@ public class GameEngine {
         canHoldThisTurn = true; // Reset hold status for the next turn
     }
 
-    private boolean checkTSpin() {
+    private TSpinType checkTSpinType() {
         if (currentPiece.getType() != Tetromino.T || !lastMoveWasRotation) {
-            return false;
+            return TSpinType.NONE;
         }
 
         int r = currentPiece.getRow();
         int c = currentPiece.getCol();
+        int rotation = currentPiece.getRotationIndex();
 
-        // 4 corners relative to (1,1) center: (0,0), (0,2), (2,0), (2,2)
-        int[][] corners = {
-            {r + 0, c + 0}, {r + 0, c + 2},
-            {r + 2, c + 0}, {r + 2, c + 2}
-        };
+        // corners relative to center (r+1, c+1)
+        int[][] frontCorners;
+        int[][] backCorners;
 
-        int count = 0;
-        for (int[] corner : corners) {
+        if (rotation == 0) { // Pointing UP
+            frontCorners = new int[][] { {r, c}, {r, c + 2} }; // TL, TR
+            backCorners = new int[][] { {r + 2, c}, {r + 2, c + 2} }; // BL, BR
+        } else if (rotation == 1) { // Pointing RIGHT
+            frontCorners = new int[][] { {r, c + 2}, {r + 2, c + 2} }; // TR, BR
+            backCorners = new int[][] { {r, c}, {r + 2, c} }; // TL, BL
+        } else if (rotation == 2) { // Pointing DOWN
+            frontCorners = new int[][] { {r + 2, c}, {r + 2, c + 2} }; // BL, BR
+            backCorners = new int[][] { {r, c}, {r, c + 2} }; // TL, TR
+        } else { // Pointing LEFT (rotation == 3)
+            frontCorners = new int[][] { {r, c}, {r + 2, c} }; // TL, BL
+            backCorners = new int[][] { {r, c + 2}, {r + 2, c + 2} }; // TR, BR
+        }
+
+        int occupiedFront = 0;
+        for (int[] corner : frontCorners) {
             if (board.isOccupied(corner[0], corner[1])) {
-                count++;
+                occupiedFront++;
             }
         }
 
-        return count >= 3;
+        int occupiedBack = 0;
+        for (int[] corner : backCorners) {
+            if (board.isOccupied(corner[0], corner[1])) {
+                occupiedBack++;
+            }
+        }
+
+        int totalOccupied = occupiedFront + occupiedBack;
+
+        if (totalOccupied < 3) {
+            return TSpinType.NONE;
+        }
+
+        // 3-Corner Rule satisfied. Classify Regular vs Mini:
+        if (occupiedFront == 2) {
+            return TSpinType.REGULAR;
+        }
+
+        // If only 1 front corner is occupied, check if upgraded by a complex wall kick
+        if (lastRotationKickOffset != null) {
+            int dr = lastRotationKickOffset[0];
+            int dc = lastRotationKickOffset[1];
+            // Simple kicks are: (0,0), (0, -1), (0, 1), (-1, 0)
+            boolean isSimpleKick = (dr == 0 && Math.abs(dc) <= 1) || (dr == -1 && dc == 0);
+            if (!isSimpleKick) {
+                return TSpinType.REGULAR;
+            }
+        }
+
+        return TSpinType.MINI;
     }
 
-    private int getLineClearPoints(int lines, boolean isTSpin) {
-        if (isTSpin) {
+    private int getLineClearPoints(int lines, TSpinType tSpinType) {
+        if (tSpinType == TSpinType.REGULAR) {
             switch (lines) {
                 case 0: return 400;
                 case 1: return 800;
                 case 2: return 1200;
                 case 3: return 1600;
+                default: return 0;
+            }
+        } else if (tSpinType == TSpinType.MINI) {
+            switch (lines) {
+                case 0: return 100;
+                case 1: return 100;
+                case 2: return 400;
                 default: return 0;
             }
         } else {
@@ -520,6 +604,9 @@ public class GameEngine {
 
     // Generate a random piece
     private Piece generateRandomPiece() {
+        if (gameState == GameState.TUTORIAL) {
+            return new Piece(Tetromino.T);
+        }
         Tetromino[] types = Tetromino.values();
         Tetromino randomType = types[new Random().nextInt(types.length)];
         return new Piece(randomType);
@@ -531,6 +618,9 @@ public class GameEngine {
         stopLockDelay();
         lockMoveResets = 0;
         lockTotalStartTime = 0;
+
+        lastMoveWasRotation = false;
+        lastRotationKickOffset = new int[] {0, 0};
 
         piecesSpawned++;
         needsAiCalculation = true; // Request AI path recalculation
@@ -716,19 +806,19 @@ public class GameEngine {
     }
 
     public void navigatePauseMenu(int dir) {
-        if (gameState == GameState.PLAYING && isPaused) {
+        if ((gameState == GameState.PLAYING || gameState == GameState.TUTORIAL) && isPaused) {
             panel.navigatePauseMenu(dir);
         }
     }
 
     public void selectPauseMenuItem() {
-        if (gameState == GameState.PLAYING && isPaused) {
+        if ((gameState == GameState.PLAYING || gameState == GameState.TUTORIAL) && isPaused) {
             panel.selectPauseMenuItem();
         }
     }
 
     public void handleBackAction() {
-        if (gameState == GameState.PLAYING && isPaused) {
+        if ((gameState == GameState.PLAYING || gameState == GameState.TUTORIAL) && isPaused) {
             if (panel.isShowSettingsInPause()) {
                 panel.setShowSettingsInPause(false);
             } else {
@@ -757,7 +847,7 @@ public class GameEngine {
 
     // Move piece left
     public void movePieceLeft() {
-        if (gameState != GameState.PLAYING || isGameOver || isPaused)
+        if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
         if (handleMove(0, -1)) {
@@ -768,7 +858,7 @@ public class GameEngine {
 
     // Move piece right
     public void movePieceRight() {
-        if (gameState != GameState.PLAYING || isGameOver || isPaused)
+        if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
         if (handleMove(0, 1)) {
@@ -779,29 +869,28 @@ public class GameEngine {
 
     // Rotate piece
     public void rotatePiece() {
-        if (gameState != GameState.PLAYING || isGameOver || isPaused)
+        if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
         
+        int fromState = currentPiece.getRotationIndex();
         currentPiece.rotate();
+        int toState = currentPiece.getRotationIndex();
         
         // 1. Check if the rotated position is immediately valid
         if (board.isValidMove(currentPiece)) {
             lastMoveWasRotation = true;
+            lastRotationKickOffset = new int[] {0, 0};
             resetLockDelay();
             panel.repaint();
             return;
         }
         
-        // 2. Wall Kick / Floor Kick Mechanism
-        // Try common offset kicks: Left 1, Right 1, Up 1 (floor kick), Left 2, Right 2, Up-Left, Up-Right
-        int[][] kickOffsets = {
-            {0, -1}, {0, 1}, {-1, 0},
-            {0, -2}, {0, 2},
-            {-1, -1}, {-1, 1}
-        };
+        // 2. Wall Kick / Floor Kick Mechanism (SRS)
+        int[][] kickOffsets = getSrsKickOffsets(currentPiece.getType(), fromState, toState);
         
         boolean kickSuccessful = false;
+        int[] successfulOffset = null;
         for (int[] offset : kickOffsets) {
             int dr = offset[0];
             int dc = offset[1];
@@ -809,6 +898,7 @@ public class GameEngine {
             currentPiece.move(dr, dc);
             if (board.isValidMove(currentPiece)) {
                 kickSuccessful = true;
+                successfulOffset = offset;
                 break;
             }
             // Undo this kick attempt before trying next
@@ -817,6 +907,7 @@ public class GameEngine {
         
         if (kickSuccessful) {
             lastMoveWasRotation = true;
+            lastRotationKickOffset = successfulOffset;
             resetLockDelay();
         } else {
             // All kicks failed, undo rotation
@@ -825,9 +916,38 @@ public class GameEngine {
         panel.repaint();
     }
 
+    private int[][] getSrsKickOffsets(Tetromino type, int fromState, int toState) {
+        if (type == Tetromino.O) {
+            return new int[0][2];
+        }
+        
+        if (type == Tetromino.I) {
+            if (fromState == 0 && toState == 1) {
+                return new int[][] { {0, -2}, {0, 1}, {1, -2}, {-2, 1} };
+            } else if (fromState == 1 && toState == 2) {
+                return new int[][] { {0, -1}, {0, 2}, {-2, -1}, {1, 2} };
+            } else if (fromState == 2 && toState == 3) {
+                return new int[][] { {0, 2}, {0, -1}, {-1, 2}, {2, -1} };
+            } else if (fromState == 3 && toState == 0) {
+                return new int[][] { {0, 1}, {0, -2}, {2, 1}, {-1, -2} };
+            }
+        } else { // J, L, S, T, Z
+            if (fromState == 0 && toState == 1) {
+                return new int[][] { {0, -1}, {-1, -1}, {2, 0}, {2, -1} };
+            } else if (fromState == 1 && toState == 2) {
+                return new int[][] { {0, 1}, {1, 1}, {-2, 0}, {-2, 1} };
+            } else if (fromState == 2 && toState == 3) {
+                return new int[][] { {0, 1}, {-1, 1}, {2, 0}, {2, 1} };
+            } else if (fromState == 3 && toState == 0) {
+                return new int[][] { {0, -1}, {1, -1}, {-2, 0}, {-2, -1} };
+            }
+        }
+        return new int[0][2];
+    }
+
     // Drop piece (Hard Drop)
     public void dropPiece() {
-        if (gameState != GameState.PLAYING || isGameOver || isPaused)
+        if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
         int startRow = currentPiece.getRow();
@@ -852,7 +972,7 @@ public class GameEngine {
 
     // Hold the current piece
     public void holdPiece() {
-        if (gameState != GameState.PLAYING || isGameOver || isPaused)
+        if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         if (!canHoldThisTurn)
             return;
@@ -994,6 +1114,95 @@ public class GameEngine {
         else {
             dropPiece();
         }
+    }
+
+    public int getTutorialLevel() {
+        return tutorialLevel;
+    }
+
+    public boolean isTransitioning() {
+        return isTransitioning;
+    }
+
+    public void startTutorial() {
+        tutorialLevel = 1;
+        startTutorialLevel(tutorialLevel);
+    }
+
+    public void startTutorialLevel(int level) {
+        this.tutorialLevel = level;
+        this.isTransitioning = false;
+        
+        board.clear();
+        score = 0;
+        secondsElapsed = 0;
+        comboCount = -1;
+        isGameOver = false;
+        isPaused = false;
+        heldPiece = null;
+        canHoldThisTurn = true;
+        piecesSpawned = 0;
+        totalActions = 0;
+        totalLinesCleared = 0;
+        tetrisClears = 0;
+        tSpins = 0;
+        maxCombo = 0;
+        
+        nextPiece = new Piece(Tetromino.T);
+        spawnNewPiece();
+        
+        board.setupTutorialLevel(level);
+        
+        gameState = GameState.TUTORIAL;
+        
+        SoundManager.playBGM("/resources/bgm.wav");
+        
+        gameLoop.stop();
+        gameLoop.setDelay(1000);
+        gameLoop.setInitialDelay(1000);
+        gameLoop.start();
+        
+        secondTimer.stop();
+        secondTimer.start();
+        
+        panel.repaint();
+    }
+
+    public boolean isLastTutorialSuccess() {
+        return lastTutorialSuccess;
+    }
+
+    private void tutorialSuccess() {
+        lastTutorialSuccess = true;
+        isTransitioning = true;
+        gameLoop.stop();
+        panel.repaint();
+        
+        javax.swing.Timer delayTimer = new javax.swing.Timer(1200, e -> {
+            if (tutorialLevel < 3) {
+                startTutorialLevel(tutorialLevel + 1);
+            } else {
+                isGameOver = true;
+                isTransitioning = false;
+                SoundManager.stopBGM();
+                panel.repaint();
+            }
+        });
+        delayTimer.setRepeats(false);
+        delayTimer.start();
+    }
+
+    private void tutorialFail() {
+        lastTutorialSuccess = false;
+        isTransitioning = true;
+        gameLoop.stop();
+        panel.repaint();
+        
+        javax.swing.Timer delayTimer = new javax.swing.Timer(1200, e -> {
+            startTutorialLevel(tutorialLevel);
+        });
+        delayTimer.setRepeats(false);
+        delayTimer.start();
     }
 
 }

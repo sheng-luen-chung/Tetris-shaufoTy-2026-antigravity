@@ -105,4 +105,67 @@ public class Board {
             grid[0][col] = null;
         }
     }
+
+    // Set up the board grid for T-spin tutorial levels
+    public void setupTutorialLevel(int level) {
+        clear();
+        if (level == 1) { // TSS (T-Spin Single)
+            // Row 17: Overhang on col 2, entry path at cols 3-4
+            for (int c = 0; c < COLS; c++) {
+                if (c != 3 && c != 4) {
+                    grid[17][c] = Color.GRAY;
+                }
+            }
+            // Row 18: Target line. Empty at cols 2, 3, 4.
+            for (int c = 0; c < COLS; c++) {
+                if (c != 2 && c != 3 && c != 4) {
+                    grid[18][c] = Color.GRAY;
+                }
+            }
+            // Row 19: Bottom line. Empty at col 3 (pointing part) and col 0 (prevent clear)
+            for (int c = 0; c < COLS; c++) {
+                if (c != 0 && c != 3) {
+                    grid[19][c] = Color.GRAY;
+                }
+            }
+        } else if (level == 2) { // TSD Right (T-Spin Double Right-facing)
+            // Row 17: Overhang on col 2, entry path at cols 3-4
+            for (int c = 0; c < COLS; c++) {
+                if (c != 3 && c != 4) {
+                    grid[17][c] = Color.GRAY;
+                }
+            }
+            // Row 18: Target line 1. Empty at cols 2, 3, 4.
+            for (int c = 0; c < COLS; c++) {
+                if (c != 2 && c != 3 && c != 4) {
+                    grid[18][c] = Color.GRAY;
+                }
+            }
+            // Row 19: Target line 2. Empty at col 3.
+            for (int c = 0; c < COLS; c++) {
+                if (c != 3) {
+                    grid[19][c] = Color.GRAY;
+                }
+            }
+        } else if (level == 3) { // TSD Left (T-Spin Double Left-facing)
+            // Row 17: Overhang on col 7, entry path at cols 5-6
+            for (int c = 0; c < COLS; c++) {
+                if (c != 5 && c != 6) {
+                    grid[17][c] = Color.GRAY;
+                }
+            }
+            // Row 18: Target line 1. Empty at cols 5, 6, 7.
+            for (int c = 0; c < COLS; c++) {
+                if (c != 5 && c != 6 && c != 7) {
+                    grid[18][c] = Color.GRAY;
+                }
+            }
+            // Row 19: Target line 2. Empty at col 6.
+            for (int c = 0; c < COLS; c++) {
+                if (c != 6) {
+                    grid[19][c] = Color.GRAY;
+                }
+            }
+        }
+    }
 }

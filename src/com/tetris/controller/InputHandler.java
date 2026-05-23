@@ -37,8 +37,9 @@ public class InputHandler extends KeyAdapter {
             int deltaTime = (int) (now - lastTickTime);
             lastTickTime = now;
 
-            if (engine.getGameState() == GameEngine.GameState.PLAYING && 
-                !engine.isGameOver() && !engine.isPaused()) {
+            GameEngine.GameState state = engine.getGameState();
+            boolean isActiveState = (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL);
+            if (isActiveState && !engine.isGameOver() && !engine.isPaused() && !engine.isTransitioning()) {
                 updateInputs(deltaTime);
                 engine.tickLockDelay(); // Tick lock delay every frame
             } else {
@@ -150,7 +151,14 @@ public class InputHandler extends KeyAdapter {
                     engine.navigateLeaderboardTabs(1);
                     break;
             }
-        } else if (state == GameEngine.GameState.PLAYING) {
+        } else if (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL) {
+            if (engine.isTransitioning()) {
+                if (keyCode == KeyEvent.VK_ESCAPE) {
+                    engine.returnToMenu();
+                }
+                return;
+            }
+
             if (engine.isGameOver()) {
                 if (keyCode == KeyEvent.VK_ENTER || keyCode == KeyEvent.VK_ESCAPE || keyCode == KeyEvent.VK_SPACE) {
                     engine.returnToMenu();
@@ -248,7 +256,8 @@ public class InputHandler extends KeyAdapter {
     @Override
     public void keyReleased(KeyEvent e) {
         int keyCode = e.getKeyCode();
-        if (engine.getGameState() == GameEngine.GameState.PLAYING) {
+        GameEngine.GameState state = engine.getGameState();
+        if (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL) {
             switch (keyCode) {
                 case KeyEvent.VK_LEFT:
                     leftPressed = false;

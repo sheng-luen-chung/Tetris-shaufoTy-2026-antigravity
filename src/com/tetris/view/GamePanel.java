@@ -42,7 +42,7 @@ public class GamePanel extends JPanel {
 
     // Menu properties
     private int selectedMenuIndex = 0;
-    private final Rectangle[] menuOptionBounds = new Rectangle[6];
+    private final Rectangle[] menuOptionBounds = new Rectangle[7];
     private Rectangle backButtonBounds = new Rectangle();
     private final List<FloatingPiece> floatingPieces = new ArrayList<>();
     private Timer menuAnimationTimer;
@@ -95,14 +95,14 @@ public class GamePanel extends JPanel {
     }
 
     // Add a score popup at a grid cell (col, row)
-    public void addScorePopup(int gridCol, int gridRow, int score, int lines, boolean isTSpin, int comboCount) {
+    public void addScorePopup(int gridCol, int gridRow, int score, int lines, com.tetris.controller.GameEngine.TSpinType tSpinType, int comboCount) {
         String scoreText = "+" + score;
         String lineText = "";
         String comboText = (comboCount >= 1) ? ((comboCount + 1) + " COMBO!") : "";
         Color popupColor = new Color(255, 235, 120); // Default gold
         Font font = new Font("Arial", Font.BOLD, 24); // Font size
 
-        if (isTSpin) {
+        if (tSpinType == com.tetris.controller.GameEngine.TSpinType.REGULAR) {
             switch (lines) {
                 case 0:
                     lineText = "T-SPIN";
@@ -128,6 +128,29 @@ public class GamePanel extends JPanel {
                     lineText = "T-SPIN CLEAR";
                     popupColor = new Color(255, 0, 255);
                     font = new Font("Impact", Font.BOLD, 28);
+                    break;
+            }
+        } else if (tSpinType == com.tetris.controller.GameEngine.TSpinType.MINI) {
+            switch (lines) {
+                case 0:
+                    lineText = "T-SPIN MINI";
+                    popupColor = new Color(255, 160, 122); // Light Salmon / Coral
+                    font = new Font("Impact", Font.BOLD, 24);
+                    break;
+                case 1:
+                    lineText = "T-SPIN MINI SINGLE!";
+                    popupColor = new Color(255, 160, 122);
+                    font = new Font("Impact", Font.BOLD, 24);
+                    break;
+                case 2:
+                    lineText = "T-SPIN MINI DOUBLE!!";
+                    popupColor = new Color(255, 160, 122);
+                    font = new Font("Impact", Font.BOLD, 26);
+                    break;
+                default:
+                    lineText = "T-SPIN MINI CLEAR";
+                    popupColor = new Color(255, 160, 122);
+                    font = new Font("Impact", Font.BOLD, 24);
                     break;
             }
         } else {
@@ -360,7 +383,7 @@ public class GamePanel extends JPanel {
                             }
                         }
                     } else {
-                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 6 : 5;
+                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 7 : 6;
                         for (int i = 0; i < numOptions; i++) {
                             if (menuOptionBounds[i] != null && menuOptionBounds[i].contains(e.getPoint())) {
                                 selectedMenuIndex = i;
@@ -380,7 +403,7 @@ public class GamePanel extends JPanel {
                             break;
                         }
                     }
-                } else if (state == com.tetris.controller.GameEngine.GameState.PLAYING) {
+                } else if (state == com.tetris.controller.GameEngine.GameState.PLAYING || state == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
                     if (gameEngine.isGameOver()) {
                         gameEngine.returnToMenu();
                     } else if (gameEngine.isPaused()) {
@@ -444,7 +467,7 @@ public class GamePanel extends JPanel {
                             }
                         }
                     } else {
-                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 6 : 5;
+                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 7 : 6;
                         for (int i = 0; i < numOptions; i++) {
                             if (menuOptionBounds[i] != null && menuOptionBounds[i].contains(e.getPoint())) {
                                 if (selectedMenuIndex != i) {
@@ -455,7 +478,7 @@ public class GamePanel extends JPanel {
                             }
                         }
                     }
-                } else if (state == com.tetris.controller.GameEngine.GameState.PLAYING && gameEngine.isPaused()) {
+                } else if ((state == com.tetris.controller.GameEngine.GameState.PLAYING || state == com.tetris.controller.GameEngine.GameState.TUTORIAL) && gameEngine.isPaused()) {
                     int numPauseOptions = 4;
                     for (int i = 0; i < numPauseOptions; i++) {
                         if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
@@ -552,6 +575,7 @@ public class GamePanel extends JPanel {
                 drawLeaderboardScreen(g);
                 break;
             case PLAYING:
+            case TUTORIAL:
             default:
                 Graphics2D g2d = (Graphics2D) g;
                 java.awt.geom.AffineTransform oldTransform = g2d.getTransform();
@@ -594,7 +618,16 @@ public class GamePanel extends JPanel {
 
                 // Draw Game Over Overlay
                 if (gameEngine.isGameOver()) {
-                    drawGameOverOverlay(g2d);
+                    if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+                        drawTutorialVictoryOverlay(g2d);
+                    } else {
+                        drawGameOverOverlay(g2d);
+                    }
+                }
+
+                // Draw Tutorial Overlays
+                if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+                    drawTutorialOverlays(g2d);
                 }
 
                 // Draw Perfect Clear Overlay
@@ -610,7 +643,7 @@ public class GamePanel extends JPanel {
         if (showDifficultySelectInMenu) {
             selectedDifficultyIndex = (selectedDifficultyIndex + dir + 4) % 4;
         } else {
-            int numOptions = com.tetris.util.SaveManager.hasSave() ? 6 : 5;
+            int numOptions = com.tetris.util.SaveManager.hasSave() ? 7 : 6;
             selectedMenuIndex = (selectedMenuIndex + dir + numOptions) % numOptions;
         }
         repaint();
@@ -632,6 +665,37 @@ public class GamePanel extends JPanel {
                         selectedDifficultyIndex = 0; // Default to EASY
                         break;
                     case 2:
+                        // T-SPIN PRACTICE
+                        gameEngine.startTutorial();
+                        break;
+                    case 3:
+                        // AI DEMO Option
+                        gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
+                        showDifficultySelectInMenu = false;
+                        gameEngine.startGame();
+                        gameEngine.setAiPlay(true);
+                        break;
+                    case 4:
+                        showSettingsInMenu = true;
+                        break;
+                    case 5:
+                        gameEngine.showLeaderboard();
+                        break;
+                    case 6:
+                        System.exit(0);
+                        break;
+                }
+            } else {
+                switch (selectedMenuIndex) {
+                    case 0:
+                        showDifficultySelectInMenu = true;
+                        selectedDifficultyIndex = 0; // Default to EASY
+                        break;
+                    case 1:
+                        // T-SPIN PRACTICE
+                        gameEngine.startTutorial();
+                        break;
+                    case 2:
                         // AI DEMO Option
                         gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
                         showDifficultySelectInMenu = false;
@@ -645,29 +709,6 @@ public class GamePanel extends JPanel {
                         gameEngine.showLeaderboard();
                         break;
                     case 5:
-                        System.exit(0);
-                        break;
-                }
-            } else {
-                switch (selectedMenuIndex) {
-                    case 0:
-                        showDifficultySelectInMenu = true;
-                        selectedDifficultyIndex = 0; // Default to EASY
-                        break;
-                    case 1:
-                        // AI DEMO Option
-                        gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
-                        showDifficultySelectInMenu = false;
-                        gameEngine.startGame();
-                        gameEngine.setAiPlay(true);
-                        break;
-                    case 2:
-                        showSettingsInMenu = true;
-                        break;
-                    case 3:
-                        gameEngine.showLeaderboard();
-                        break;
-                    case 4:
                         System.exit(0);
                         break;
                 }
@@ -829,9 +870,9 @@ public class GamePanel extends JPanel {
 
         // Options
         boolean hasSave = com.tetris.util.SaveManager.hasSave();
-        int numOptions = hasSave ? 6 : 5;
-        int startY = hasSave ? 230 : 255;
-        int gap = 45;
+        int numOptions = hasSave ? 7 : 6;
+        int startY = hasSave ? 200 : 225;
+        int gap = 40;
         g2d.setFont(new Font("Arial", Font.BOLD, 22));
         FontMetrics fmOption = g2d.getFontMetrics();
 
@@ -841,18 +882,20 @@ public class GamePanel extends JPanel {
                 switch (i) {
                     case 0: label = "CONTINUE"; break;
                     case 1: label = "PLAY GAME"; break;
-                    case 2: label = "AI DEMO"; break;
-                    case 3: label = "SETTINGS"; break;
-                    case 4: label = "LEADERBOARD"; break;
-                    case 5: label = "EXIT"; break;
+                    case 2: label = "T-SPIN PRACTICE"; break;
+                    case 3: label = "AI DEMO"; break;
+                    case 4: label = "SETTINGS"; break;
+                    case 5: label = "LEADERBOARD"; break;
+                    case 6: label = "EXIT"; break;
                 }
             } else {
                 switch (i) {
                     case 0: label = "PLAY GAME"; break;
-                    case 1: label = "AI DEMO"; break;
-                    case 2: label = "SETTINGS"; break;
-                    case 3: label = "LEADERBOARD"; break;
-                    case 4: label = "EXIT"; break;
+                    case 1: label = "T-SPIN PRACTICE"; break;
+                    case 2: label = "AI DEMO"; break;
+                    case 3: label = "SETTINGS"; break;
+                    case 4: label = "LEADERBOARD"; break;
+                    case 5: label = "EXIT"; break;
                 }
             }
 
@@ -1542,8 +1585,15 @@ public class GamePanel extends JPanel {
         // 3. Draw Level
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
         g.drawString("LEVEL", startX + 20, 170);
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 20));
-        g.drawString(gameEngine.getDifficulty().getLabel(), startX + 20, 195);
+        if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+            g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
+            g.setColor(new Color(0, 255, 255));
+            g.drawString(gameEngine.getTutorialLevel() + " / 3", startX + 20, 195);
+        } else {
+            g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 20));
+            g.drawString(gameEngine.getDifficulty().getLabel(), startX + 20, 195);
+        }
+        g.setColor(Color.WHITE);
 
         // 4. Previews Side-by-Side (NEXT & HOLD)
         int boxY = 215;
@@ -1587,61 +1637,65 @@ public class GamePanel extends JPanel {
             g.drawString("[Empty]", holdBoxX + (boxW - emptyW) / 2, boxY + 20 + (boxH - 22)/2 + 4);
         }
 
-        // 5. Draw Leaderboard (Controls hints deleted to free up space)
-        drawLeaderboard(g, startX + 15, 330);
+        // 5. Draw Leaderboard or Tutorial Hints
+        if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+            drawTutorialHints(g, startX + 15, 330);
+        } else {
+            drawLeaderboard(g, startX + 15, 330);
 
-        // 6. AI Autoplay Status Overlay / Score Disqualification Warning
-        if (gameEngine.isAiPlay()) {
-            int aiX = startX + 15;
-            int aiY = 405;
-            int aiW = 170;
-            int aiH = 80;
+            // 6. AI Autoplay Status Overlay / Score Disqualification Warning
+            if (gameEngine.isAiPlay()) {
+                int aiX = startX + 15;
+                int aiY = 405;
+                int aiW = 170;
+                int aiH = 80;
 
-            long now = System.currentTimeMillis();
-            int alpha = 130 + (int)(60 * Math.sin(now / 150.0));
+                long now = System.currentTimeMillis();
+                int alpha = 130 + (int)(60 * Math.sin(now / 150.0));
 
-            // Semi-transparent container
-            g2d.setColor(new Color(160, 32, 240, 25));
-            g2d.fillRoundRect(aiX, aiY, aiW, aiH, 8, 8);
+                // Semi-transparent container
+                g2d.setColor(new Color(160, 32, 240, 25));
+                g2d.fillRoundRect(aiX, aiY, aiW, aiH, 8, 8);
 
-            // Glowing border
-            g2d.setColor(new Color(180, 50, 255, alpha));
-            g2d.drawRoundRect(aiX, aiY, aiW, aiH, 8, 8);
+                // Glowing border
+                g2d.setColor(new Color(180, 50, 255, alpha));
+                g2d.drawRoundRect(aiX, aiY, aiW, aiH, 8, 8);
 
-            // Pulsing dot
-            g2d.setColor(new Color(180, 50, 255, alpha));
-            g2d.fillOval(aiX + 15, aiY + 16, 8, 8);
+                // Pulsing dot
+                g2d.setColor(new Color(180, 50, 255, alpha));
+                g2d.fillOval(aiX + 15, aiY + 16, 8, 8);
 
-            g2d.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
-            g2d.setColor(new Color(230, 200, 255));
-            g2d.drawString("AUTO PLAY", aiX + 30, aiY + 24);
+                g2d.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
+                g2d.setColor(new Color(230, 200, 255));
+                g2d.drawString("AUTO PLAY", aiX + 30, aiY + 24);
 
-            g2d.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 10));
-            g2d.setColor(new Color(185, 175, 200));
-            g2d.drawString("AI is playing the game.", aiX + 15, aiY + 44);
-            g2d.drawString("Press [A] to manual control", aiX + 15, aiY + 59);
-        } else if (gameEngine.hasUsedAiThisSession()) {
-            int warnX = startX + 15;
-            int warnY = 405;
-            int warnW = 170;
-            int warnH = 65;
+                g2d.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 10));
+                g2d.setColor(new Color(185, 175, 200));
+                g2d.drawString("AI is playing the game.", aiX + 15, aiY + 44);
+                g2d.drawString("Press [A] to manual control", aiX + 15, aiY + 59);
+            } else if (gameEngine.hasUsedAiThisSession()) {
+                int warnX = startX + 15;
+                int warnY = 405;
+                int warnW = 170;
+                int warnH = 65;
 
-            // Semi-transparent warm warning background
-            g2d.setColor(new Color(255, 69, 0, 25));
-            g2d.fillRoundRect(warnX, warnY, warnW, warnH, 8, 8);
+                // Semi-transparent warm warning background
+                g2d.setColor(new Color(255, 69, 0, 25));
+                g2d.fillRoundRect(warnX, warnY, warnW, warnH, 8, 8);
 
-            // Orange-red border
-            g2d.setColor(new Color(255, 100, 0, 160));
-            g2d.drawRoundRect(warnX, warnY, warnW, warnH, 8, 8);
+                // Orange-red border
+                g2d.setColor(new Color(255, 100, 0, 160));
+                g2d.drawRoundRect(warnX, warnY, warnW, warnH, 8, 8);
 
-            g2d.setFont(new java.awt.Font("Microsoft JhengHei", java.awt.Font.BOLD, 11));
-            g2d.setColor(new Color(255, 160, 122));
-            g2d.drawString("不納入排行榜紀錄", warnX + 10, warnY + 22);
+                g2d.setFont(new java.awt.Font("Microsoft JhengHei", java.awt.Font.BOLD, 11));
+                g2d.setColor(new Color(255, 160, 122));
+                g2d.drawString("不納入排行榜紀錄", warnX + 10, warnY + 22);
 
-            g2d.setFont(new java.awt.Font("Microsoft JhengHei", java.awt.Font.PLAIN, 10));
-            g2d.setColor(new Color(230, 200, 185));
-            g2d.drawString("本局曾使用自動遊玩", warnX + 10, warnY + 40);
-            g2d.drawString("分數將不寫入排行榜", warnX + 10, warnY + 53);
+                g2d.setFont(new java.awt.Font("Microsoft JhengHei", java.awt.Font.PLAIN, 10));
+                g2d.setColor(new Color(230, 200, 185));
+                g2d.drawString("本局曾使用自動遊玩", warnX + 10, warnY + 40);
+                g2d.drawString("分數將不寫入排行榜", warnX + 10, warnY + 53);
+            }
         }
     }
 
@@ -2388,6 +2442,151 @@ public class GamePanel extends JPanel {
                 g2d.drawString(label, btnX + (btnW - labelW) / 2, y + (btnH + labelH) / 2 - 2);
             }
         }
+    }
+
+    private void drawTutorialHints(Graphics g, int x, int startY) {
+        g.setColor(new Color(255, 215, 120)); // Gold
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
+        g.drawString("TRAINING HINTS", x, startY);
+        
+        g.setColor(Color.WHITE);
+        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
+        
+        int level = gameEngine.getTutorialLevel();
+        String[] lines;
+        if (level == 1) {
+            lines = new String[] {
+                "Level 1: T-Spin Single",
+                "Goal: Clear 1 line with T-spin.",
+                "",
+                "1. Drop T-piece pointing",
+                "   RIGHT into the slot.",
+                "2. When it hits bottom,",
+                "   press UP Arrow to rotate",
+                "   clockwise (pointing DOWN).",
+                "3. Secure the T-spin Single!"
+            };
+        } else if (level == 2) {
+            lines = new String[] {
+                "Level 2: T-Spin Double",
+                "Goal: Clear 2 lines with T-spin.",
+                "",
+                "1. Symmetrical to Level 1,",
+                "   but the bottom is deeper.",
+                "2. Drop T-piece pointing",
+                "   RIGHT and tuck it in.",
+                "3. Rotate clockwise to",
+                "   clear 2 lines at once!"
+            };
+        } else { // Level 3
+            lines = new String[] {
+                "Level 3: Left T-Spin Double",
+                "Goal: Clear 2 lines (Left slot).",
+                "",
+                "1. Slot is on the left now.",
+                "2. Drop T-piece pointing",
+                "   LEFT into the entry path.",
+                "3. Press UP Arrow twice",
+                "   (or rotate CCW) to spin",
+                "   it into the slot!"
+            };
+        }
+        
+        int lineY = startY + 22;
+        for (String line : lines) {
+            g.drawString(line, x, lineY);
+            lineY += 16;
+        }
+    }
+
+    private void drawTutorialOverlays(Graphics2D g2d) {
+        if (gameEngine.isTransitioning()) {
+            int boardW = COLS * TILE_SIZE;
+            int boardH = ROWS * TILE_SIZE;
+            
+            g2d.setColor(new Color(0, 0, 0, 160));
+            g2d.fillRect(0, 0, boardW, boardH);
+            
+            boolean success = gameEngine.isLastTutorialSuccess();
+            g2d.setFont(new Font("Impact", Font.BOLD, 36));
+            FontMetrics fm = g2d.getFontMetrics();
+            String text = success ? "SUCCESS!" : "FAILED! TRY AGAIN";
+            Color color = success ? new Color(0, 255, 100) : new Color(255, 50, 50);
+            
+            int textX = (boardW - fm.stringWidth(text)) / 2;
+            int textY = boardH / 2 - 10;
+            
+            // Draw neon glow
+            g2d.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 80));
+            g2d.drawString(text, textX - 2, textY - 2);
+            g2d.drawString(text, textX + 2, textY + 2);
+            
+            g2d.setColor(Color.WHITE);
+            g2d.drawString(text, textX, textY);
+            
+            // Draw a small subtext
+            g2d.setFont(new Font("Arial", Font.PLAIN, 14));
+            FontMetrics fmSub = g2d.getFontMetrics();
+            String subText = success ? "Loading next level..." : "Resetting board...";
+            g2d.setColor(new Color(200, 200, 200));
+            g2d.drawString(subText, (boardW - fmSub.stringWidth(subText)) / 2, textY + 40);
+        }
+    }
+
+    private void drawTutorialVictoryOverlay(Graphics2D g2d) {
+        int width = getWidth();
+        int height = getHeight();
+        if (width <= 0) width = COLS * TILE_SIZE + SIDEBAR_WIDTH;
+        if (height <= 0) height = ROWS * TILE_SIZE;
+        
+        // Semi-transparent dark background
+        g2d.setColor(new Color(10, 10, 25, 235));
+        g2d.fillRect(0, 0, width, height);
+        
+        // Title: TUTORIAL COMPLETE
+        g2d.setFont(new Font("Impact", Font.BOLD, 42));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        String titleText = "TUTORIAL COMPLETE";
+        int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
+        g2d.setColor(new Color(255, 215, 0)); // Gold
+        g2d.drawString(titleText, titleX, 150);
+        
+        // Subtitle: T-SPIN MASTER!
+        g2d.setFont(new Font("Impact", Font.BOLD, 36));
+        FontMetrics fmSub = g2d.getFontMetrics();
+        String subText = "T-SPIN MASTER!";
+        int subX = (width - fmSub.stringWidth(subText)) / 2;
+        g2d.setColor(new Color(0, 255, 255)); // Neon Cyan
+        g2d.drawString(subText, subX, 220);
+        
+        // A nice message card
+        int cardW = 320;
+        int cardH = 150;
+        int cardX = (width - cardW) / 2;
+        int cardY = 270;
+        g2d.setColor(new Color(255, 255, 255, 15));
+        g2d.fillRoundRect(cardX, cardY, cardW, cardH, 12, 12);
+        g2d.setColor(new Color(255, 255, 255, 40));
+        g2d.drawRoundRect(cardX, cardY, cardW, cardH, 12, 12);
+        
+        g2d.setFont(new Font("Arial", Font.PLAIN, 15));
+        g2d.setColor(Color.WHITE);
+        String msg1 = "You have successfully completed";
+        String msg2 = "all T-Spin training levels!";
+        String msg3 = "Now you are ready to use T-spins";
+        String msg4 = "in real game play to dominate!";
+        
+        int textY = cardY + 30;
+        g2d.drawString(msg1, cardX + (cardW - g2d.getFontMetrics().stringWidth(msg1)) / 2, textY);
+        g2d.drawString(msg2, cardX + (cardW - g2d.getFontMetrics().stringWidth(msg2)) / 2, textY + 25);
+        g2d.drawString(msg3, cardX + (cardW - g2d.getFontMetrics().stringWidth(msg3)) / 2, textY + 60);
+        g2d.drawString(msg4, cardX + (cardW - g2d.getFontMetrics().stringWidth(msg4)) / 2, textY + 85);
+        
+        // Prompt
+        g2d.setFont(new Font("Arial", Font.BOLD, 16));
+        g2d.setColor(new Color(150, 150, 180));
+        String prompt = "Press ENTER or ESC to Return to Menu";
+        g2d.drawString(prompt, (width - g2d.getFontMetrics().stringWidth(prompt)) / 2, 480);
     }
 
 }
