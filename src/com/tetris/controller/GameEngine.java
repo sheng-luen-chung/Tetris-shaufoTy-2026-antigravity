@@ -62,6 +62,14 @@ public class GameEngine {
     private int secondsElapsed = 0;
     private int comboCount = -1; // -1 means no combo, 0+ means consecutive clears
     private boolean lastMoveWasRotation = false;
+
+    // Stats tracking
+    private int piecesSpawned = 0;
+    private int totalActions = 0;
+    private int totalLinesCleared = 0;
+    private int tetrisClears = 0;
+    private int tSpins = 0;
+    private int maxCombo = 0;
     
     // Lock Delay Mechanism
     private boolean isLocking = false;
@@ -122,6 +130,12 @@ public class GameEngine {
         leaderboardRecorded = false;
         heldPiece = null;
         canHoldThisTurn = true;
+        piecesSpawned = 0;
+        totalActions = 0;
+        totalLinesCleared = 0;
+        tetrisClears = 0;
+        tSpins = 0;
+        maxCombo = 0;
         nextPiece = generateRandomPiece();
         spawnNewPiece();
         gameState = GameState.PLAYING;
@@ -258,6 +272,7 @@ public class GameEngine {
     public void softDrop() {
         if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
+        totalActions++;
         update();
         // Restart gravity timer to prevent "gravity stutter" during soft drop
         if (gameLoop != null) {
@@ -334,9 +349,18 @@ public class GameEngine {
         // Update Combo
         if (lines > 0) {
             comboCount++;
+            totalLinesCleared += lines;
+            if (lines == 4) {
+                tetrisClears++;
+            }
+            maxCombo = Math.max(maxCombo, comboCount);
             SoundManager.playSFX("/resources/clear.wav");
         } else {
             comboCount = -1;
+        }
+
+        if (isTSpin) {
+            tSpins++;
         }
 
         if (lines > 0 || isTSpin) {
@@ -436,6 +460,8 @@ public class GameEngine {
         stopLockDelay();
         lockMoveResets = 0;
         lockTotalStartTime = 0;
+
+        piecesSpawned++;
 
         // Use nextPiece and generate new nextPiece
         currentPiece = nextPiece;
@@ -652,10 +678,13 @@ public class GameEngine {
         }
     }
 
+
+
     // Move piece left
     public void movePieceLeft() {
         if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
+        totalActions++;
         if (handleMove(0, -1)) {
             lastMoveWasRotation = false;
             resetLockDelay();
@@ -666,6 +695,7 @@ public class GameEngine {
     public void movePieceRight() {
         if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
+        totalActions++;
         if (handleMove(0, 1)) {
             lastMoveWasRotation = false;
             resetLockDelay();
@@ -676,6 +706,7 @@ public class GameEngine {
     public void rotatePiece() {
         if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
+        totalActions++;
         currentPiece.rotate();
         if (!board.isValidMove(currentPiece)) {
             // If collision, cancel rotation
@@ -691,6 +722,7 @@ public class GameEngine {
     public void dropPiece() {
         if (gameState != GameState.PLAYING || isGameOver || isPaused)
             return;
+        totalActions++;
         int startRow = currentPiece.getRow();
         while (board.isValidMove(currentPiece)) {
             currentPiece.move(1, 0);
@@ -717,6 +749,7 @@ public class GameEngine {
             return;
         if (!canHoldThisTurn)
             return;
+        totalActions++;
 
         stopLockDelay(); // Stop lock delay when holding
 
@@ -742,6 +775,42 @@ public class GameEngine {
         
         canHoldThisTurn = false;
         panel.repaint();
+    }
+
+    public int getPiecesSpawned() {
+        return piecesSpawned;
+    }
+
+    public int getTotalActions() {
+        return totalActions;
+    }
+
+    public int getTotalLinesCleared() {
+        return totalLinesCleared;
+    }
+
+    public int getTetrisClears() {
+        return tetrisClears;
+    }
+
+    public int getTSpins() {
+        return tSpins;
+    }
+
+    public int getMaxCombo() {
+        return maxCombo;
+    }
+
+    public double getPPM() {
+        return secondsElapsed > 0 ? (piecesSpawned / (secondsElapsed / 60.0)) : 0.0;
+    }
+
+    public double getAPM() {
+        return secondsElapsed > 0 ? (totalActions / (secondsElapsed / 60.0)) : 0.0;
+    }
+
+    public double getTetrisRate() {
+        return totalLinesCleared > 0 ? (((double)(tetrisClears * 4) / totalLinesCleared) * 100.0) : 0.0;
     }
 
     // Handle move

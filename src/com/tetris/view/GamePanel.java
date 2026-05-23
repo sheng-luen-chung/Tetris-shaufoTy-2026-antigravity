@@ -994,44 +994,197 @@ public class GamePanel extends JPanel {
         repaint();
     }
 
-    // Draw game over screen overlay on grid area
+    private static class Badge {
+        final String title;
+        final String description;
+        final Color color;
+
+        Badge(String title, String description, Color color) {
+            this.title = title;
+            this.description = description;
+            this.color = color;
+        }
+    }
+
+    // Draw game over screen overlay covering the full screen
     private void drawGameOverOverlay(Graphics g) {
-        int width = COLS * TILE_SIZE;
-        int height = ROWS * TILE_SIZE;
+        Graphics2D g2d = (Graphics2D) g;
+        int width = getWidth();
+        int height = getHeight();
+        if (width <= 0) width = COLS * TILE_SIZE + SIDEBAR_WIDTH;
+        if (height <= 0) height = ROWS * TILE_SIZE;
 
-        g.setColor(new Color(50, 0, 15, 185)); // Deep red-purple translucent overlay
-        g.fillRect(0, 0, width, height);
+        // Enable anti-aliasing for text and shapes
+        g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        g.setColor(Color.WHITE);
-        g.setFont(new Font("Arial", Font.BOLD, 34));
-        FontMetrics fm = g.getFontMetrics();
-        String text = "GAME OVER";
-        int x = (width - fm.stringWidth(text)) / 2;
-        int y = height / 2 - 40;
+        // 1. Semi-transparent dark violet space background
+        g2d.setColor(new Color(15, 5, 25, 235));
+        g2d.fillRect(0, 0, width, height);
+
+        // Draw a subtle neon red glowing border around the whole panel
+        g2d.setColor(new Color(255, 40, 80, 100));
+        g2d.setStroke(new java.awt.BasicStroke(3f));
+        g2d.drawRect(5, 5, width - 10, height - 10);
+        g2d.setStroke(new java.awt.BasicStroke(1f));
+
+        // 2. Header: Centered red neon "GAME OVER"
+        g2d.setFont(new Font("Impact", Font.BOLD | Font.ITALIC, 46));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        String titleText = "GAME OVER";
+        int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
+        int titleY = 65;
+
+        // Glow effect
+        g2d.setColor(new Color(255, 0, 50, 120));
+        g2d.drawString(titleText, titleX + 2, titleY + 2);
+        g2d.drawString(titleText, titleX - 2, titleY - 2);
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(titleText, titleX, titleY);
+
+        // Neon violet subtitle "MISSION SUMMARY"
+        g2d.setFont(new Font("Arial", Font.BOLD, 13));
+        g2d.setColor(new Color(180, 100, 255));
+        String subTitleText = "MISSION SUMMARY";
+        int subTitleX = (width - g2d.getFontMetrics().stringWidth(subTitleText)) / 2;
+        g2d.drawString(subTitleText, subTitleX, 92);
+
+        // 3. Grid of Statistics (y = 120 to 310)
+        int cardW = 180;
+        int cardH = 58;
+        int col1X = 60;
+        int col2X = 260;
+        int row1Y = 120;
+        int row2Y = 190;
+        int row3Y = 260;
+
+        // Fetch stats from gameEngine
+        int score = gameEngine.getScore();
+        int seconds = gameEngine.getSecondsElapsed();
+        String timeStr = String.format("%02d:%02d", seconds / 60, seconds % 60);
+        int lines = gameEngine.getTotalLinesCleared();
+        int pieces = gameEngine.getPiecesSpawned();
+        double ppm = gameEngine.getPPM();
+        int actions = gameEngine.getTotalActions();
+        double apm = gameEngine.getAPM();
+        double tetrisRate = gameEngine.getTetrisRate();
+
+        drawStatCard(g2d, col1X, row1Y, cardW, cardH, "FINAL SCORE", String.format("%,d", score), new Color(255, 215, 0));
+        drawStatCard(g2d, col2X, row1Y, cardW, cardH, "TIME ELAPSED", timeStr, new Color(0, 255, 255));
+        drawStatCard(g2d, col1X, row2Y, cardW, cardH, "LINES CLEARED", String.valueOf(lines), new Color(0, 255, 100));
+        drawStatCard(g2d, col2X, row2Y, cardW, cardH, "PIECES SPAWNED", String.format("%d (%.1f PPM)", pieces, ppm), new Color(255, 140, 0));
+        drawStatCard(g2d, col1X, row3Y, cardW, cardH, "TOTAL ACTIONS", String.format("%d (%.1f APM)", actions, apm), new Color(180, 100, 255));
+        drawStatCard(g2d, col2X, row3Y, cardW, cardH, "TETRIS RATE", String.format("%.1f%%", tetrisRate), new Color(255, 50, 150));
+
+        // 4. Earned Badges Section (y = 335 to 500)
+        int badgeContainerX = 60;
+        int badgeContainerY = 335;
+        int badgeContainerW = 380;
+        int badgeContainerH = 160;
+
+        // Draw Badge Container Box
+        g2d.setColor(new Color(255, 255, 255, 10));
+        g2d.fillRoundRect(badgeContainerX, badgeContainerY, badgeContainerW, badgeContainerH, 12, 12);
+        g2d.setColor(new Color(255, 255, 255, 30));
+        g2d.drawRoundRect(badgeContainerX, badgeContainerY, badgeContainerW, badgeContainerH, 12, 12);
+
+        // Container title
+        g2d.setFont(new Font("Arial", Font.BOLD, 13));
+        g2d.setColor(new Color(255, 215, 120)); // Gold
+        g2d.drawString("EARNED BADGES", badgeContainerX + 15, badgeContainerY + 22);
+
+        // Identify Earned Badges
+        List<Badge> earnedBadges = new ArrayList<>();
+        if (seconds >= 300) {
+            earnedBadges.add(new Badge("🏆 Survivor", "Survived over 5 minutes (" + timeStr + ")", new Color(0, 255, 100)));
+        }
+        if (gameEngine.getTetrisClears() >= 5) {
+            earnedBadges.add(new Badge("👑 Tetris Master", "Cleared 4 lines 5+ times (" + gameEngine.getTetrisClears() + " times)", new Color(255, 215, 0)));
+        }
+        if (ppm >= 40.0 && seconds >= 60) {
+            earnedBadges.add(new Badge("⚡ Speed Demon", String.format("Maintained %.1f PPM (>40 PPM)", ppm), new Color(0, 255, 255)));
+        }
+        if (gameEngine.getTSpins() >= 3) {
+            earnedBadges.add(new Badge("🔮 T-Spin Tactician", "Cleared T-Spin 3+ times (" + gameEngine.getTSpins() + " times)", new Color(180, 100, 255)));
+        }
+        if (gameEngine.getMaxCombo() >= 3) { // 4+ consecutive clears
+            earnedBadges.add(new Badge("🔥 Combo Specialist", "Reached combo multiplier of " + (gameEngine.getMaxCombo() + 1), new Color(255, 50, 150)));
+        }
+
+        // Draw Badges
+        if (earnedBadges.isEmpty()) {
+            g2d.setFont(new Font("Arial", Font.ITALIC, 13));
+            g2d.setColor(new Color(150, 150, 160));
+            String emptyMsg = "No badges earned this game.";
+            String emptyTip = "Tip: Try surviving longer (5m) or getting 3+ T-Spins!";
+            g2d.drawString(emptyMsg, badgeContainerX + 25, badgeContainerY + 65);
+            g2d.drawString(emptyTip, badgeContainerX + 25, badgeContainerY + 95);
+        } else {
+            int badgeY = badgeContainerY + 45;
+            int gap = 38;
+            for (int i = 0; i < Math.min(3, earnedBadges.size()); i++) {
+                Badge badge = earnedBadges.get(i);
+                
+                // Draw badge title
+                g2d.setFont(new Font("Arial", Font.BOLD, 12));
+                g2d.setColor(badge.color);
+                g2d.drawString(badge.title, badgeContainerX + 20, badgeY);
+
+                // Draw badge description
+                g2d.setFont(new Font("Arial", Font.PLAIN, 11));
+                g2d.setColor(new Color(210, 210, 220));
+                g2d.drawString(badge.description, badgeContainerX + 160, badgeY);
+
+                // Draw a divider line
+                if (i < Math.min(3, earnedBadges.size()) - 1) {
+                    g2d.setColor(new Color(255, 255, 255, 15));
+                    g2d.drawLine(badgeContainerX + 15, badgeY + 12, badgeContainerX + badgeContainerW - 15, badgeY + 12);
+                }
+
+                badgeY += gap;
+            }
+            if (earnedBadges.size() > 3) {
+                g2d.setFont(new Font("Arial", Font.ITALIC, 11));
+                g2d.setColor(new Color(150, 150, 160));
+                String moreMsg = "+ " + (earnedBadges.size() - 3) + " more badges earned";
+                g2d.drawString(moreMsg, badgeContainerX + badgeContainerW - 130, badgeContainerY + badgeContainerH - 12);
+            }
+        }
+
+        // 5. Pulsing/Breathing Footer Instruction
+        long now = System.currentTimeMillis();
+        float pulse = (float) (0.6 + 0.4 * Math.sin(now / 250.0));
+        g2d.setFont(new Font("Arial", Font.BOLD, 14));
+        String footerText = "Press ENTER or Click to return to Menu";
+        int footerX = (width - g2d.getFontMetrics().stringWidth(footerText)) / 2;
+        int footerY = 540;
+
+        g2d.setColor(new Color(0, 255, 255, (int) (255 * pulse)));
+        g2d.drawString(footerText, footerX, footerY);
+    }
+
+    private void drawStatCard(Graphics2D g2d, int x, int y, int w, int h, String label, String value, Color accentColor) {
+        // Draw card background
+        g2d.setColor(new Color(255, 255, 255, 10));
+        g2d.fillRoundRect(x, y, w, h, 8, 8);
         
-        // Red glowing drop-shadow
-        g.setColor(new Color(255, 0, 50, 160));
-        g.drawString(text, x + 2, y + 2);
-        g.setColor(Color.WHITE);
-        g.drawString(text, x, y);
+        // Draw card border
+        g2d.setColor(new Color(255, 255, 255, 25));
+        g2d.drawRoundRect(x, y, w, h, 8, 8);
 
-        // Score
-        g.setFont(new Font("Arial", Font.BOLD, 20));
-        fm = g.getFontMetrics();
-        String scoreText = "Score: " + gameEngine.getScore();
-        x = (width - fm.stringWidth(scoreText)) / 2;
-        y += 45;
-        g.setColor(new Color(255, 215, 0));
-        g.drawString(scoreText, x, y);
+        // Draw left accent bar
+        g2d.setColor(accentColor);
+        g2d.fillRoundRect(x, y, 4, h, 4, 4);
 
-        // Instruction to return
-        g.setFont(new Font("Arial", Font.PLAIN, 13));
-        fm = g.getFontMetrics();
-        String subText = "Press ENTER / Click to Menu";
-        x = (width - fm.stringWidth(subText)) / 2;
-        y += 45;
-        g.setColor(new Color(200, 200, 220));
-        g.drawString(subText, x, y);
+        // Draw label text
+        g2d.setFont(new Font("Arial", Font.BOLD, 10));
+        g2d.setColor(new Color(170, 170, 185));
+        g2d.drawString(label, x + 12, y + 18);
+
+        // Draw value text
+        g2d.setFont(new Font("Arial", Font.BOLD, 15));
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(value, x + 12, y + 42);
     }
 
     // Pause menu navigation helper
