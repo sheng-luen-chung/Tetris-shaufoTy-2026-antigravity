@@ -62,6 +62,7 @@ public class GamePanel extends JPanel {
     private Rectangle bgmMuteBounds = new Rectangle();
     private Rectangle sfxMuteBounds = new Rectangle();
     private Rectangle menuSettingsBackButtonBounds = new Rectangle();
+    private Rectangle menuSettingsThemeBounds = new Rectangle();
     private boolean isDraggingBGM = false;
     private boolean isDraggingSFX = false;
 
@@ -314,6 +315,13 @@ public class GamePanel extends JPanel {
                             return;
                         }
 
+                        // THEME button click
+                        if (menuSettingsThemeBounds != null && menuSettingsThemeBounds.contains(e.getPoint())) {
+                            com.tetris.util.ThemeManager.nextTheme();
+                            repaint();
+                            return;
+                        }
+
                         // Volume and mute controls
                         if (bgmTrackBounds.contains(e.getPoint())) {
                             isDraggingBGM = true;
@@ -385,7 +393,7 @@ public class GamePanel extends JPanel {
                                 return;
                             }
                         }
-                        int numPauseOptions = showSettingsInPause ? 3 : 4;
+                        int numPauseOptions = 4;
                         for (int i = 0; i < numPauseOptions; i++) {
                             if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
                                 selectedPauseIndex = i;
@@ -433,7 +441,7 @@ public class GamePanel extends JPanel {
                         }
                     }
                 } else if (state == com.tetris.controller.GameEngine.GameState.PLAYING && gameEngine.isPaused()) {
-                    int numPauseOptions = showSettingsInPause ? 3 : 4;
+                    int numPauseOptions = 4;
                     for (int i = 0; i < numPauseOptions; i++) {
                         if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
                             if (selectedPauseIndex != i) {
@@ -682,8 +690,9 @@ public class GamePanel extends JPanel {
         g2.scale(fp.scale, fp.scale);
 
         int blockSize = 18;
-        Color blockColor = new Color(fp.color.getRed(), fp.color.getGreen(), fp.color.getBlue(), 30);
-        Color borderColor = new Color(fp.color.getRed(), fp.color.getGreen(), fp.color.getBlue(), 70);
+        Color themeColor = com.tetris.util.ThemeManager.getMappedColor(fp.color);
+        Color blockColor = new Color(themeColor.getRed(), themeColor.getGreen(), themeColor.getBlue(), 30);
+        Color borderColor = new Color(themeColor.getRed(), themeColor.getGreen(), themeColor.getBlue(), 70);
 
         for (int[] cell : coords) {
             int bx = cell[0] * blockSize - blockSize;
@@ -1189,7 +1198,7 @@ public class GamePanel extends JPanel {
 
     // Pause menu navigation helper
     public void navigatePauseMenu(int dir) {
-        int numOptions = showSettingsInPause ? 3 : 4;
+        int numOptions = 4;
         selectedPauseIndex = (selectedPauseIndex + dir + numOptions) % numOptions;
         repaint();
     }
@@ -1208,8 +1217,6 @@ public class GamePanel extends JPanel {
                 case 2: // SETTINGS
                     showSettingsInPause = true;
                     selectedPauseIndex = 0;
-                    // Do NOT call previewBGM() here — BGM should stay silent while paused.
-                    // Audio preview only activates when the user actively drags the slider.
                     break;
                 case 3: // BACK TO MAIN
                     showSettingsInPause = false;
@@ -1224,12 +1231,12 @@ public class GamePanel extends JPanel {
                 case 1: // GRID LINES
                     showGridLines = !showGridLines;
                     break;
-                case 2: // BACK
+                case 2: // THEME
+                    com.tetris.util.ThemeManager.nextTheme();
+                    break;
+                case 3: // BACK
                     showSettingsInPause = false;
                     selectedPauseIndex = 2; // return cursor to settings option (index 2 now, because SETTINGS is index 2!)
-                    // Re-apply gain-mute so BGM stays silent while the pause menu is shown.
-                    // (The clip might have become audible while the user adjusted the volume slider.)
-                    com.tetris.util.SoundManager.pauseBGM();
                     break;
             }
         }
@@ -1263,7 +1270,7 @@ public class GamePanel extends JPanel {
 
         // Selection container card
         int cardW = 340;
-        int cardH = showSettingsInPause ? 340 : 310;
+        int cardH = showSettingsInPause ? 360 : 310;
         int cardX = (width - cardW) / 2;
         int cardY = 160;
 
@@ -1275,7 +1282,7 @@ public class GamePanel extends JPanel {
         // Draw Options
         g2d.setFont(new Font("Arial", Font.BOLD, 18));
         FontMetrics fmOption = g2d.getFontMetrics();
-        int numPauseOptions = showSettingsInPause ? 3 : 4;
+        int numPauseOptions = 4;
 
         for (int i = 0; i < numPauseOptions; i++) {
             String label = "";
@@ -1298,7 +1305,8 @@ public class GamePanel extends JPanel {
                 switch (i) {
                     case 0: label = "GHOST PIECE: " + (showGhostPiece ? "ON" : "OFF"); break;
                     case 1: label = "GRID LINES: " + (showGridLines ? "ON" : "OFF"); break;
-                    case 2: label = "BACK"; break;
+                    case 2: label = "THEME: " + com.tetris.util.ThemeManager.getCurrentTheme().getLabel(); break;
+                    case 3: label = "BACK"; break;
                 }
                 textWidth = fmOption.stringWidth(label);
                 x = cardX + (cardW - textWidth) / 2;
@@ -1308,9 +1316,12 @@ public class GamePanel extends JPanel {
                 } else if (i == 1) {
                     y = cardY + 95;
                     pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 72, cardW - 30, 32);
+                } else if (i == 2) {
+                    y = cardY + 260;
+                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 237, cardW - 30, 32);
                 } else {
-                    y = cardY + 300;
-                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 277, cardW - 30, 32);
+                    y = cardY + 312;
+                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 289, cardW - 30, 32);
                 }
             }
 
@@ -1359,7 +1370,7 @@ public class GamePanel extends JPanel {
     // Draw the grid
     private void drawGrid(Graphics g) {
         if (!showGridLines) return;
-        g.setColor(new Color(40, 40, 40));
+        g.setColor(com.tetris.util.ThemeManager.getGridLineColor());
         for (int i = 0; i <= COLS; i++) {
             g.drawLine(i * TILE_SIZE, 0, i * TILE_SIZE, ROWS * TILE_SIZE);
         }
@@ -1433,7 +1444,8 @@ public class GamePanel extends JPanel {
         ghost.move(-1, 0);
 
         // Draw ghost squares
-        Color ghostColor = new Color(255, 255, 255, 80);    // Translucent white
+        Color baseColor = currentPiece.getType().getColor();
+        Color ghostColor = new Color(baseColor.getRed(), baseColor.getGreen(), baseColor.getBlue(), 75); // Mapped translucent color
         for (int[] coord : ghost.getAbsoluteCoords()) {
             drawSquare(g, coord[0], coord[1], ghostColor);
         }
@@ -1559,17 +1571,15 @@ public class GamePanel extends JPanel {
         int offsetY = boxY + (boxH - pieceH) / 2 - minY * tileSize;
 
         Color color = type.getColor();
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         for (int[] cell : coords) {
             // cell[0] is row, cell[1] is col
             int px = offsetX + cell[1] * tileSize; 
             int py = offsetY + cell[0] * tileSize;
-
-            g.setColor(color);
-            g.fillRect(px, py, tileSize, tileSize);
-
-            g.setColor(color.darker());
-            g.drawRect(px, py, tileSize, tileSize);
+            drawThemeSquare(g2, px, py, tileSize, color);
         }
+        g2.dispose();
     }
 
     private void drawLeaderboard(Graphics g, int x, int startY) {
@@ -1611,14 +1621,67 @@ public class GamePanel extends JPanel {
     private void drawSquare(Graphics g, int x, int y, Color color) {
         if (y < 0)
             return;
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        drawThemeSquare(g2, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, color);
+        g2.dispose();
+    }
 
-        g.setColor(color);
-        g.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE); // Draw square
-
-        // To make the blocks easier to distinguish,
-        // draw a dark border around each block.
-        g.setColor(color.darker());
-        g.drawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE); // Draw border
+    private void drawThemeSquare(Graphics2D g2, int px, int py, int size, Color originalColor) {
+        com.tetris.util.ThemeManager.Theme theme = com.tetris.util.ThemeManager.getCurrentTheme();
+        Color color = com.tetris.util.ThemeManager.getMappedColor(originalColor);
+        
+        switch (theme) {
+            case RETRO_GAMEBOY:
+                g2.setColor(color);
+                g2.fillRect(px, py, size, size);
+                g2.setColor(com.tetris.util.ThemeManager.getGameBoyDarkColor());
+                g2.drawRect(px, py, size, size);
+                
+                int gbInset = Math.max(2, size / 4);
+                g2.drawRect(px + gbInset, py + gbInset, size - gbInset * 2, size - gbInset * 2);
+                break;
+                
+            case CLASSIC_ARCADE:
+                g2.setColor(color);
+                g2.fillRect(px, py, size, size);
+                
+                g2.setColor(new Color(255, 255, 255, 120));
+                g2.drawLine(px, py, px + size, py);
+                g2.drawLine(px, py, px, py + size);
+                
+                g2.setColor(new Color(0, 0, 0, 100));
+                g2.drawLine(px, py + size - 1, px + size - 1, py + size - 1);
+                g2.drawLine(px + size - 1, py, px + size - 1, py + size - 1);
+                
+                int dotSize = Math.max(1, size / 8);
+                int arcInset = size <= 16 ? 2 : 4;
+                g2.setColor(Color.WHITE);
+                g2.fillRect(px + arcInset, py + arcInset, dotSize, dotSize);
+                break;
+                
+            case MIDNIGHT_STEALTH:
+                g2.setColor(new Color(15, 10, 20, 210));
+                g2.fillRect(px, py, size, size);
+                g2.setColor(color);
+                g2.drawRect(px, py, size, size);
+                break;
+                
+            case CYBERPUNK_NEON:
+            default:
+                g2.setColor(new Color(10, 10, 15, 220));
+                g2.fillRect(px, py, size, size);
+                
+                g2.setColor(color);
+                g2.setStroke(new java.awt.BasicStroke(Math.max(1f, size / 15f)));
+                g2.drawRect(px + 1, py + 1, size - 2, size - 2);
+                g2.setStroke(new java.awt.BasicStroke(1f));
+                
+                g2.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 80));
+                int dotS = Math.max(2, size / 8);
+                g2.fillOval(px + size / 2 - dotS / 2, py + size / 2 - dotS / 2, dotS, dotS);
+                break;
+        }
     }
 
     // Simple score popup structure
@@ -1895,7 +1958,7 @@ public class GamePanel extends JPanel {
         g2d.drawString(titleText, titleX, titleY);
 
         int cardW = 340;
-        int cardH = 230;
+        int cardH = 285;
         int cardX = (getWidth() - cardW) / 2;
         int cardY = 180;
 
@@ -1904,15 +1967,40 @@ public class GamePanel extends JPanel {
         g2d.setColor(new Color(255, 255, 255, 40));
         g2d.drawRoundRect(cardX, cardY, cardW, cardH, 15, 15);
 
-        drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 35, 55);
+        drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 30, 50);
 
+        // THEME button
+        String themeText = "THEME: " + com.tetris.util.ThemeManager.getCurrentTheme().getLabel();
+        g2d.setFont(new Font("Arial", Font.BOLD, 16));
+        FontMetrics fmTheme = g2d.getFontMetrics();
+        int themeBtnW = 240;
+        int themeBtnH = 36;
+        int themeBtnX = (getWidth() - themeBtnW) / 2;
+        int themeBtnY = cardY + 145;
+
+        menuSettingsThemeBounds = new Rectangle(themeBtnX, themeBtnY, themeBtnW, themeBtnH);
+        boolean hoverTheme = (mousePos != null && menuSettingsThemeBounds.contains(mousePos));
+
+        if (hoverTheme) {
+            g2d.setColor(new Color(255, 255, 255, 40));
+            g2d.fillRoundRect(themeBtnX, themeBtnY, themeBtnW, themeBtnH, 10, 10);
+            g2d.setColor(Color.WHITE);
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 15));
+            g2d.fillRoundRect(themeBtnX, themeBtnY, themeBtnW, themeBtnH, 10, 10);
+            g2d.setColor(new Color(200, 200, 200));
+        }
+        g2d.drawRoundRect(themeBtnX, themeBtnY, themeBtnW, themeBtnH, 10, 10);
+        g2d.drawString(themeText, themeBtnX + (themeBtnW - fmTheme.stringWidth(themeText)) / 2, themeBtnY + 24);
+
+        // BACK button
         String backText = "BACK";
         g2d.setFont(new Font("Arial", Font.BOLD, 18));
         FontMetrics fmBack = g2d.getFontMetrics();
         int btnW = 120;
         int btnH = 36;
         int btnX = (getWidth() - btnW) / 2;
-        int btnY = cardY + cardH - 52;
+        int btnY = cardY + 215;
 
         menuSettingsBackButtonBounds = new Rectangle(btnX, btnY, btnW, btnH);
         boolean hoverBack = (mousePos != null && menuSettingsBackButtonBounds.contains(mousePos));
