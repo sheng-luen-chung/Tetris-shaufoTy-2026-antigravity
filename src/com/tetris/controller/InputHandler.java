@@ -21,37 +21,49 @@ public class InputHandler extends KeyAdapter {
     private int rightRepeatCounter = 0;
 
     // Professional Tetris Tuning Constants
-    private static final int DAS_DELAY_MS = 180;        // Delay before auto-repeat begins
-    private static final int ARR_RATE_MS = 40;          // Auto-repeat rate (moves per ms)
-    private static final int SOFT_DROP_INTERVAL_MS = 45; // Soft drop vertical speed
+    private static final int DAS_DELAY_MS = 160;        // Reduced from 180 for better responsiveness
+    private static final int ARR_RATE_MS = 30;          // Reduced from 40 for smoother movement
+    private static final int SOFT_DROP_INTERVAL_MS = 30; // Reduced from 45 for faster soft drop
 
     private final javax.swing.Timer inputTimer;
+    private long lastTickTime = System.currentTimeMillis();
 
     public InputHandler(GameEngine engine) {
         this.engine = engine;
 
-        // 60 FPS high-frequency input polling loop
-        this.inputTimer = new javax.swing.Timer(16, e -> {
+        // High-frequency input polling loop (10ms for lower perceived latency)
+        this.inputTimer = new javax.swing.Timer(10, e -> {
+            long now = System.currentTimeMillis();
+            int deltaTime = (int) (now - lastTickTime);
+            lastTickTime = now;
+
             if (engine.getGameState() == GameEngine.GameState.PLAYING && 
                 !engine.isGameOver() && !engine.isPaused()) {
-                updateInputs();
+                updateInputs(deltaTime);
                 engine.tickLockDelay(); // Tick lock delay every frame
             } else {
                 resetKeyStates();
+                lastTickTime = now;
             }
         });
         this.inputTimer.start();
     }
 
-    private void updateInputs() {
+    private void updateInputs(int deltaTime) {
         // Continuous left movement (DAS)
         if (leftPressed && !rightPressed) {
-            leftHoldTime += 16;
+            int oldHoldTime = leftHoldTime;
+            leftHoldTime += deltaTime;
             if (leftHoldTime >= DAS_DELAY_MS) {
-                leftRepeatCounter += 16;
-                if (leftRepeatCounter >= ARR_RATE_MS) {
+                // If we just passed DAS threshold, trigger a move immediately
+                if (oldHoldTime < DAS_DELAY_MS) {
                     engine.movePieceLeft();
-                    leftRepeatCounter = 0;
+                }
+                
+                leftRepeatCounter += deltaTime;
+                while (leftRepeatCounter >= ARR_RATE_MS) {
+                    engine.movePieceLeft();
+                    leftRepeatCounter -= ARR_RATE_MS;
                 }
             }
         } else {
@@ -61,12 +73,18 @@ public class InputHandler extends KeyAdapter {
 
         // Continuous right movement (DAS)
         if (rightPressed && !leftPressed) {
-            rightHoldTime += 16;
+            int oldHoldTime = rightHoldTime;
+            rightHoldTime += deltaTime;
             if (rightHoldTime >= DAS_DELAY_MS) {
-                rightRepeatCounter += 16;
-                if (rightRepeatCounter >= ARR_RATE_MS) {
+                // If we just passed DAS threshold, trigger a move immediately
+                if (oldHoldTime < DAS_DELAY_MS) {
                     engine.movePieceRight();
-                    rightRepeatCounter = 0;
+                }
+
+                rightRepeatCounter += deltaTime;
+                while (rightRepeatCounter >= ARR_RATE_MS) {
+                    engine.movePieceRight();
+                    rightRepeatCounter -= ARR_RATE_MS;
                 }
             }
         } else {
@@ -76,10 +94,10 @@ public class InputHandler extends KeyAdapter {
 
         // Continuous down movement (Soft Drop)
         if (downPressed) {
-            downHoldTime += 16;
-            if (downHoldTime >= SOFT_DROP_INTERVAL_MS) {
-                engine.update();
-                downHoldTime = 0;
+            downHoldTime += deltaTime;
+            while (downHoldTime >= SOFT_DROP_INTERVAL_MS) {
+                engine.softDrop();
+                downHoldTime -= SOFT_DROP_INTERVAL_MS;
             }
         } else {
             downHoldTime = 0;
@@ -187,7 +205,7 @@ public class InputHandler extends KeyAdapter {
                     if (!downPressed) {
                         downPressed = true;
                         downHoldTime = 0;
-                        engine.update();
+                        engine.softDrop();
                     }
                     break;
 

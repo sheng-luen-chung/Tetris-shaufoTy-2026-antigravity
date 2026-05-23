@@ -16,10 +16,14 @@ import java.util.concurrent.Executors;
 public class SoundManager {
 
     private static Clip bgmClip;
-    private static float bgmVolume = 0.25f; // 初始 BGM 再小聲一點點 (預設 25%)
-    private static float sfxVolume = 0.8f;  // 預設 80%
+    private static float bgmVolume = 0.25f;
+    private static float sfxVolume = 0.8f;
     private static boolean bgmMuted = false;
     private static boolean sfxMuted = false;
+    // True while the game is logically paused. The clip keeps running silently
+    // (gain at minimum) so that resumeBGM() can restore sound instantly via
+    // gainControl rather than clip.start(), which has OS-level startup latency.
+    private static boolean bgmPaused = false;
     
     // 使用執行緒池來非同步播放 SFX，避免頻繁建立執行緒造成的資源開銷。
     // 設定為 Daemon 執行緒，使得遊戲關閉時這些執行緒會自動結束。
@@ -55,7 +59,9 @@ public class SoundManager {
             
             // 設定循環播放
             bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
-            bgmClip.start();
+            if (!bgmMuted && bgmVolume > 0.0f) {
+                bgmClip.start();
+            }
         } catch (Exception e) {
             System.err.println("[SoundManager] 播放 BGM 失敗: " + filePath);
             e.printStackTrace();
@@ -66,11 +72,10 @@ public class SoundManager {
      * 停止當前播放的背景音樂 (BGM) 並釋放資源。
      */
     public static synchronized void stopBGM() {
+        bgmPaused = false;
         if (bgmClip != null) {
             try {
-                if (bgmClip.isRunning()) {
-                    bgmClip.stop();
-                }
+                if (bgmClip.isRunning()) bgmClip.stop();
                 bgmClip.close();
             } catch (Exception e) {
                 System.err.println("[SoundManager] 停止 BGM 時發生錯誤");
@@ -82,37 +87,36 @@ public class SoundManager {
     }
 
     /**
-     * 暫停背景音樂 (BGM)。
-     * 停止播放（立即生效），不釋放資源也不重設播放位置。
+     * 暫停背景音樂。
+     * 直接停止 Clip 播放，達到即時靜音的效果。
      */
     public static synchronized void pauseBGM() {
-        if (bgmClip != null && bgmClip.isRunning()) {
-            bgmClip.stop(); // Immediate: halts audio output at the OS/driver level
+        bgmPaused = true;
+        if (bgmClip != null) {
+            if (bgmClip.isRunning()) {
+                bgmClip.stop();
+            }
         }
     }
 
     /**
-     * 恢復播放背景音樂 (BGM)。
-     * 從暫停處繼續播放（立即生效）。
+     * 恢復背景音樂。
+     * 若未靜音且音量大於 0，則重新啟動 Clip 播放。
      */
     public static synchronized void resumeBGM() {
-        if (bgmClip != null && !bgmClip.isRunning()) {
-            setClipVolume(bgmClip, bgmVolume, bgmMuted); // ensure correct volume before starting
-            bgmClip.start();
+        bgmPaused = false;
+        if (bgmClip != null) {
+            setClipVolume(bgmClip, bgmVolume, bgmMuted);
+            if (!bgmMuted && bgmVolume > 0.0f) {
+                if (!bgmClip.isRunning()) {
+                    bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
+                    bgmClip.start();
+                }
+            }
         }
     }
 
-    /**
-     * 暂時啟動 BGM Clip 供設定區預聴音量。
-     * 僅在「暫停狀態下開啟設定」時呼叫，讓使用者拉動滑桿時能即時聽到 BGM 的變化。
-     * 關閉設定區後應呼叫 pauseBGM() 再次停止。
-     */
-    public static synchronized void previewBGM() {
-        if (bgmClip != null && !bgmClip.isRunning()) {
-            setClipVolume(bgmClip, bgmVolume, bgmMuted);
-            bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
-        }
-    }
+
 
     /**
      * 非同步單次播放音效 (SFX)，不會阻塞主執行緒。
@@ -251,6 +255,18 @@ public class SoundManager {
         bgmVolume = Math.max(0.0f, Math.min(1.0f, volume));
         if (bgmClip != null) {
             setClipVolume(bgmClip, bgmVolume, bgmMuted);
+            if (!bgmPaused) {
+                if (!bgmMuted && bgmVolume > 0.0f) {
+                    if (!bgmClip.isRunning()) {
+                        bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
+                        bgmClip.start();
+                    }
+                } else {
+                    if (bgmClip.isRunning()) {
+                        bgmClip.stop();
+                    }
+                }
+            }
         }
     }
 
@@ -270,6 +286,18 @@ public class SoundManager {
         bgmMuted = muted;
         if (bgmClip != null) {
             setClipVolume(bgmClip, bgmVolume, bgmMuted);
+            if (!bgmPaused) {
+                if (!bgmMuted && bgmVolume > 0.0f) {
+                    if (!bgmClip.isRunning()) {
+                        bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
+                        bgmClip.start();
+                    }
+                } else {
+                    if (bgmClip.isRunning()) {
+                        bgmClip.stop();
+                    }
+                }
+            }
         }
     }
 

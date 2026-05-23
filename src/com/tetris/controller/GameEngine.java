@@ -254,6 +254,17 @@ public class GameEngine {
         }
     }
 
+    // Soft drop piece (down)
+    public void softDrop() {
+        if (gameState != GameState.PLAYING || isGameOver || isPaused)
+            return;
+        update();
+        // Restart gravity timer to prevent "gravity stutter" during soft drop
+        if (gameLoop != null) {
+            gameLoop.restart();
+        }
+    }
+
     // Update the piece (down)
     public void update() {
         if (gameState != GameState.PLAYING)

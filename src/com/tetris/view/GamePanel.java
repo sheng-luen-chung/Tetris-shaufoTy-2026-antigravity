@@ -365,9 +365,6 @@ public class GamePanel extends JPanel {
                             // Volume and Mute clicks inside pause settings
                             if (bgmTrackBounds.contains(e.getPoint())) {
                                 isDraggingBGM = true;
-                                // Start BGM clip temporarily so the user can hear the change
-                                // while dragging. It will be re-paused on mouseReleased.
-                                com.tetris.util.SoundManager.previewBGM();
                                 updateBGMVolumeFromMouse(e.getX());
                                 return;
                             } else if (sfxTrackBounds.contains(e.getPoint())) {
@@ -376,9 +373,6 @@ public class GamePanel extends JPanel {
                                 return;
                             } else if (bgmMuteBounds.contains(e.getPoint())) {
                                 com.tetris.util.SoundManager.setBGMMuted(!com.tetris.util.SoundManager.isBGMMuted());
-                                // Brief preview so the mute toggle is audible
-                                com.tetris.util.SoundManager.previewBGM();
-                                isDraggingBGM = true; // treated as a drag so mouseReleased re-pauses
                                 repaint();
                                 return;
                             } else if (sfxMuteBounds.contains(e.getPoint())) {
@@ -405,13 +399,6 @@ public class GamePanel extends JPanel {
 
             @Override
             public void mouseReleased(MouseEvent e) {
-                // If we were previewing BGM during a drag in pause settings, re-pause it.
-                if (isDraggingBGM
-                        && gameEngine != null
-                        && gameEngine.isPaused()
-                        && showSettingsInPause) {
-                    com.tetris.util.SoundManager.pauseBGM();
-                }
                 isDraggingBGM = false;
                 isDraggingSFX = false;
             }
@@ -1073,7 +1060,6 @@ public class GamePanel extends JPanel {
                     break;
                 case 3: // BACK TO MAIN
                     showSettingsInPause = false;
-                    gameEngine.togglePause(); // Unpause first!
                     gameEngine.returnToMenu();
                     break;
             }
