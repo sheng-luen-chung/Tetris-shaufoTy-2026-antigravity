@@ -59,6 +59,7 @@ public class GameEngine {
     private GamePanel panel;
     private Piece currentPiece;
     private Piece nextPiece;
+    private final java.util.List<Piece> nextPieces = new java.util.ArrayList<>();
     private Piece heldPiece = null;
     private boolean canHoldThisTurn = true;
     
@@ -125,7 +126,11 @@ public class GameEngine {
         this.leaderboardManager = new LeaderboardManager();
 
         // Initialize pieces
-        nextPiece = generateRandomPiece();
+        nextPieces.clear();
+        for (int i = 0; i < 5; i++) {
+            nextPieces.add(generateRandomPiece());
+        }
+        nextPiece = nextPieces.get(0);
         spawnNewPiece();
 
         // Set game loop (falling piece)
@@ -208,7 +213,11 @@ public class GameEngine {
         tSpins = 0;
         maxCombo = 0;
         pvpWinner = 0;
-        nextPiece = generateRandomPiece();
+        nextPieces.clear();
+        for (int i = 0; i < 5; i++) {
+            nextPieces.add(generateRandomPiece());
+        }
+        nextPiece = nextPieces.get(0);
         spawnNewPiece();
         usedAiThisSession = false;
         gameState = GameState.PLAYING;
@@ -254,7 +263,11 @@ public class GameEngine {
             opponent.tetrisClears = 0;
             opponent.tSpins = 0;
             opponent.maxCombo = 0;
-            opponent.nextPiece = opponent.generateRandomPiece();
+            opponent.nextPieces.clear();
+            for (int i = 0; i < 5; i++) {
+                opponent.nextPieces.add(opponent.generateRandomPiece());
+            }
+            opponent.nextPiece = opponent.nextPieces.get(0);
             opponent.spawnNewPiece();
 
             opponent.gameLoop.stop();
@@ -799,8 +812,9 @@ public class GameEngine {
         needsAiCalculation = true; // Request AI path recalculation
 
         // Use nextPiece and generate new nextPiece
-        currentPiece = nextPiece;
-        nextPiece = generateRandomPiece();
+        currentPiece = nextPieces.remove(0);
+        nextPieces.add(generateRandomPiece());
+        nextPiece = nextPieces.get(0);
 
         // Update view
         panel.setCurrentPiece(currentPiece);
@@ -884,7 +898,8 @@ public class GameEngine {
         if (gameState != GameState.PLAYING || isGameOver || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL) {
             return;
         }
-        SaveManager.save(score, secondsElapsed, difficulty, canHoldThisTurn, currentPiece, nextPiece, heldPiece, board);
+        SaveManager.save(score, secondsElapsed, difficulty, canHoldThisTurn, currentPiece, nextPiece, heldPiece, board,
+                         piecesSpawned, totalActions, totalLinesCleared, tetrisClears, tSpins, maxCombo);
     }
 
     // Load game state from save file
@@ -905,7 +920,18 @@ public class GameEngine {
         this.canHoldThisTurn = state.canHoldThisTurn;
         this.currentPiece = state.currentPiece;
         this.nextPiece = state.nextPiece;
+        this.nextPieces.clear();
+        this.nextPieces.add(this.nextPiece);
+        for (int i = 0; i < 4; i++) {
+            this.nextPieces.add(generateRandomPiece());
+        }
         this.heldPiece = state.heldPiece;
+        this.piecesSpawned = state.piecesSpawned;
+        this.totalActions = state.totalActions;
+        this.totalLinesCleared = state.totalLinesCleared;
+        this.tetrisClears = state.tetrisClears;
+        this.tSpins = state.tSpins;
+        this.maxCombo = state.maxCombo;
         this.comboCount = -1;
         this.isGameOver = false;
         this.isVictory = false;
@@ -989,6 +1015,10 @@ public class GameEngine {
 
     public Piece getNextPiece() {
         return nextPiece;
+    }
+
+    public java.util.List<Piece> getNextPieces() {
+        return nextPieces;
     }
 
     public Piece getHeldPiece() {
@@ -1431,7 +1461,11 @@ public class GameEngine {
         tSpins = 0;
         maxCombo = 0;
         
-        nextPiece = new Piece(Tetromino.T);
+        nextPieces.clear();
+        for (int i = 0; i < 5; i++) {
+            nextPieces.add(new Piece(Tetromino.T));
+        }
+        nextPiece = nextPieces.get(0);
         spawnNewPiece();
         
         board.setupTutorialLevel(level);

@@ -59,7 +59,7 @@ public class GamePanel extends JPanel {
 
     // Pause menu properties
     private int selectedPauseIndex = 0;
-    private final Rectangle[] pauseOptionBounds = new Rectangle[4];
+    private final Rectangle[] pauseOptionBounds = new Rectangle[5];
     private boolean showSettingsInPause = false;
     private boolean showGhostPiece = true;
     private boolean showGridLines = true;
@@ -82,6 +82,8 @@ public class GamePanel extends JPanel {
     private Rectangle sfxMuteBounds = new Rectangle();
     private Rectangle menuSettingsBackButtonBounds = new Rectangle();
     private Rectangle menuSettingsThemeBounds = new Rectangle();
+    private Rectangle menuSettingsPreviewCountBounds = new Rectangle();
+    private int nextPiecesCount = 3;
     private boolean isDraggingBGM = false;
     private boolean isDraggingSFX = false;
 
@@ -412,6 +414,13 @@ public class GamePanel extends JPanel {
                             return;
                         }
 
+                        // PREVIEW COUNT button click
+                        if (menuSettingsPreviewCountBounds != null && menuSettingsPreviewCountBounds.contains(e.getPoint())) {
+                            nextPiecesCount = nextPiecesCount % 5 + 1;
+                            repaint();
+                            return;
+                        }
+
                         // Volume and mute controls
                         if (bgmTrackBounds.contains(e.getPoint())) {
                             isDraggingBGM = true;
@@ -523,7 +532,7 @@ public class GamePanel extends JPanel {
                                 return;
                             }
                         }
-                        int numPauseOptions = 4;
+                        int numPauseOptions = showSettingsInPause ? 5 : 4;
                         for (int i = 0; i < numPauseOptions; i++) {
                             if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
                                 selectedPauseIndex = i;
@@ -581,7 +590,7 @@ public class GamePanel extends JPanel {
                         }
                     }
                 } else if ((state == com.tetris.controller.GameEngine.GameState.PLAYING || state == com.tetris.controller.GameEngine.GameState.TUTORIAL) && gameEngine.isPaused()) {
-                    int numPauseOptions = 4;
+                    int numPauseOptions = showSettingsInPause ? 5 : 4;
                     for (int i = 0; i < numPauseOptions; i++) {
                         if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
                             if (selectedPauseIndex != i) {
@@ -1141,9 +1150,9 @@ public class GamePanel extends JPanel {
         g2d.setTransform(oldTransform);
 
         // Neon subtitle
-        g2d.setFont(new Font("Arial", Font.BOLD, 13));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 13));
         g2d.setColor(new Color(0, 255, 255));
-        String subtitle = "NEON ARCADE EDITION";
+        String subtitle = "霓虹街機版 (NEON ARCADE EDITION)";
         int subX = (getWidth() - g2d.getFontMetrics().stringWidth(subtitle)) / 2;
         g2d.drawString(subtitle, subX, 155);
 
@@ -1152,29 +1161,29 @@ public class GamePanel extends JPanel {
         int numOptions = hasSave ? 7 : 6;
         int startY = hasSave ? 200 : 225;
         int gap = 40;
-        g2d.setFont(new Font("Arial", Font.BOLD, 22));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 20));
         FontMetrics fmOption = g2d.getFontMetrics();
 
         for (int i = 0; i < numOptions; i++) {
             String label = "";
             if (hasSave) {
                 switch (i) {
-                    case 0: label = "CONTINUE"; break;
-                    case 1: label = "PLAY GAME"; break;
-                    case 2: label = "T-SPIN PRACTICE"; break;
-                    case 3: label = "AI DEMO"; break;
-                    case 4: label = "SETTINGS"; break;
-                    case 5: label = "LEADERBOARD"; break;
-                    case 6: label = "EXIT"; break;
+                    case 0: label = "繼續上一局"; break;
+                    case 1: label = "開始新遊戲"; break;
+                    case 2: label = "T-Spin 練習模式"; break;
+                    case 3: label = "AI 自動遊玩演示"; break;
+                    case 4: label = "遊戲設定"; break;
+                    case 5: label = "高分排行榜"; break;
+                    case 6: label = "結束遊戲"; break;
                 }
             } else {
                 switch (i) {
-                    case 0: label = "PLAY GAME"; break;
-                    case 1: label = "T-SPIN PRACTICE"; break;
-                    case 2: label = "AI DEMO"; break;
-                    case 3: label = "SETTINGS"; break;
-                    case 4: label = "LEADERBOARD"; break;
-                    case 5: label = "EXIT"; break;
+                    case 0: label = "開始新遊戲"; break;
+                    case 1: label = "T-Spin 練習模式"; break;
+                    case 2: label = "AI 自動遊玩演示"; break;
+                    case 3: label = "遊戲設定"; break;
+                    case 4: label = "高分排行榜"; break;
+                    case 5: label = "結束遊戲"; break;
                 }
             }
 
@@ -1209,10 +1218,10 @@ public class GamePanel extends JPanel {
         }
 
         // Control Hints
-        g2d.setFont(new Font("Arial", Font.PLAIN, 12));
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
         g2d.setColor(new Color(120, 120, 150));
-        String hint1 = "Use \u2191 / \u2193 Arrows or Mouse to Navigate";
-        String hint2 = "Press ENTER or Click to Select";
+        String hint1 = "使用 ⬆ / ⬇ 方向鍵或滑鼠移動游標";
+        String hint2 = "按下 ENTER 鍵或點擊滑鼠確認選擇";
         g2d.drawString(hint1, (getWidth() - g2d.getFontMetrics().stringWidth(hint1)) / 2, 530);
         g2d.drawString(hint2, (getWidth() - g2d.getFontMetrics().stringWidth(hint2)) / 2, 550);
     }
@@ -1553,9 +1562,9 @@ public class GamePanel extends JPanel {
         g2d.drawRect(2, 2, w - 4, h - 4);
         g2d.setStroke(new java.awt.BasicStroke(1f));
 
-        g2d.setFont(new Font("Impact", Font.BOLD, 36));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 36));
         FontMetrics fm = g2d.getFontMetrics();
-        String text1 = "GAME OVER";
+        String text1 = "遊戲結束";
         int x1 = (w - fm.stringWidth(text1)) / 2;
         int y1 = h / 2 - 20;
 
@@ -1564,9 +1573,9 @@ public class GamePanel extends JPanel {
         g2d.setColor(Color.WHITE);
         g2d.drawString(text1, x1, y1);
 
-        g2d.setFont(new Font("Arial", Font.BOLD, 14));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 14));
         FontMetrics fmSub = g2d.getFontMetrics();
-        String text2 = "WAITING FOR OPPONENT...";
+        String text2 = "等待對手完成...";
         int x2 = (w - fmSub.stringWidth(text2)) / 2;
         int y2 = h / 2 + 20;
 
@@ -1601,11 +1610,11 @@ public class GamePanel extends JPanel {
         g2d.setStroke(new java.awt.BasicStroke(1f));
 
         // 2. Header Title
-        g2d.setFont(new Font("Impact", Font.BOLD | Font.ITALIC, 54));
+        g2d.setFont(new Font("SansSerif", Font.BOLD | Font.ITALIC, 48));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = (winner == 1) ? "PLAYER 1 WINS!" : 
-                           ((winner == 2) ? "PLAYER 2 WINS!" : 
-                           ((winner == 3) ? "IT'S A DRAW!" : "GAME OVER"));
+        String titleText = (winner == 1) ? "玩家 1 獲得勝利！" : 
+                           ((winner == 2) ? "玩家 2 獲得勝利！" : 
+                           ((winner == 3) ? "雙方平手！" : "遊戲結束"));
         int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 80;
 
@@ -1616,9 +1625,9 @@ public class GamePanel extends JPanel {
         g2d.setColor(Color.WHITE);
         g2d.drawString(titleText, titleX, titleY);
 
-        g2d.setFont(new Font("Arial", Font.BOLD, 14));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 14));
         g2d.setColor(new Color(180, 100, 255));
-        String subTitleText = "LOCAL PVP BATTLE SUMMARY";
+        String subTitleText = "雙人對戰戰績結算 (LOCAL PVP BATTLE SUMMARY)";
         int subTitleX = (width - g2d.getFontMetrics().stringWidth(subTitleText)) / 2;
         g2d.drawString(subTitleText, subTitleX, 110);
 
@@ -1642,15 +1651,15 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(p2StartX, statsY, cardW, cardH, 15, 15);
 
         // Render Stats for P1
-        drawPlayerStatsCard(g2d, p1StartX, statsY, cardW, "PLAYER 1", gameEngine, new Color(0, 255, 255));
+        drawPlayerStatsCard(g2d, p1StartX, statsY, cardW, "玩家 1 (PLAYER 1)", gameEngine, new Color(0, 255, 255));
 
         // Render Stats for P2
-        drawPlayerStatsCard(g2d, p2StartX, statsY, cardW, "PLAYER 2", gameEngine2, new Color(255, 100, 255));
+        drawPlayerStatsCard(g2d, p2StartX, statsY, cardW, "玩家 2 (PLAYER 2)", gameEngine2, new Color(255, 100, 255));
 
         // 4. Return Hint at bottom
-        g2d.setFont(new Font("Arial", Font.BOLD, 16));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
         g2d.setColor(new Color(120, 120, 150));
-        String hintText = "Press ENTER or SPACE to Return to Main Menu";
+        String hintText = "按下 ENTER 或 空白鍵 返回主選單";
         int hintX = (width - g2d.getFontMetrics().stringWidth(hintText)) / 2;
         g2d.drawString(hintText, hintX, 520);
     }
@@ -1659,33 +1668,33 @@ public class GamePanel extends JPanel {
         if (engine == null) return;
         
         g2d.setColor(themeColor);
-        g2d.setFont(new Font("Arial", Font.BOLD, 22));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 22));
         FontMetrics fmTitle = g2d.getFontMetrics();
         g2d.drawString(playerTitle, startX + (cardW - fmTitle.stringWidth(playerTitle)) / 2, startY + 35);
 
         // Stats details
-        g2d.setFont(new Font("Arial", Font.PLAIN, 16));
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 16));
         g2d.setColor(Color.WHITE);
         int itemY = startY + 80;
         int gap = 40;
 
-        g2d.drawString("Final Score:", startX + 40, itemY);
+        g2d.drawString("最終分數:", startX + 40, itemY);
         g2d.drawString(String.format("%,d", engine.getScore()), startX + 260, itemY);
         itemY += gap;
 
-        g2d.drawString("Lines Cleared:", startX + 40, itemY);
+        g2d.drawString("消除行數:", startX + 40, itemY);
         g2d.drawString(String.valueOf(engine.getTotalLinesCleared()), startX + 260, itemY);
         itemY += gap;
 
-        g2d.drawString("T-Spins Cleared:", startX + 40, itemY);
+        g2d.drawString("達成 T-Spin:", startX + 40, itemY);
         g2d.drawString(String.valueOf(engine.getTSpins()), startX + 260, itemY);
         itemY += gap;
 
-        g2d.drawString("Max Combo:", startX + 40, itemY);
+        g2d.drawString("最高連消:", startX + 40, itemY);
         g2d.drawString(String.valueOf(Math.max(0, engine.getMaxCombo())), startX + 260, itemY);
         itemY += gap;
 
-        g2d.drawString("Pieces Placed:", startX + 40, itemY);
+        g2d.drawString("放置方塊:", startX + 40, itemY);
         g2d.drawString(String.valueOf(engine.getPiecesSpawned()), startX + 260, itemY);
     }
 
@@ -1836,13 +1845,13 @@ public class GamePanel extends JPanel {
         g2d.setStroke(new java.awt.BasicStroke(1f));
 
         // 2. Header: Centered neon "VICTORY!" or "GAME OVER" or "TIME UP!"
-        g2d.setFont(new Font("Impact", Font.BOLD | Font.ITALIC, 46));
+        g2d.setFont(new Font("SansSerif", Font.BOLD | Font.ITALIC, 42));
         FontMetrics fmTitle = g2d.getFontMetrics();
         String titleText;
         if (isVictory) {
-            titleText = (gameEngine.getGameMode() == GameMode.ULTRA) ? "TIME UP!" : "VICTORY!";
+            titleText = (gameEngine.getGameMode() == GameMode.ULTRA) ? "時間到！" : "挑戰成功！";
         } else {
-            titleText = "GAME OVER";
+            titleText = "遊戲結束";
         }
         int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 65;
@@ -1855,9 +1864,9 @@ public class GamePanel extends JPanel {
         g2d.drawString(titleText, titleX, titleY);
 
         // Neon violet subtitle "MISSION SUMMARY"
-        g2d.setFont(new Font("Arial", Font.BOLD, 13));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 13));
         g2d.setColor(isVictory ? new Color(0, 255, 255) : new Color(180, 100, 255));
-        String subTitleText = isVictory ? "CHALLENGE COMPLETE" : "MISSION SUMMARY";
+        String subTitleText = isVictory ? "挑戰完成" : "戰績結算";
         int subTitleX = (width - g2d.getFontMetrics().stringWidth(subTitleText)) / 2;
         g2d.drawString(subTitleText, subTitleX, 92);
 
@@ -1881,22 +1890,22 @@ public class GamePanel extends JPanel {
         double apm = gameEngine.getAPM();
         double tetrisRate = gameEngine.getTetrisRate();
 
-        drawStatCard(g2d, col1X, row1Y, cardW, cardH, "FINAL SCORE", String.format("%,d", score), new Color(255, 215, 0));
+        drawStatCard(g2d, col1X, row1Y, cardW, cardH, "最終分數", String.format("%,d", score), new Color(255, 215, 0));
         String timeLabel;
         if (gameEngine.getGameMode() == GameMode.SURVIVAL) {
-            timeLabel = "SURVIVED TIME";
+            timeLabel = "生存時間";
         } else if (gameEngine.getGameMode() == GameMode.ULTRA) {
-            timeLabel = "TIME ELAPSED";
+            timeLabel = "消耗時間";
         } else {
-            timeLabel = isVictory ? "CLEAR TIME" : "TIME ELAPSED";
+            timeLabel = isVictory ? "通關時間" : "消耗時間";
         }
         drawStatCard(g2d, col2X, row1Y, cardW, cardH, timeLabel, timeStr, new Color(0, 255, 255));
         
         String linesStr = (gameEngine.getGameMode() == GameMode.SPRINT) ? (lines + " / 40") : String.valueOf(lines);
-        drawStatCard(g2d, col1X, row2Y, cardW, cardH, "LINES CLEARED", linesStr, new Color(0, 255, 100));
-        drawStatCard(g2d, col2X, row2Y, cardW, cardH, "PIECES SPAWNED", String.format("%d (%.1f PPM)", pieces, ppm), new Color(255, 140, 0));
-        drawStatCard(g2d, col1X, row3Y, cardW, cardH, "TOTAL ACTIONS", String.format("%d (%.1f APM)", actions, apm), new Color(180, 100, 255));
-        drawStatCard(g2d, col2X, row3Y, cardW, cardH, "TETRIS RATE", String.format("%.1f%%", tetrisRate), new Color(255, 50, 150));
+        drawStatCard(g2d, col1X, row2Y, cardW, cardH, "消行總數", linesStr, new Color(0, 255, 100));
+        drawStatCard(g2d, col2X, row2Y, cardW, cardH, "方塊總數", String.format("%d (%.1f PPM)", pieces, ppm), new Color(255, 140, 0));
+        drawStatCard(g2d, col1X, row3Y, cardW, cardH, "操作次數", String.format("%d (%.1f APM)", actions, apm), new Color(180, 100, 255));
+        drawStatCard(g2d, col2X, row3Y, cardW, cardH, "四行消率", String.format("%.1f%%", tetrisRate), new Color(255, 50, 150));
 
         // 4. Earned Badges Section (y = 335 to 500)
         int badgeContainerX = 60;
@@ -1911,34 +1920,34 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(badgeContainerX, badgeContainerY, badgeContainerW, badgeContainerH, 12, 12);
 
         // Container title
-        g2d.setFont(new Font("Arial", Font.BOLD, 13));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 13));
         g2d.setColor(new Color(255, 215, 120)); // Gold
-        g2d.drawString("EARNED BADGES", badgeContainerX + 15, badgeContainerY + 22);
+        g2d.drawString("獲得徽章", badgeContainerX + 15, badgeContainerY + 22);
 
         // Identify Earned Badges
         List<Badge> earnedBadges = new ArrayList<>();
         if (seconds >= 300) {
-            earnedBadges.add(new Badge("🏆 Survivor", "Survived over 5 minutes (" + timeStr + ")", new Color(0, 255, 100)));
+            earnedBadges.add(new Badge("🏆 生存者", "生存時間超過 5 分鐘 (" + timeStr + ")", new Color(0, 255, 100)));
         }
         if (gameEngine.getTetrisClears() >= 5) {
-            earnedBadges.add(new Badge("👑 Tetris Master", "Cleared 4 lines 5+ times (" + gameEngine.getTetrisClears() + " times)", new Color(255, 215, 0)));
+            earnedBadges.add(new Badge("👑 消行大師", "達成 4 行消除 5 次以上 (" + gameEngine.getTetrisClears() + " 次)", new Color(255, 215, 0)));
         }
         if (ppm >= 40.0 && seconds >= 60) {
-            earnedBadges.add(new Badge("⚡ Speed Demon", String.format("Maintained %.1f PPM (>40 PPM)", ppm), new Color(0, 255, 255)));
+            earnedBadges.add(new Badge("⚡ 極速狂魔", String.format("平均速度維持在 %.1f PPM (>40 PPM)", ppm), new Color(0, 255, 255)));
         }
         if (gameEngine.getTSpins() >= 3) {
-            earnedBadges.add(new Badge("🔮 T-Spin Tactician", "Cleared T-Spin 3+ times (" + gameEngine.getTSpins() + " times)", new Color(180, 100, 255)));
+            earnedBadges.add(new Badge("🔮 T-Spin 戰術家", "達成 T-Spin 3 次以上 (" + gameEngine.getTSpins() + " 次)", new Color(180, 100, 255)));
         }
         if (gameEngine.getMaxCombo() >= 3) { // 4+ consecutive clears
-            earnedBadges.add(new Badge("🔥 Combo Specialist", "Reached combo multiplier of " + (gameEngine.getMaxCombo() + 1), new Color(255, 50, 150)));
+            earnedBadges.add(new Badge("🔥 連消專家", "最高連消次數達 " + (gameEngine.getMaxCombo() + 1) + " 次", new Color(255, 50, 150)));
         }
 
         // Draw Badges
         if (earnedBadges.isEmpty()) {
-            g2d.setFont(new Font("Arial", Font.ITALIC, 13));
+            g2d.setFont(new Font("SansSerif", Font.ITALIC, 13));
             g2d.setColor(new Color(150, 150, 160));
-            String emptyMsg = "No badges earned this game.";
-            String emptyTip = "Tip: Try surviving longer (5m) or getting 3+ T-Spins!";
+            String emptyMsg = "本局未獲得徽章。";
+            String emptyTip = "提示：嘗試生存更久（5分鐘）或獲得 3 次以上 T-Spin！";
             g2d.drawString(emptyMsg, badgeContainerX + 25, badgeContainerY + 65);
             g2d.drawString(emptyTip, badgeContainerX + 25, badgeContainerY + 95);
         } else {
@@ -1948,12 +1957,12 @@ public class GamePanel extends JPanel {
                 Badge badge = earnedBadges.get(i);
                 
                 // Draw badge title
-                g2d.setFont(new Font("Arial", Font.BOLD, 12));
+                g2d.setFont(new Font("SansSerif", Font.BOLD, 12));
                 g2d.setColor(badge.color);
                 g2d.drawString(badge.title, badgeContainerX + 20, badgeY);
 
                 // Draw badge description
-                g2d.setFont(new Font("Arial", Font.PLAIN, 11));
+                g2d.setFont(new Font("SansSerif", Font.PLAIN, 11));
                 g2d.setColor(new Color(210, 210, 220));
                 g2d.drawString(badge.description, badgeContainerX + 160, badgeY);
 
@@ -1966,9 +1975,9 @@ public class GamePanel extends JPanel {
                 badgeY += gap;
             }
             if (earnedBadges.size() > 3) {
-                g2d.setFont(new Font("Arial", Font.ITALIC, 11));
+                g2d.setFont(new Font("SansSerif", Font.ITALIC, 11));
                 g2d.setColor(new Color(150, 150, 160));
-                String moreMsg = "+ " + (earnedBadges.size() - 3) + " more badges earned";
+                String moreMsg = "+ 還有 " + (earnedBadges.size() - 3) + " 個獲得的徽章";
                 g2d.drawString(moreMsg, badgeContainerX + badgeContainerW - 130, badgeContainerY + badgeContainerH - 12);
             }
         }
@@ -1976,8 +1985,8 @@ public class GamePanel extends JPanel {
         // 5. Pulsing/Breathing Footer Instruction
         long now = System.currentTimeMillis();
         float pulse = (float) (0.6 + 0.4 * Math.sin(now / 250.0));
-        g2d.setFont(new Font("Arial", Font.BOLD, 14));
-        String footerText = "Press ENTER or Click to return to Menu";
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 14));
+        String footerText = "按下 ENTER 鍵或點擊返回主選單";
         int footerX = (width - g2d.getFontMetrics().stringWidth(footerText)) / 2;
         int footerY = 540;
 
@@ -1999,19 +2008,19 @@ public class GamePanel extends JPanel {
         g2d.fillRoundRect(x, y, 4, h, 4, 4);
 
         // Draw label text
-        g2d.setFont(new Font("Arial", Font.BOLD, 10));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 10));
         g2d.setColor(new Color(170, 170, 185));
         g2d.drawString(label, x + 12, y + 18);
 
         // Draw value text
-        g2d.setFont(new Font("Arial", Font.BOLD, 15));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 15));
         g2d.setColor(Color.WHITE);
         g2d.drawString(value, x + 12, y + 42);
     }
 
     // Pause menu navigation helper
     public void navigatePauseMenu(int dir) {
-        int numOptions = 4;
+        int numOptions = showSettingsInPause ? 5 : 4;
         selectedPauseIndex = (selectedPauseIndex + dir + numOptions) % numOptions;
         repaint();
     }
@@ -2044,10 +2053,13 @@ public class GamePanel extends JPanel {
                 case 1: // GRID LINES
                     showGridLines = !showGridLines;
                     break;
-                case 2: // THEME
+                case 2: // PREVIEW COUNT
+                    nextPiecesCount = nextPiecesCount % 5 + 1;
+                    break;
+                case 3: // THEME
                     com.tetris.util.ThemeManager.nextTheme();
                     break;
-                case 3: // BACK
+                case 4: // BACK
                     showSettingsInPause = false;
                     selectedPauseIndex = 2; // return cursor to settings option (index 2 now, because SETTINGS is index 2!)
                     break;
@@ -2069,9 +2081,9 @@ public class GamePanel extends JPanel {
         g2d.fillRect(0, 0, width, height);
 
         // Title: GAME PAUSED
-        g2d.setFont(new Font("Impact", Font.BOLD, 46));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 42));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = "GAME PAUSED";
+        String titleText = "遊戲暫停";
         int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 120;
 
@@ -2083,7 +2095,7 @@ public class GamePanel extends JPanel {
 
         // Selection container card
         int cardW = 340;
-        int cardH = showSettingsInPause ? 360 : 310;
+        int cardH = showSettingsInPause ? 370 : 310;
         int cardX = (width - cardW) / 2;
         int cardY = 160;
 
@@ -2093,9 +2105,9 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(cardX, cardY, cardW, cardH, 15, 15);
 
         // Draw Options
-        g2d.setFont(new Font("Arial", Font.BOLD, 18));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 18));
         FontMetrics fmOption = g2d.getFontMetrics();
-        int numPauseOptions = 4;
+        int numPauseOptions = showSettingsInPause ? 5 : 4;
 
         for (int i = 0; i < numPauseOptions; i++) {
             String label = "";
@@ -2105,10 +2117,10 @@ public class GamePanel extends JPanel {
 
             if (!showSettingsInPause) {
                 switch (i) {
-                    case 0: label = "RESUME GAME"; break;
-                    case 1: label = "SAVE GAME"; break;
-                    case 2: label = "SETTINGS"; break;
-                    case 3: label = "BACK TO MAIN"; break;
+                    case 0: label = "繼續遊戲"; break;
+                    case 1: label = "儲存進度"; break;
+                    case 2: label = "遊戲設定"; break;
+                    case 3: label = "返回主選單"; break;
                 }
                 textWidth = fmOption.stringWidth(label);
                 x = cardX + (cardW - textWidth) / 2;
@@ -2116,25 +2128,29 @@ public class GamePanel extends JPanel {
                 pauseOptionBounds[i] = new Rectangle(cardX + 15, y - textHeight + 5, cardW - 30, textHeight + 15);
             } else {
                 switch (i) {
-                    case 0: label = "GHOST PIECE: " + (showGhostPiece ? "ON" : "OFF"); break;
-                    case 1: label = "GRID LINES: " + (showGridLines ? "ON" : "OFF"); break;
-                    case 2: label = "THEME: " + com.tetris.util.ThemeManager.getCurrentTheme().getLabel(); break;
-                    case 3: label = "BACK"; break;
+                    case 0: label = "幻影方塊: " + (showGhostPiece ? "開啟" : "關閉"); break;
+                    case 1: label = "網格線: " + (showGridLines ? "顯示" : "隱藏"); break;
+                    case 2: label = "預覽數量: " + nextPiecesCount + " 個"; break;
+                    case 3: label = "視覺主題: " + getThemeChineseLabel(com.tetris.util.ThemeManager.getCurrentTheme()); break;
+                    case 4: label = "返回"; break;
                 }
                 textWidth = fmOption.stringWidth(label);
                 x = cardX + (cardW - textWidth) / 2;
                 if (i == 0) {
-                    y = cardY + 45;
-                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 22, cardW - 30, 32);
+                    y = cardY + 35;
+                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 12, cardW - 30, 32);
                 } else if (i == 1) {
-                    y = cardY + 95;
-                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 72, cardW - 30, 32);
+                    y = cardY + 75;
+                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 52, cardW - 30, 32);
                 } else if (i == 2) {
-                    y = cardY + 260;
-                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 237, cardW - 30, 32);
+                    y = cardY + 115;
+                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 92, cardW - 30, 32);
+                } else if (i == 3) {
+                    y = cardY + 275;
+                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 252, cardW - 30, 32);
                 } else {
-                    y = cardY + 312;
-                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 289, cardW - 30, 32);
+                    y = cardY + 325;
+                    pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 302, cardW - 30, 32);
                 }
             }
 
@@ -2161,13 +2177,13 @@ public class GamePanel extends JPanel {
         }
 
         if (showSettingsInPause) {
-            drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 140, 55);
+            drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 155, 50);
         } else {
             // Draw temporary save status text if it was saved within 3 seconds
             if (System.currentTimeMillis() - lastSaveTime < 3000) {
-                g2d.setFont(new Font("Arial", Font.BOLD, 14));
+                g2d.setFont(new Font("SansSerif", Font.BOLD, 14));
                 boolean canSave = (gameEngine.getGameMode() == com.tetris.model.GameMode.ENDLESS);
-                String savedText = canSave ? "Progress Saved!" : "This mode cannot be saved!";
+                String savedText = canSave ? "進度已儲存！" : "此模式不支援存檔！";
                 g2d.setColor(canSave ? new Color(0, 255, 100) : new Color(255, 60, 60)); // Green for success, Red for warning
                 int savedW = g2d.getFontMetrics().stringWidth(savedText);
                 g2d.drawString(savedText, cardX + (cardW - savedW) / 2, cardY + cardH - 15);
@@ -2175,9 +2191,9 @@ public class GamePanel extends JPanel {
         }
 
         // Control Hints
-        g2d.setFont(new Font("Arial", Font.PLAIN, 12));
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
         g2d.setColor(new Color(120, 120, 150));
-        String hint = "Use \u2191 / \u2193 Arrows or Mouse | Enter to Select";
+        String hint = "使用 ⬆ / ⬇ 方向鍵或滑鼠選擇 | Enter 鍵確認";
         g2d.drawString(hint, (width - g2d.getFontMetrics().stringWidth(hint)) / 2, 515);
     }
 
@@ -2299,23 +2315,23 @@ public class GamePanel extends JPanel {
         g.drawLine(startX, 0, startX, getHeight());
 
         g.setColor(Color.WHITE);
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 18));
 
         // 1. Draw Score or Sprint Lines progress
         if (targetEngine.getGameMode() == GameMode.SPRINT) {
-            g.drawString("LINES", startX + 20, 45);
-            g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 30));
+            g.drawString("消行進度", startX + 20, 45);
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 26));
             g.drawString(targetEngine.getTotalLinesCleared() + " / 40", startX + 20, 72);
         } else {
-            g.drawString("SCORE", startX + 20, 45);
-            g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 30));
+            g.drawString("目前分數", startX + 20, 45);
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 26));
             g.drawString(String.valueOf(targetEngine.getScore()), startX + 20, 72);
         }
 
         // 2. Draw Timer
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
-        g.drawString("TIME", startX + 20, 108);
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 24));
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 18));
+        g.drawString("遊玩時間", startX + 20, 108);
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 24));
         int seconds = targetEngine.getSecondsElapsed();
         String timeStr;
         if (targetEngine.getGameMode() == GameMode.ULTRA) {
@@ -2339,42 +2355,48 @@ public class GamePanel extends JPanel {
                 interval = 10;
             }
             int timeLeft = interval - (seconds % interval);
-            g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 12));
             if (timeLeft <= 3) {
                 g.setColor(new Color(255, 60, 60)); // Red warning
             } else {
                 g.setColor(new Color(255, 140, 0)); // Neon Orange/Gold
             }
-            g.drawString("GARBAGE IN: " + timeLeft + "s", startX + 20, 150);
+            g.drawString("垃圾行倒數: " + timeLeft + " 秒", startX + 20, 150);
             g.setColor(Color.WHITE);
         }
 
         // 3. Draw Level
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
-        g.drawString("LEVEL", startX + 20, 170);
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 18));
+        g.drawString("遊戲難度", startX + 20, 170);
         if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
-            g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
             g.setColor(new Color(0, 255, 255));
-            g.drawString(targetEngine.getTutorialLevel() + " / 3", startX + 20, 195);
+            g.drawString("教學 " + targetEngine.getTutorialLevel() + " / 3", startX + 20, 195);
         } else {
-            g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 20));
-            g.drawString(targetEngine.getDifficulty().getLabel(), startX + 20, 195);
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 20));
+            String diffStr = "中等";
+            switch (targetEngine.getDifficulty()) {
+                case EASY: diffStr = "簡單"; break;
+                case NORMAL: diffStr = "中等"; break;
+                case HARD: diffStr = "困難"; break;
+            }
+            g.drawString(diffStr, startX + 20, 195);
 
             // Draw Sprint score in small font on the side
             if (targetEngine.getGameMode() == GameMode.SPRINT) {
-                g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
+                g.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 12));
                 g.setColor(new Color(180, 180, 180));
-                g.drawString("Score: " + targetEngine.getScore(), startX + 110, 193);
+                g.drawString("分數: " + targetEngine.getScore(), startX + 110, 193);
             }
         }
         g.setColor(Color.WHITE);
 
-        // 4. Previews Side-by-Side (NEXT & HOLD)
+        // 4. Previews (NEXT & HOLD)
         int boxY = 215;
         int boxW = 80;
         int boxH = 85;
 
-        // Next Box
+        // Next Box (first piece)
         int nextBoxX = startX + 15;
         g.setColor(new Color(255, 255, 255, 15));
         g.fillRoundRect(nextBoxX, boxY, boxW, boxH, 8, 8);
@@ -2382,12 +2404,30 @@ public class GamePanel extends JPanel {
         g.drawRoundRect(nextBoxX, boxY, boxW, boxH, 8, 8);
 
         g.setColor(new Color(0, 255, 255)); // Cyan title for NEXT
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
-        g.drawString("NEXT", nextBoxX + 8, boxY + 18);
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 12));
+        g.drawString("下一個", nextBoxX + 8, boxY + 18);
 
-        Piece nextPiece = targetEngine.getNextPiece();
-        if (nextPiece != null) {
-            drawCenteredPiece(g, nextPiece.getType(), nextBoxX, boxY + 20, boxW, boxH - 22);
+        java.util.List<Piece> nextPieces = targetEngine.getNextPieces();
+        if (nextPieces != null && !nextPieces.isEmpty()) {
+            drawCenteredPiece(g, nextPieces.get(0).getType(), nextBoxX, boxY + 20, boxW, boxH - 22);
+        }
+
+        // Draw subsequent preview boxes vertically stacked
+        int currentY = boxY + boxH; // 215 + 85 = 300
+        for (int i = 1; i < nextPiecesCount; i++) {
+            currentY += 4; // spacing
+            int subBoxY = currentY;
+            int subBoxH = 30;
+
+            g.setColor(new Color(255, 255, 255, 10));
+            g.fillRoundRect(nextBoxX, subBoxY, boxW, subBoxH, 6, 6);
+            g.setColor(new Color(255, 255, 255, 30));
+            g.drawRoundRect(nextBoxX, subBoxY, boxW, subBoxH, 6, 6);
+
+            if (nextPieces != null && i < nextPieces.size()) {
+                drawCenteredPiece(g, nextPieces.get(i).getType(), nextBoxX, subBoxY, boxW, subBoxH);
+            }
+            currentY += subBoxH;
         }
 
         // Hold Box
@@ -2398,55 +2438,59 @@ public class GamePanel extends JPanel {
         g.drawRoundRect(holdBoxX, boxY, boxW, boxH, 8, 8);
 
         g.setColor(new Color(255, 100, 255)); // Neon magenta title for HOLD
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
-        g.drawString("HOLD", holdBoxX + 8, boxY + 18);
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 12));
+        g.drawString("暫存區", holdBoxX + 8, boxY + 18);
 
         Piece heldPiece = targetEngine.getHeldPiece();
         if (heldPiece != null) {
             drawCenteredPiece(g, heldPiece.getType(), holdBoxX, boxY + 20, boxW, boxH - 22);
         } else {
             g.setColor(new Color(150, 150, 180));
-            g.setFont(new java.awt.Font("Arial", java.awt.Font.ITALIC, 11));
-            int emptyW = g.getFontMetrics().stringWidth("[Empty]");
-            g.drawString("[Empty]", holdBoxX + (boxW - emptyW) / 2, boxY + 20 + (boxH - 22)/2 + 4);
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.ITALIC, 11));
+            int emptyW = g.getFontMetrics().stringWidth("[無]");
+            g.drawString("[無]", holdBoxX + (boxW - emptyW) / 2, boxY + 20 + (boxH - 22)/2 + 4);
         }
 
         // 5. Draw Leaderboard or PVP info
+        int dynamicYStart = currentY + 15;
         if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
-            drawTutorialHints(g, startX + 15, 330);
+            drawTutorialHints(g, startX + 15, dynamicYStart);
         } else if (targetEngine.getGameMode() == GameMode.PVP) {
             // Draw PvP stats!
             int statsX = startX + 15;
-            int statsY = 320;
+            int statsY = dynamicYStart;
             int statsW = 170;
-            int statsH = 160;
-            
+            int statsH = 130;
+
             // Draw card background
             g2d.setColor(new Color(255, 255, 255, 10));
             g2d.fillRoundRect(statsX, statsY, statsW, statsH, 8, 8);
             g2d.setColor(new Color(255, 255, 255, 30));
             g2d.drawRoundRect(statsX, statsY, statsW, statsH, 8, 8);
-            
+
             g2d.setColor(new Color(0, 255, 255));
-            g2d.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
-            String playerTitle = (targetEngine.getPlayerNum() == 1) ? "PLAYER 1 (WASD)" : "PLAYER 2 (ARROWS)";
-            g2d.drawString(playerTitle, statsX + 10, statsY + 22);
-            
+            g2d.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 12));
+            String playerTitle = (targetEngine.getPlayerNum() == 1) ? "玩家 1 (WASD)" : "玩家 2 (方向鍵)";
+            g2d.drawString(playerTitle, statsX + 10, statsY + 20);
+
             g2d.setColor(Color.WHITE);
-            g2d.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
-            g2d.drawString("Lines Cleared: " + targetEngine.getTotalLinesCleared(), statsX + 10, statsY + 50);
-            g2d.drawString("T-Spins: " + targetEngine.getTSpins(), statsX + 10, statsY + 75);
-            g2d.drawString("Max Combo: " + targetEngine.getMaxCombo(), statsX + 10, statsY + 100);
-            g2d.drawString("Pieces: " + targetEngine.getPiecesSpawned(), statsX + 10, statsY + 125);
+            g2d.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 12));
+            g2d.drawString("消除行數: " + targetEngine.getTotalLinesCleared(), statsX + 10, statsY + 45);
+            g2d.drawString("T-Spins 次數: " + targetEngine.getTSpins(), statsX + 10, statsY + 68);
+            g2d.drawString("最高連消: " + targetEngine.getMaxCombo(), statsX + 10, statsY + 91);
+            g2d.drawString("已放方塊: " + targetEngine.getPiecesSpawned(), statsX + 10, statsY + 114);
         } else {
-            drawLeaderboard(g, startX + 15, 330);
+            drawLeaderboard(g, startX + 15, dynamicYStart);
 
             // 6. AI Autoplay Status Overlay / Score Disqualification Warning
+            int leaderboardCount = targetEngine.getLeaderboardEntries().size();
+            int leaderboardH = leaderboardCount == 0 ? 25 : 16 + leaderboardCount * 13;
+            int aiY = dynamicYStart + leaderboardH + 15;
+
             if (targetEngine.isAiPlay()) {
                 int aiX = startX + 15;
-                int aiY = 405;
                 int aiW = 170;
-                int aiH = 80;
+                int aiH = 75;
 
                 long now = System.currentTimeMillis();
                 int alpha = 130 + (int)(60 * Math.sin(now / 150.0));
@@ -2463,36 +2507,35 @@ public class GamePanel extends JPanel {
                 g2d.setColor(new Color(180, 50, 255, alpha));
                 g2d.fillOval(aiX + 15, aiY + 16, 8, 8);
 
-                g2d.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
+                g2d.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 12));
                 g2d.setColor(new Color(230, 200, 255));
-                g2d.drawString("AUTO PLAY", aiX + 30, aiY + 24);
+                g2d.drawString("自動遊玩中", aiX + 30, aiY + 24);
 
-                g2d.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 10));
+                g2d.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 10));
                 g2d.setColor(new Color(185, 175, 200));
-                g2d.drawString("AI is playing the game.", aiX + 15, aiY + 44);
-                g2d.drawString("Press [A] to manual control", aiX + 15, aiY + 59);
+                g2d.drawString("AI 正在替您遊玩遊戲中", aiX + 15, aiY + 44);
+                g2d.drawString("按 [A] 鍵切換回手動操作", aiX + 15, aiY + 59);
             } else if (targetEngine.hasUsedAiThisSession()) {
                 int warnX = startX + 15;
-                int warnY = 405;
                 int warnW = 170;
                 int warnH = 65;
 
                 // Semi-transparent warm warning background
                 g2d.setColor(new Color(255, 69, 0, 25));
-                g2d.fillRoundRect(warnX, warnY, warnW, warnH, 8, 8);
+                g2d.fillRoundRect(warnX, aiY, warnW, warnH, 8, 8);
 
                 // Orange-red border
                 g2d.setColor(new Color(255, 100, 0, 160));
-                g2d.drawRoundRect(warnX, warnY, warnW, warnH, 8, 8);
+                g2d.drawRoundRect(warnX, aiY, warnW, warnH, 8, 8);
 
                 g2d.setFont(new java.awt.Font("Microsoft JhengHei", java.awt.Font.BOLD, 11));
                 g2d.setColor(new Color(255, 160, 122));
-                g2d.drawString("不納入排行榜紀錄", warnX + 10, warnY + 22);
+                g2d.drawString("不納入排行榜紀錄", warnX + 10, aiY + 22);
 
                 g2d.setFont(new java.awt.Font("Microsoft JhengHei", java.awt.Font.PLAIN, 10));
                 g2d.setColor(new Color(230, 200, 185));
-                g2d.drawString("本局曾使用自動遊玩", warnX + 10, warnY + 40);
-                g2d.drawString("分數將不寫入排行榜", warnX + 10, warnY + 53);
+                g2d.drawString("本局曾使用自動遊玩", warnX + 10, aiY + 40);
+                g2d.drawString("分數將不寫入排行榜", warnX + 10, aiY + 53);
             }
         }
     }
@@ -2519,7 +2562,13 @@ public class GamePanel extends JPanel {
         int spanX = maxX - minX + 1;
         int spanY = maxY - minY + 1;
 
-        int tileSize = 16;
+        // Calculate tileSize to fit inside boxW and boxH with padding
+        int maxTileW = (boxW - 10) / spanX;
+        int maxTileH = (boxH - 6) / spanY;
+        int tileSize = Math.min(maxTileW, maxTileH);
+        if (tileSize > 18) tileSize = 18;
+        if (tileSize < 8) tileSize = 8;
+
         int pieceW = spanX * tileSize;
         int pieceH = spanY * tileSize;
 
@@ -2546,15 +2595,15 @@ public class GamePanel extends JPanel {
         List<LeaderboardEntry> entries = gameEngine.getLeaderboardEntries();
 
         g.setColor(new Color(255, 215, 120));
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
-        g.drawString("LEADERBOARD", x, startY);
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 14));
+        g.drawString("高分排行榜", x, startY);
 
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 11));
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 11));
         int lineY = startY + 16;
 
         if (entries.isEmpty()) {
             g.setColor(new Color(210, 210, 210));
-            g.drawString("No scores yet", x, lineY);
+            g.drawString("尚無紀錄", x, lineY);
             return;
         }
 
@@ -2565,8 +2614,13 @@ public class GamePanel extends JPanel {
             }
 
             g.setColor(new Color(240, 240, 240));
-            String diffDisp = "NORMAL".equalsIgnoreCase(entry.getDifficulty()) ? "MEDIUM" : entry.getDifficulty();
-            String text = String.format("%d. %d pts | %s", rank, entry.getScore(), diffDisp);
+            String diffDisp = "中等";
+            if ("EASY".equalsIgnoreCase(entry.getDifficulty())) {
+                diffDisp = "簡單";
+            } else if ("HARD".equalsIgnoreCase(entry.getDifficulty())) {
+                diffDisp = "困難";
+            }
+            String text = String.format("%d. %d 分 | %s", rank, entry.getScore(), diffDisp);
             g.drawString(text, x, lineY);
             lineY += 13;
             rank++;
@@ -2999,8 +3053,8 @@ public class GamePanel extends JPanel {
         }
         g2d.drawRoundRect(muteX, muteY, muteW, muteH, 6, 6);
         
-        g2d.setFont(new Font("Arial", Font.BOLD, 11));
-        String muteText = bgmMute ? "MUTED" : "MUTE";
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 11));
+        String muteText = bgmMute ? "已靜音" : "靜音";
         int muteTextW = g2d.getFontMetrics().stringWidth(muteText);
         g2d.drawString(muteText, muteX + (muteW - muteTextW) / 2, muteY + 15);
         
@@ -3057,8 +3111,8 @@ public class GamePanel extends JPanel {
         }
         g2d.drawRoundRect(sfxMuteX, sfxMuteY, muteW, muteH, 6, 6);
         
-        g2d.setFont(new Font("Arial", Font.BOLD, 11));
-        String sfxMuteText = sfxMute ? "MUTED" : "MUTE";
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 11));
+        String sfxMuteText = sfxMute ? "已靜音" : "靜音";
         int sfxMuteTextW = g2d.getFontMetrics().stringWidth(sfxMuteText);
         g2d.drawString(sfxMuteText, sfxMuteX + (muteW - sfxMuteTextW) / 2, sfxMuteY + 15);
     }
@@ -3068,9 +3122,9 @@ public class GamePanel extends JPanel {
      */
     private void drawMenuSettings(Graphics2D g2d) {
         java.awt.Point mousePos = getMousePosition();
-        g2d.setFont(new Font("Impact", Font.BOLD, 46));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 42));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = "SETTINGS";
+        String titleText = "遊戲設定";
         int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 120;
 
@@ -3080,7 +3134,7 @@ public class GamePanel extends JPanel {
         g2d.drawString(titleText, titleX, titleY);
 
         int cardW = 340;
-        int cardH = 285;
+        int cardH = 335;
         int cardX = (getWidth() - cardW) / 2;
         int cardY = 180;
 
@@ -3092,8 +3146,8 @@ public class GamePanel extends JPanel {
         drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 30, 50);
 
         // THEME button
-        String themeText = "THEME: " + com.tetris.util.ThemeManager.getCurrentTheme().getLabel();
-        g2d.setFont(new Font("Arial", Font.BOLD, 16));
+        String themeText = "視覺主題: " + getThemeChineseLabel(com.tetris.util.ThemeManager.getCurrentTheme());
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
         FontMetrics fmTheme = g2d.getFontMetrics();
         int themeBtnW = 240;
         int themeBtnH = 36;
@@ -3115,14 +3169,38 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(themeBtnX, themeBtnY, themeBtnW, themeBtnH, 10, 10);
         g2d.drawString(themeText, themeBtnX + (themeBtnW - fmTheme.stringWidth(themeText)) / 2, themeBtnY + 24);
 
+        // PREVIEW COUNT button
+        String previewText = "預覽數量: " + nextPiecesCount + " 個";
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
+        FontMetrics fmPreview = g2d.getFontMetrics();
+        int previewBtnW = 240;
+        int previewBtnH = 36;
+        int previewBtnX = (getWidth() - previewBtnW) / 2;
+        int previewBtnY = cardY + 195;
+
+        menuSettingsPreviewCountBounds = new Rectangle(previewBtnX, previewBtnY, previewBtnW, previewBtnH);
+        boolean hoverPreview = (mousePos != null && menuSettingsPreviewCountBounds.contains(mousePos));
+
+        if (hoverPreview) {
+            g2d.setColor(new Color(255, 255, 255, 40));
+            g2d.fillRoundRect(previewBtnX, previewBtnY, previewBtnW, previewBtnH, 10, 10);
+            g2d.setColor(Color.WHITE);
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 15));
+            g2d.fillRoundRect(previewBtnX, previewBtnY, previewBtnW, previewBtnH, 10, 10);
+            g2d.setColor(new Color(200, 200, 200));
+        }
+        g2d.drawRoundRect(previewBtnX, previewBtnY, previewBtnW, previewBtnH, 10, 10);
+        g2d.drawString(previewText, previewBtnX + (previewBtnW - fmPreview.stringWidth(previewText)) / 2, previewBtnY + 24);
+
         // BACK button
-        String backText = "BACK";
-        g2d.setFont(new Font("Arial", Font.BOLD, 18));
+        String backText = "返回";
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 18));
         FontMetrics fmBack = g2d.getFontMetrics();
         int btnW = 120;
         int btnH = 36;
         int btnX = (getWidth() - btnW) / 2;
-        int btnY = cardY + 215;
+        int btnY = cardY + 265;
 
         menuSettingsBackButtonBounds = new Rectangle(btnX, btnY, btnW, btnH);
         boolean hoverBack = (mousePos != null && menuSettingsBackButtonBounds.contains(mousePos));
@@ -3160,9 +3238,9 @@ public class GamePanel extends JPanel {
      * 繪製主畫面 GameMode 選擇卡片
      */
     private void drawModeSelectScreen(Graphics2D g2d) {
-        g2d.setFont(new Font("Impact", Font.BOLD, 46));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 42));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = "SELECT MODE";
+        String titleText = "選擇模式";
         int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 120;
 
@@ -3183,9 +3261,9 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(cardX, cardY, cardW, cardH, 15, 15);
 
         // Subtitle inside card
-        g2d.setFont(new Font("Arial", Font.BOLD, 15));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 15));
         g2d.setColor(new Color(200, 200, 220));
-        String subText = "SELECT GAME MODE";
+        String subText = "請選擇遊戲模式";
         int subW = g2d.getFontMetrics().stringWidth(subText);
         g2d.drawString(subText, cardX + (cardW - subW) / 2, cardY + 25);
 
@@ -3214,38 +3292,38 @@ public class GamePanel extends JPanel {
 
             switch (i) {
                 case 0:
-                    label = "ENDLESS MODE";
+                    label = "無盡模式 (ENDLESS)";
                     baseColor = new Color(0, 255, 255);
                     selectColor = Color.WHITE;
                     fillCol = new Color(0, 255, 255, isSelected ? 45 : 20);
                     break;
                 case 1:
-                    label = "SPRINT (40 LINES)";
+                    label = "40行衝刺賽 (SPRINT)";
                     baseColor = new Color(255, 100, 255);
                     selectColor = Color.WHITE;
                     fillCol = new Color(255, 100, 255, isSelected ? 45 : 20);
                     break;
                 case 2:
-                    label = "ULTRA (2 MINUTES)";
+                    label = "2分鐘限時賽 (ULTRA)";
                     baseColor = new Color(255, 215, 0);
                     selectColor = Color.WHITE;
                     fillCol = new Color(255, 215, 0, isSelected ? 45 : 20);
                     break;
                 case 3:
-                    label = "SURVIVAL MODE";
+                    label = "生存挑戰賽 (SURVIVAL)";
                     baseColor = new Color(255, 140, 0);
                     selectColor = Color.WHITE;
                     fillCol = new Color(255, 140, 0, isSelected ? 45 : 20);
                     break;
                 case 4:
-                    label = "PVP BATTLE";
+                    label = "雙人對戰模式 (PVP)";
                     baseColor = new Color(255, 60, 60);
                     selectColor = Color.WHITE;
                     fillCol = new Color(255, 60, 60, isSelected ? 45 : 20);
                     break;
                 case 5:
                 default:
-                    label = "BACK";
+                    label = "返回";
                     baseColor = new Color(160, 160, 180);
                     selectColor = new Color(0, 255, 255);
                     fillCol = new Color(255, 255, 255, isSelected ? 30 : 10);
@@ -3268,7 +3346,7 @@ public class GamePanel extends JPanel {
             g2d.setStroke(new java.awt.BasicStroke(1.0f));
 
             // Draw text
-            g2d.setFont(new Font("Arial", Font.BOLD, 16));
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 15));
             FontMetrics fmOpt = g2d.getFontMetrics();
             int labelW = fmOpt.stringWidth(label);
             int labelH = fmOpt.getAscent();
@@ -3295,9 +3373,9 @@ public class GamePanel extends JPanel {
      * 繪製主畫面 Difficulty 選擇卡片
      */
     private void drawDifficultySelectScreen(Graphics2D g2d) {
-        g2d.setFont(new Font("Impact", Font.BOLD, 46));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 42));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = "START GAME";
+        String titleText = "開始遊戲";
         int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 120;
 
@@ -3318,9 +3396,9 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(cardX, cardY, cardW, cardH, 15, 15);
 
         // 卡片內子標題
-        g2d.setFont(new Font("Arial", Font.BOLD, 15));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 15));
         g2d.setColor(new Color(200, 200, 220));
-        String subText = "SELECT DIFFICULTY";
+        String subText = "請選擇難易度";
         int subW = g2d.getFontMetrics().stringWidth(subText);
         g2d.drawString(subText, cardX + (cardW - subW) / 2, cardY + 25);
 
@@ -3349,26 +3427,26 @@ public class GamePanel extends JPanel {
 
             switch (i) {
                 case 0:
-                    label = "EASY";
+                    label = "簡單 (EASY)";
                     baseColor = new Color(0, 200, 80);
                     selectColor = new Color(0, 255, 100);
                     fillCol = new Color(0, 200, 80, isSelected ? 45 : 20);
                     break;
                 case 1:
-                    label = "MEDIUM";
+                    label = "中等 (NORMAL)";
                     baseColor = new Color(220, 180, 0);
                     selectColor = new Color(255, 220, 0);
                     fillCol = new Color(220, 180, 0, isSelected ? 45 : 20);
                     break;
                 case 2:
-                    label = "HARD";
+                    label = "困難 (HARD)";
                     baseColor = new Color(220, 40, 40);
                     selectColor = new Color(255, 60, 60);
                     fillCol = new Color(220, 40, 40, isSelected ? 45 : 20);
                     break;
                 case 3:
                 default:
-                    label = "BACK";
+                    label = "返回";
                     baseColor = new Color(160, 160, 180);
                     selectColor = new Color(0, 255, 255);
                     fillCol = new Color(255, 255, 255, isSelected ? 30 : 10);
@@ -3391,7 +3469,7 @@ public class GamePanel extends JPanel {
             g2d.setStroke(new java.awt.BasicStroke(1.0f));
 
             // 畫文字
-            g2d.setFont(new Font("Arial", Font.BOLD, 18));
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 18));
             FontMetrics fmOpt = g2d.getFontMetrics();
             int labelW = fmOpt.stringWidth(label);
             int labelH = fmOpt.getAscent();
@@ -3416,56 +3494,58 @@ public class GamePanel extends JPanel {
 
     private void drawTutorialHints(Graphics g, int x, int startY) {
         g.setColor(new Color(255, 215, 120)); // Gold
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
-        g.drawString("TRAINING HINTS", x, startY);
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 14));
+        g.drawString("訓練提示 (TRAINING HINTS)", x, startY);
         
         g.setColor(Color.WHITE);
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 12));
         
         int level = gameEngine.getTutorialLevel();
         String[] lines;
         if (level == 1) {
             lines = new String[] {
-                "Level 1: T-Spin Single",
-                "Goal: Clear 1 line with T-spin.",
+                "關卡 1：T-Spin Single",
+                "目標：以 T-Spin 消除 1 行。",
                 "",
-                "1. Drop T-piece pointing",
-                "   RIGHT into the slot.",
-                "2. When it hits bottom,",
-                "   press UP Arrow to rotate",
-                "   clockwise (pointing DOWN).",
-                "3. Secure the T-spin Single!"
+                "1. 將 T 方塊右朝下 (指向右)",
+                "   放入右側凹槽中。",
+                "2. 當它到達底部時，",
+                "   按下 ⬆ 方向鍵進行",
+                "   順時針旋轉 (指向下)。",
+                "3. 成功完成 T-spin Single！"
             };
         } else if (level == 2) {
             lines = new String[] {
-                "Level 2: T-Spin Double",
-                "Goal: Clear 2 lines with T-spin.",
+                "關卡 2：T-Spin Double",
+                "目標：以 T-Spin 消除 2 行。",
                 "",
-                "1. Symmetrical to Level 1,",
-                "   but the bottom is deeper.",
-                "2. Drop T-piece pointing",
-                "   RIGHT and tuck it in.",
-                "3. Rotate clockwise to",
-                "   clear 2 lines at once!"
+                "1. 本關結構與關卡 1 對稱，",
+                "   但是凹槽深度更深。",
+                "2. 將 T 方塊右朝下 (指向右)",
+                "   放入入口並塞入底部。",
+                "3. 按下 ⬆ 方向鍵順時針",
+                "   旋轉，一次消除 2 行！"
             };
         } else { // Level 3
             lines = new String[] {
-                "Level 3: Left T-Spin Double",
-                "Goal: Clear 2 lines (Left slot).",
+                "關卡 3：左側 T-Spin Double",
+                "目標：消除左側凹槽 2 行。",
                 "",
-                "1. Slot is on the left now.",
-                "2. Drop T-piece pointing",
-                "   LEFT into the entry path.",
-                "3. Press UP Arrow twice",
-                "   (or rotate CCW) to spin",
-                "   it into the slot!"
+                "1. 這次的凹槽位於左側。",
+                "2. 將 T 方塊左朝下 (指向左)",
+                "   放入左側入口通道中。",
+                "3. 按下 ⬆ 方向鍵兩次",
+                "   (或按 Z 鍵逆時針旋轉)",
+                "   將方塊轉入凹槽中！"
             };
         }
         
-        int lineY = startY + 22;
+        int lineY = startY + 20;
+        int lineSpacing = (startY > 380) ? 12 : 16;
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, (startY > 380) ? 10 : 12));
         for (String line : lines) {
             g.drawString(line, x, lineY);
-            lineY += 16;
+            lineY += lineSpacing;
         }
     }
 
@@ -3478,9 +3558,9 @@ public class GamePanel extends JPanel {
             g2d.fillRect(0, 0, boardW, boardH);
             
             boolean success = gameEngine.isLastTutorialSuccess();
-            g2d.setFont(new Font("Impact", Font.BOLD, 36));
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 32));
             FontMetrics fm = g2d.getFontMetrics();
-            String text = success ? "SUCCESS!" : "FAILED! TRY AGAIN";
+            String text = success ? "挑戰成功！" : "挑戰失敗！請再試一次";
             Color color = success ? new Color(0, 255, 100) : new Color(255, 50, 50);
             
             int textX = (boardW - fm.stringWidth(text)) / 2;
@@ -3495,9 +3575,9 @@ public class GamePanel extends JPanel {
             g2d.drawString(text, textX, textY);
             
             // Draw a small subtext
-            g2d.setFont(new Font("Arial", Font.PLAIN, 14));
+            g2d.setFont(new Font("SansSerif", Font.PLAIN, 14));
             FontMetrics fmSub = g2d.getFontMetrics();
-            String subText = success ? "Loading next level..." : "Resetting board...";
+            String subText = success ? "正在載入下一關..." : "正在重置版面...";
             g2d.setColor(new Color(200, 200, 200));
             g2d.drawString(subText, (boardW - fmSub.stringWidth(subText)) / 2, textY + 40);
         }
@@ -3514,17 +3594,17 @@ public class GamePanel extends JPanel {
         g2d.fillRect(0, 0, width, height);
         
         // Title: TUTORIAL COMPLETE
-        g2d.setFont(new Font("Impact", Font.BOLD, 42));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 36));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = "TUTORIAL COMPLETE";
+        String titleText = "教學關卡全部完成！";
         int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
         g2d.setColor(new Color(255, 215, 0)); // Gold
         g2d.drawString(titleText, titleX, 150);
         
         // Subtitle: T-SPIN MASTER!
-        g2d.setFont(new Font("Impact", Font.BOLD, 36));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 32));
         FontMetrics fmSub = g2d.getFontMetrics();
-        String subText = "T-SPIN MASTER!";
+        String subText = "T-SPIN 大師！";
         int subX = (width - fmSub.stringWidth(subText)) / 2;
         g2d.setColor(new Color(0, 255, 255)); // Neon Cyan
         g2d.drawString(subText, subX, 220);
@@ -3539,12 +3619,12 @@ public class GamePanel extends JPanel {
         g2d.setColor(new Color(255, 255, 255, 40));
         g2d.drawRoundRect(cardX, cardY, cardW, cardH, 12, 12);
         
-        g2d.setFont(new Font("Arial", Font.PLAIN, 15));
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 15));
         g2d.setColor(Color.WHITE);
-        String msg1 = "You have successfully completed";
-        String msg2 = "all T-Spin training levels!";
-        String msg3 = "Now you are ready to use T-spins";
-        String msg4 = "in real game play to dominate!";
+        String msg1 = "您已成功通過所有";
+        String msg2 = "T-Spin 旋轉訓練關卡！";
+        String msg3 = "現在您已準備好在實戰中";
+        String msg4 = "運用 T-Spin 主宰整場戰局！";
         
         int textY = cardY + 30;
         g2d.drawString(msg1, cardX + (cardW - g2d.getFontMetrics().stringWidth(msg1)) / 2, textY);
@@ -3553,10 +3633,20 @@ public class GamePanel extends JPanel {
         g2d.drawString(msg4, cardX + (cardW - g2d.getFontMetrics().stringWidth(msg4)) / 2, textY + 85);
         
         // Prompt
-        g2d.setFont(new Font("Arial", Font.BOLD, 16));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
         g2d.setColor(new Color(150, 150, 180));
-        String prompt = "Press ENTER or ESC to Return to Menu";
+        String prompt = "按下 ENTER 鍵或 ESC 返回主選單";
         g2d.drawString(prompt, (width - g2d.getFontMetrics().stringWidth(prompt)) / 2, 480);
     }
 
+    private String getThemeChineseLabel(com.tetris.util.ThemeManager.Theme theme) {
+        if (theme == null) return "未知";
+        switch (theme) {
+            case CYBERPUNK_NEON: return "賽博霓虹";
+            case RETRO_GAMEBOY: return "復古 GameBoy";
+            case CLASSIC_ARCADE: return "經典街機";
+            case MIDNIGHT_STEALTH: return "暗夜幽影";
+            default: return theme.getLabel();
+        }
+    }
 }

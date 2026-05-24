@@ -37,7 +37,9 @@ public class SaveManager {
 
     public static boolean save(int score, int secondsElapsed, GameEngine.Difficulty difficulty,
                                boolean canHoldThisTurn, Piece currentPiece, Piece nextPiece,
-                               Piece heldPiece, Board board) {
+                               Piece heldPiece, Board board,
+                               int piecesSpawned, int totalActions, int totalLinesCleared,
+                               int tetrisClears, int tSpins, int maxCombo) {
         Path path = getSaveFilePath();
         try {
             Files.createDirectories(path.getParent());
@@ -49,6 +51,12 @@ public class SaveManager {
                 writer.write("currentPiece=" + serializePiece(currentPiece) + "\n");
                 writer.write("nextPiece=" + serializePiece(nextPiece) + "\n");
                 writer.write("heldPiece=" + serializePiece(heldPiece) + "\n");
+                writer.write("piecesSpawned=" + piecesSpawned + "\n");
+                writer.write("totalActions=" + totalActions + "\n");
+                writer.write("totalLinesCleared=" + totalLinesCleared + "\n");
+                writer.write("tetrisClears=" + tetrisClears + "\n");
+                writer.write("tSpins=" + tSpins + "\n");
+                writer.write("maxCombo=" + maxCombo + "\n");
 
                 // Serialize board grid (20 rows x 10 cols)
                 StringBuilder boardStr = new StringBuilder();
@@ -125,6 +133,12 @@ public class SaveManager {
             state.currentPiece = deserializePiece(data.get("currentPiece"));
             state.nextPiece = deserializePiece(data.get("nextPiece"));
             state.heldPiece = deserializePiece(data.get("heldPiece"));
+            state.piecesSpawned = Integer.parseInt(data.getOrDefault("piecesSpawned", "0"));
+            state.totalActions = Integer.parseInt(data.getOrDefault("totalActions", "0"));
+            state.totalLinesCleared = Integer.parseInt(data.getOrDefault("totalLinesCleared", "0"));
+            state.tetrisClears = Integer.parseInt(data.getOrDefault("tetrisClears", "0"));
+            state.tSpins = Integer.parseInt(data.getOrDefault("tSpins", "0"));
+            state.maxCombo = Integer.parseInt(data.getOrDefault("maxCombo", "0"));
 
             String boardStr = data.get("board");
             state.grid = new Color[Board.ROWS][Board.COLS];
@@ -160,5 +174,11 @@ public class SaveManager {
         public Piece nextPiece;
         public Piece heldPiece;
         public Color[][] grid;
+        public int piecesSpawned;
+        public int totalActions;
+        public int totalLinesCleared;
+        public int tetrisClears;
+        public int tSpins;
+        public int maxCombo;
     }
 }
