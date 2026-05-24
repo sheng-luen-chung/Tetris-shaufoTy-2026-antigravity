@@ -58,7 +58,36 @@ public class ThemeManager {
         }
     }
 
+    public enum ColorBlindMode {
+        OFF("關閉"),
+        FRIENDLY_COLOR("友善色彩"),
+        SYMBOL_ASSIST("符號輔助"),
+        BOTH("雙重輔助");
+
+        private final String label;
+
+        ColorBlindMode(String label) {
+            this.label = label;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+    }
+
     private static Theme currentTheme = Theme.CYBERPUNK_NEON;
+    private static ColorBlindMode currentColorBlindMode = ColorBlindMode.OFF;
+
+    // Okabe-Ito Colorblind Friendly Palette for Tetris shapes (I, J, L, O, S, T, Z)
+    private static final Color[] COLORBLIND_FRIENDLY_COLORS = new Color[] {
+        new Color(86, 180, 233),  // I: Sky Blue
+        new Color(0, 114, 178),   // J: Blue
+        new Color(230, 159, 0),   // L: Orange
+        new Color(240, 228, 66),  // O: Yellow
+        new Color(0, 158, 115),   // S: Bluish Green
+        new Color(204, 121, 167), // T: Reddish Purple
+        new Color(213, 94, 0)     // Z: Vermillion
+    };
 
     public static Theme getCurrentTheme() {
         return currentTheme;
@@ -73,6 +102,21 @@ public class ThemeManager {
     public static void nextTheme() {
         Theme[] values = Theme.values();
         currentTheme = values[(currentTheme.ordinal() + 1) % values.length];
+    }
+
+    public static ColorBlindMode getCurrentColorBlindMode() {
+        return currentColorBlindMode;
+    }
+
+    public static void setCurrentColorBlindMode(ColorBlindMode mode) {
+        if (mode != null) {
+            currentColorBlindMode = mode;
+        }
+    }
+
+    public static void nextColorBlindMode() {
+        ColorBlindMode[] values = ColorBlindMode.values();
+        currentColorBlindMode = values[(currentColorBlindMode.ordinal() + 1) % values.length];
     }
 
     // Color of the grid lines based on theme
@@ -135,8 +179,14 @@ public class ThemeManager {
         if (shapeIndex == -1) {
             return originalColor;
         }
-        
-        Color mapped = currentTheme.getColor(shapeIndex);
+
+        Color mapped;
+        if (currentColorBlindMode == ColorBlindMode.FRIENDLY_COLOR || currentColorBlindMode == ColorBlindMode.BOTH) {
+            mapped = COLORBLIND_FRIENDLY_COLORS[shapeIndex];
+        } else {
+            mapped = currentTheme.getColor(shapeIndex);
+        }
+
         if (alpha < 255) {
             return new Color(mapped.getRed(), mapped.getGreen(), mapped.getBlue(), alpha);
         }

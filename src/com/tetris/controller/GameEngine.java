@@ -526,6 +526,7 @@ public class GameEngine {
             SoundManager.playSFX("/resources/clear.wav");
         } else {
             comboCount = -1;
+            SoundManager.playSynthSound(SoundManager.SoundType.LOCK);
         }
 
         // PVP Garbage Generation
@@ -1178,6 +1179,7 @@ public class GameEngine {
         if (handleMove(0, -1)) {
             lastMoveWasRotation = false;
             resetLockDelay();
+            SoundManager.playSynthSound(SoundManager.SoundType.MOVE);
         }
     }
 
@@ -1189,6 +1191,7 @@ public class GameEngine {
         if (handleMove(0, 1)) {
             lastMoveWasRotation = false;
             resetLockDelay();
+            SoundManager.playSynthSound(SoundManager.SoundType.MOVE);
         }
     }
 
@@ -1207,6 +1210,7 @@ public class GameEngine {
             lastMoveWasRotation = true;
             lastRotationKickOffset = new int[] {0, 0};
             resetLockDelay();
+            SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
             panel.repaint();
             return;
         }
@@ -1234,6 +1238,7 @@ public class GameEngine {
             lastMoveWasRotation = true;
             lastRotationKickOffset = successfulOffset;
             resetLockDelay();
+            SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
         } else {
             // All kicks failed, undo rotation
             currentPiece.undoRotate();
@@ -1302,6 +1307,7 @@ public class GameEngine {
         if (!canHoldThisTurn)
             return;
         totalActions++;
+        SoundManager.playSynthSound(SoundManager.SoundType.HOLD);
 
         stopLockDelay(); // Stop lock delay when holding
 

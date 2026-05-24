@@ -45,21 +45,21 @@ public class InputHandler extends KeyAdapter {
 
     // Player 1 Custom Keys (Left, Right, Down, Rotate, Drop, Hold)
     private static boolean p1Customized = false;
-    private static int p1KeyLeft = KeyEvent.VK_A;
-    private static int p1KeyRight = KeyEvent.VK_D;
-    private static int p1KeyDown = KeyEvent.VK_S;
-    private static int p1KeyRotate = KeyEvent.VK_W;
+    private static int p1KeyLeft = KeyEvent.VK_LEFT;
+    private static int p1KeyRight = KeyEvent.VK_RIGHT;
+    private static int p1KeyDown = KeyEvent.VK_DOWN;
+    private static int p1KeyRotate = KeyEvent.VK_UP;
     private static int p1KeyDrop = KeyEvent.VK_SPACE;
-    private static int p1KeyHold = KeyEvent.VK_SHIFT;
+    private static int p1KeyHold = KeyEvent.VK_C;
 
     // Player 2 Custom Keys
     private static boolean p2Customized = false;
-    private static int p2KeyLeft = KeyEvent.VK_LEFT;
-    private static int p2KeyRight = KeyEvent.VK_RIGHT;
-    private static int p2KeyDown = KeyEvent.VK_DOWN;
-    private static int p2KeyRotate = KeyEvent.VK_UP;
-    private static int p2KeyDrop = KeyEvent.VK_ENTER;
-    private static int p2KeyHold = KeyEvent.VK_SLASH;
+    private static int p2KeyLeft = KeyEvent.VK_A;
+    private static int p2KeyRight = KeyEvent.VK_D;
+    private static int p2KeyDown = KeyEvent.VK_S;
+    private static int p2KeyRotate = KeyEvent.VK_W;
+    private static int p2KeyDrop = KeyEvent.VK_Q;
+    private static int p2KeyHold = KeyEvent.VK_E;
 
     public static int getDasDelayMs() { return dasDelayMs; }
     public static void setDasDelayMs(int val) { dasDelayMs = val; saveConfig(); }
@@ -91,7 +91,14 @@ public class InputHandler extends KeyAdapter {
         int[] p2Keys = { p2KeyLeft, p2KeyRight, p2KeyDown, p2KeyRotate, p2KeyDrop, p2KeyHold };
         com.tetris.util.SaveManager.saveSettings(dasDelayMs, arrRateMs, softDropIntervalMs, 
                                                 p1Customized, p1Keys, 
-                                                p2Customized, p2Keys);
+                                                p2Customized, p2Keys,
+                                                com.tetris.util.SoundManager.getBGMVolume(),
+                                                com.tetris.util.SoundManager.getSFXVolume(),
+                                                com.tetris.util.SoundManager.isBGMMuted(),
+                                                com.tetris.util.SoundManager.isSFXMuted(),
+                                                com.tetris.util.ThemeManager.getCurrentTheme().name(),
+                                                com.tetris.util.ThemeManager.getCurrentColorBlindMode().name(),
+                                                com.tetris.util.SoundManager.getCurrentSoundPack().name());
     }
 
     public static void resetToDefault() {
@@ -99,19 +106,19 @@ public class InputHandler extends KeyAdapter {
         arrRateMs = 45;
         softDropIntervalMs = 30;
         p1Customized = false;
-        p1KeyLeft = KeyEvent.VK_A;
-        p1KeyRight = KeyEvent.VK_D;
-        p1KeyDown = KeyEvent.VK_S;
-        p1KeyRotate = KeyEvent.VK_W;
+        p1KeyLeft = KeyEvent.VK_LEFT;
+        p1KeyRight = KeyEvent.VK_RIGHT;
+        p1KeyDown = KeyEvent.VK_DOWN;
+        p1KeyRotate = KeyEvent.VK_UP;
         p1KeyDrop = KeyEvent.VK_SPACE;
-        p1KeyHold = KeyEvent.VK_SHIFT;
+        p1KeyHold = KeyEvent.VK_C;
         p2Customized = false;
-        p2KeyLeft = KeyEvent.VK_LEFT;
-        p2KeyRight = KeyEvent.VK_RIGHT;
-        p2KeyDown = KeyEvent.VK_DOWN;
-        p2KeyRotate = KeyEvent.VK_UP;
-        p2KeyDrop = KeyEvent.VK_ENTER;
-        p2KeyHold = KeyEvent.VK_SLASH;
+        p2KeyLeft = KeyEvent.VK_A;
+        p2KeyRight = KeyEvent.VK_D;
+        p2KeyDown = KeyEvent.VK_S;
+        p2KeyRotate = KeyEvent.VK_W;
+        p2KeyDrop = KeyEvent.VK_Q;
+        p2KeyHold = KeyEvent.VK_E;
         saveConfig();
     }
 
@@ -152,6 +159,13 @@ public class InputHandler extends KeyAdapter {
                         p2KeyHold = Integer.parseInt(parts[5]);
                     }
                 }
+                if (config.containsKey("bgmVol")) com.tetris.util.SoundManager.setBGMVolume(Float.parseFloat(config.get("bgmVol")));
+                if (config.containsKey("sfxVol")) com.tetris.util.SoundManager.setSFXVolume(Float.parseFloat(config.get("sfxVol")));
+                if (config.containsKey("bgmMute")) com.tetris.util.SoundManager.setBGMMuted(Boolean.parseBoolean(config.get("bgmMute")));
+                if (config.containsKey("sfxMute")) com.tetris.util.SoundManager.setSFXMuted(Boolean.parseBoolean(config.get("sfxMute")));
+                if (config.containsKey("theme")) com.tetris.util.ThemeManager.setCurrentTheme(com.tetris.util.ThemeManager.Theme.valueOf(config.get("theme")));
+                if (config.containsKey("colorBlind")) com.tetris.util.ThemeManager.setCurrentColorBlindMode(com.tetris.util.ThemeManager.ColorBlindMode.valueOf(config.get("colorBlind")));
+                if (config.containsKey("soundPack")) com.tetris.util.SoundManager.setCurrentSoundPack(com.tetris.util.SoundManager.SoundPack.valueOf(config.get("soundPack")));
             } catch (Exception ex) {
                 System.err.println("Error parsing controls config: " + ex.getMessage());
             }
@@ -531,19 +545,19 @@ public class InputHandler extends KeyAdapter {
             if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
                 // PVP Controls
                 // Resolve dynamic keys
-                int p1Left = p1Customized ? p1KeyLeft : KeyEvent.VK_A;
-                int p1Right = p1Customized ? p1KeyRight : KeyEvent.VK_D;
-                int p1Down = p1Customized ? p1KeyDown : KeyEvent.VK_S;
-                int p1Rotate = p1Customized ? p1KeyRotate : KeyEvent.VK_W;
+                int p1Left = p1Customized ? p1KeyLeft : KeyEvent.VK_LEFT;
+                int p1Right = p1Customized ? p1KeyRight : KeyEvent.VK_RIGHT;
+                int p1Down = p1Customized ? p1KeyDown : KeyEvent.VK_DOWN;
+                int p1Rotate = p1Customized ? p1KeyRotate : KeyEvent.VK_UP;
                 int p1Drop = p1Customized ? p1KeyDrop : KeyEvent.VK_SPACE;
-                int p1Hold = p1Customized ? p1KeyHold : KeyEvent.VK_SHIFT;
+                int p1Hold = p1Customized ? p1KeyHold : KeyEvent.VK_C;
 
-                int p2Left = p2Customized ? p2KeyLeft : KeyEvent.VK_LEFT;
-                int p2Right = p2Customized ? p2KeyRight : KeyEvent.VK_RIGHT;
-                int p2Down = p2Customized ? p2KeyDown : KeyEvent.VK_DOWN;
-                int p2Rotate = p2Customized ? p2KeyRotate : KeyEvent.VK_UP;
-                int p2Drop = p2Customized ? p2KeyDrop : KeyEvent.VK_ENTER;
-                int p2Hold = p2Customized ? p2KeyHold : KeyEvent.VK_SLASH;
+                int p2Left = p2Customized ? p2KeyLeft : KeyEvent.VK_A;
+                int p2Right = p2Customized ? p2KeyRight : KeyEvent.VK_D;
+                int p2Down = p2Customized ? p2KeyDown : KeyEvent.VK_S;
+                int p2Rotate = p2Customized ? p2KeyRotate : KeyEvent.VK_W;
+                int p2Drop = p2Customized ? p2KeyDrop : KeyEvent.VK_Q;
+                int p2Hold = p2Customized ? p2KeyHold : KeyEvent.VK_E;
 
                 // Player 1
                 if (keyCode == p1Left) {

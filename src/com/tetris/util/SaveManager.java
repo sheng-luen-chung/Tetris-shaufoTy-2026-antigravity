@@ -190,7 +190,11 @@ public class SaveManager {
 
     public static void saveSettings(int das, int arr, int sdr, 
                                     boolean p1Custom, int[] p1Keys, 
-                                    boolean p2Custom, int[] p2Keys) {
+                                    boolean p2Custom, int[] p2Keys,
+                                    float bgmVol, float sfxVol,
+                                    boolean bgmMute, boolean sfxMute,
+                                    String theme, String colorBlind,
+                                    String soundPack) {
         Path path = getSettingsFilePath();
         try {
             Files.createDirectories(path.getParent());
@@ -206,6 +210,13 @@ public class SaveManager {
                 if (p2Keys != null && p2Keys.length >= 6) {
                     writer.write("p2Keys=" + p2Keys[0] + "," + p2Keys[1] + "," + p2Keys[2] + "," + p2Keys[3] + "," + p2Keys[4] + "," + p2Keys[5] + "\n");
                 }
+                writer.write("bgmVol=" + bgmVol + "\n");
+                writer.write("sfxVol=" + sfxVol + "\n");
+                writer.write("bgmMute=" + bgmMute + "\n");
+                writer.write("sfxMute=" + sfxMute + "\n");
+                writer.write("theme=" + theme + "\n");
+                writer.write("colorBlind=" + colorBlind + "\n");
+                writer.write("soundPack=" + soundPack + "\n");
             }
         } catch (IOException e) {
             System.err.println("Failed to save settings: " + e.getMessage());
