@@ -10,6 +10,7 @@ import java.util.Random;
 import java.util.List;
 import com.tetris.util.SoundManager;
 import com.tetris.util.SaveManager;
+import com.tetris.model.GameMode;
 import java.awt.Color;
 
 public class GameEngine {
@@ -76,6 +77,10 @@ public class GameEngine {
     private boolean isTransitioning = false;
     private boolean lastTutorialSuccess = false;
 
+    // Game Mode fields
+    private GameMode gameMode = GameMode.ENDLESS;
+    private boolean isVictory = false;
+
     // Stats tracking
     private int piecesSpawned = 0;
     private int totalActions = 0;
@@ -126,6 +131,35 @@ public class GameEngine {
         secondTimer = new Timer(1000, e -> {
             if (!isGameOver && !isPaused) {
                 secondsElapsed++;
+                if (gameMode == GameMode.ULTRA && secondsElapsed >= 120) {
+                    isVictory = true;
+                    isGameOver = true;
+                    setAiPlay(false);
+                    gameLoop.stop();
+                    secondTimer.stop();
+                    SoundManager.stopBGM();
+                    SoundManager.playSFX("/resources/clear.wav");
+                    recordFinalScore();
+                } else if (gameMode == GameMode.SURVIVAL) {
+                    int interval = 15;
+                    if (difficulty == Difficulty.EASY) {
+                        interval = 20;
+                    } else if (difficulty == Difficulty.HARD) {
+                        interval = 10;
+                    }
+                    if (secondsElapsed > 0 && secondsElapsed % interval == 0) {
+                        int holeCol = new Random().nextInt(com.tetris.model.Board.COLS);
+                        board.addGarbageLine(holeCol);
+                        // Check if current piece collides and push it up if possible
+                        if (currentPiece != null && !board.isValidMove(currentPiece)) {
+                            currentPiece.move(-1, 0); // push up
+                            if (!board.isValidMove(currentPiece)) {
+                                currentPiece.move(1, 0); // push back if failed
+                            }
+                        }
+                        SoundManager.playSFX("/resources/clear.wav");
+                    }
+                }
                 panel.repaint(); // Refresh UI to show timer
             }
         });
@@ -154,6 +188,7 @@ public class GameEngine {
         secondsElapsed = 0;
         comboCount = -1;
         isGameOver = false;
+        isVictory = false;
         isPaused = false;
         leaderboardRecorded = false;
         heldPiece = null;
@@ -480,6 +515,25 @@ public class GameEngine {
                 panel.triggerPerfectClear();
             }
         }
+
+        // Check for 40-line Sprint victory
+        if (gameMode == GameMode.SPRINT && totalLinesCleared >= 40) {
+            isVictory = true;
+            isGameOver = true;
+            setAiPlay(false);
+            if (gameLoop != null) {
+                gameLoop.stop();
+            }
+            if (secondTimer != null) {
+                secondTimer.stop();
+            }
+            SoundManager.stopBGM();
+            SoundManager.playSFX("/resources/clear.wav");
+            recordFinalScore();
+            panel.repaint();
+            return;
+        }
+
         spawnNewPiece(); // Spawn
         canHoldThisTurn = true; // Reset hold status for the next turn
     }
@@ -661,13 +715,13 @@ public class GameEngine {
 
         leaderboardRecorded = true;
         if (!usedAiThisSession) {
-            leaderboardManager.recordScore(score, secondsElapsed, difficulty);
+            leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode);
         }
     }
 
     // Save current game state
     public void saveGame() {
-        if (gameState != GameState.PLAYING || isGameOver) {
+        if (gameState != GameState.PLAYING || isGameOver || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL) {
             return;
         }
         SaveManager.save(score, secondsElapsed, difficulty, canHoldThisTurn, currentPiece, nextPiece, heldPiece, board);
@@ -687,12 +741,14 @@ public class GameEngine {
         this.score = state.score;
         this.secondsElapsed = state.secondsElapsed;
         this.difficulty = state.difficulty;
+        this.gameMode = GameMode.ENDLESS; // Loaded games are always Endless
         this.canHoldThisTurn = state.canHoldThisTurn;
         this.currentPiece = state.currentPiece;
         this.nextPiece = state.nextPiece;
         this.heldPiece = state.heldPiece;
         this.comboCount = -1;
         this.isGameOver = false;
+        this.isVictory = false;
         this.isPaused = true; // Start paused for safety
         this.leaderboardRecorded = false;
         this.isLocking = false;
@@ -743,11 +799,27 @@ public class GameEngine {
     }
 
     public List<LeaderboardEntry> getLeaderboardEntries() {
-        return leaderboardManager.getTopEntries(difficulty);
+        return leaderboardManager.getTopEntries(difficulty, gameMode);
     }
 
     public List<LeaderboardEntry> getLeaderboardEntriesForDifficulty(Difficulty diff) {
-        return leaderboardManager.getTopEntries(diff);
+        return leaderboardManager.getTopEntries(diff, gameMode);
+    }
+
+    public List<LeaderboardEntry> getLeaderboardEntriesForDifficultyAndMode(Difficulty diff, GameMode mode) {
+        return leaderboardManager.getTopEntries(diff, mode);
+    }
+
+    public GameMode getGameMode() {
+        return gameMode;
+    }
+
+    public void setGameMode(GameMode gameMode) {
+        this.gameMode = gameMode;
+    }
+
+    public boolean isVictory() {
+        return isVictory;
     }
 
     public boolean isGameOver() {
@@ -829,6 +901,10 @@ public class GameEngine {
                 panel.setShowSettingsInMenu(false);
             } else if (panel.isShowDifficultySelectInMenu()) {
                 panel.setShowDifficultySelectInMenu(false);
+                panel.setShowModeSelectInMenu(true); // Go back to Mode Select
+                panel.setSelectedModeIndex(0);
+            } else if (panel.isShowModeSelectInMenu()) {
+                panel.setShowModeSelectInMenu(false); // Go back to Main Menu
             } else {
                 System.exit(0);
             }
@@ -840,6 +916,12 @@ public class GameEngine {
     public void navigateLeaderboardTabs(int dir) {
         if (gameState == GameState.LEADERBOARD) {
             panel.navigateLeaderboardTabs(dir);
+        }
+    }
+
+    public void navigateLeaderboardModes(int dir) {
+        if (gameState == GameState.LEADERBOARD) {
+            panel.navigateLeaderboardModes(dir);
         }
     }
 

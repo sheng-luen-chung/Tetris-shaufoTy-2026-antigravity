@@ -168,4 +168,21 @@ public class Board {
             }
         }
     }
+
+    // Insert a garbage line at the bottom, shifting all other rows up.
+    public void addGarbageLine(int holeCol) {
+        // Shift rows 0 to ROWS-2 up by one (row 0 gets discarded)
+        for (int r = 0; r < ROWS - 1; r++) {
+            System.arraycopy(grid[r + 1], 0, grid[r], 0, COLS);
+        }
+        
+        // Populate the bottom row (ROWS - 1) with gray blocks except for the hole
+        for (int c = 0; c < COLS; c++) {
+            if (c == holeCol) {
+                grid[ROWS - 1][c] = null;
+            } else {
+                grid[ROWS - 1][c] = Color.GRAY;
+            }
+        }
+    }
 }

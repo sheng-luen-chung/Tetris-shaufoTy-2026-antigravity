@@ -10,14 +10,20 @@ public class LeaderboardEntry {
 
     private final int score;
     private final int secondsElapsed;
+    private final int linesCleared;
     private final String difficulty;
     private final long playedAt;
 
-    public LeaderboardEntry(int score, int secondsElapsed, String difficulty, long playedAt) {
+    public LeaderboardEntry(int score, int secondsElapsed, int linesCleared, String difficulty, long playedAt) {
         this.score = score;
         this.secondsElapsed = secondsElapsed;
+        this.linesCleared = linesCleared;
         this.difficulty = difficulty;
         this.playedAt = playedAt;
+    }
+
+    public LeaderboardEntry(int score, int secondsElapsed, String difficulty, long playedAt) {
+        this(score, secondsElapsed, 0, difficulty, playedAt);
     }
 
     public int getScore() {
@@ -26,6 +32,10 @@ public class LeaderboardEntry {
 
     public int getSecondsElapsed() {
         return secondsElapsed;
+    }
+
+    public int getLinesCleared() {
+        return linesCleared;
     }
 
     public String getDifficulty() {

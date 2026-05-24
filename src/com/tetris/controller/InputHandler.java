@@ -150,6 +150,12 @@ public class InputHandler extends KeyAdapter {
                 case KeyEvent.VK_RIGHT:
                     engine.navigateLeaderboardTabs(1);
                     break;
+                case KeyEvent.VK_UP:
+                    engine.navigateLeaderboardModes(-1);
+                    break;
+                case KeyEvent.VK_DOWN:
+                    engine.navigateLeaderboardModes(1);
+                    break;
             }
         } else if (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL) {
             if (engine.isTransitioning()) {

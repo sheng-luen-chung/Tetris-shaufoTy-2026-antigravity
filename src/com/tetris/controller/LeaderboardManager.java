@@ -1,6 +1,7 @@
 package com.tetris.controller;
 
 import com.tetris.model.LeaderboardEntry;
+import com.tetris.model.GameMode;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -35,20 +36,20 @@ public class LeaderboardManager {
                     }
                 }
 
-                Path easyFile = getLeaderboardFile("EASY");
-                Path normalFile = getLeaderboardFile("NORMAL");
-                Path hardFile = getLeaderboardFile("HARD");
+                Path easyFile = getLeaderboardFile("EASY", GameMode.ENDLESS);
+                Path normalFile = getLeaderboardFile("NORMAL", GameMode.ENDLESS);
+                Path hardFile = getLeaderboardFile("HARD", GameMode.ENDLESS);
 
                 if (!Files.exists(easyFile) && !easy.isEmpty()) {
-                    easy.sort(entryComparator());
+                    easy.sort(entryComparator(GameMode.ENDLESS));
                     saveEntries(easyFile, easy);
                 }
                 if (!Files.exists(normalFile) && !normal.isEmpty()) {
-                    normal.sort(entryComparator());
+                    normal.sort(entryComparator(GameMode.ENDLESS));
                     saveEntries(normalFile, normal);
                 }
                 if (!Files.exists(hardFile) && !hard.isEmpty()) {
-                    hard.sort(entryComparator());
+                    hard.sort(entryComparator(GameMode.ENDLESS));
                     saveEntries(hardFile, hard);
                 }
             }
@@ -61,35 +62,81 @@ public class LeaderboardManager {
         }
     }
 
-    private Path getLeaderboardFile(String difficultyLabel) {
-        String fileName = "leaderboard_" + difficultyLabel.toLowerCase() + ".csv";
+    private Path getLeaderboardFile(String difficultyLabel, GameMode mode) {
+        String prefix;
+        if (mode == GameMode.SPRINT) {
+            prefix = "leaderboard_sprint_";
+        } else if (mode == GameMode.ULTRA) {
+            prefix = "leaderboard_ultra_";
+        } else if (mode == GameMode.SURVIVAL) {
+            prefix = "leaderboard_survival_";
+        } else {
+            prefix = "leaderboard_";
+        }
+        String fileName = prefix + difficultyLabel.toLowerCase() + ".csv";
         return Paths.get(System.getProperty("user.home"), ".tetris", fileName);
     }
 
-    public synchronized void recordScore(int score, int secondsElapsed, GameEngine.Difficulty difficulty) {
+    public synchronized void recordScore(int score, int secondsElapsed, GameEngine.Difficulty difficulty, GameMode mode) {
+        recordScore(score, secondsElapsed, 0, difficulty, mode);
+    }
+
+    public synchronized void recordScore(int score, int secondsElapsed, int linesCleared, GameEngine.Difficulty difficulty, GameMode mode) {
         String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label);
+        Path file = getLeaderboardFile(label, mode);
         List<LeaderboardEntry> entries = loadEntries(file);
-        entries.add(new LeaderboardEntry(score, secondsElapsed, label, System.currentTimeMillis()));
-        entries.sort(entryComparator());
+        entries.add(new LeaderboardEntry(score, secondsElapsed, linesCleared, label, System.currentTimeMillis()));
+        entries.sort(entryComparator(mode));
         saveEntries(file, entries);
     }
 
-    public synchronized List<LeaderboardEntry> getTopEntries(GameEngine.Difficulty difficulty) {
+    public synchronized List<LeaderboardEntry> getTopEntries(GameEngine.Difficulty difficulty, GameMode mode) {
         String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label);
+        Path file = getLeaderboardFile(label, mode);
         List<LeaderboardEntry> entries = loadEntries(file);
-        entries.sort(entryComparator());
+        entries.sort(entryComparator(mode));
         if (entries.size() > MAX_ENTRIES) {
             return new ArrayList<>(entries.subList(0, MAX_ENTRIES));
         }
         return entries;
     }
 
-    private Comparator<LeaderboardEntry> entryComparator() {
-        return Comparator.comparingInt(LeaderboardEntry::getScore).reversed()
-                .thenComparingInt(LeaderboardEntry::getSecondsElapsed)
-                .thenComparing(Comparator.comparingLong(LeaderboardEntry::getPlayedAt).reversed());
+    private Comparator<LeaderboardEntry> entryComparator(GameMode mode) {
+        if (mode == GameMode.SPRINT) {
+            return (a, b) -> {
+                boolean aCompleted = a.getLinesCleared() >= 40;
+                boolean bCompleted = b.getLinesCleared() >= 40;
+                
+                if (aCompleted && bCompleted) {
+                    // Both completed: sort by time elapsed ascending (faster is better)
+                    int timeCompare = Integer.compare(a.getSecondsElapsed(), b.getSecondsElapsed());
+                    if (timeCompare != 0) return timeCompare;
+                } else if (aCompleted) {
+                    // Only a completed: a ranks higher
+                    return -1;
+                } else if (bCompleted) {
+                    // Only b completed: b ranks higher
+                    return 1;
+                } else {
+                    // Neither completed: sort by lines cleared descending (more is better)
+                    int linesCompare = Integer.compare(b.getLinesCleared(), a.getLinesCleared());
+                    if (linesCompare != 0) return linesCompare;
+                }
+                
+                // Fallbacks: sort by score descending, then playedAt descending
+                int scoreCompare = Integer.compare(b.getScore(), a.getScore());
+                if (scoreCompare != 0) return scoreCompare;
+                return Long.compare(b.getPlayedAt(), a.getPlayedAt());
+            };
+        } else if (mode == GameMode.SURVIVAL) {
+            return Comparator.comparingInt(LeaderboardEntry::getSecondsElapsed).reversed()
+                    .thenComparing(Comparator.comparingInt(LeaderboardEntry::getScore).reversed())
+                    .thenComparing(Comparator.comparingLong(LeaderboardEntry::getPlayedAt).reversed());
+        } else {
+            return Comparator.comparingInt(LeaderboardEntry::getScore).reversed()
+                    .thenComparingInt(LeaderboardEntry::getSecondsElapsed)
+                    .thenComparing(Comparator.comparingLong(LeaderboardEntry::getPlayedAt).reversed());
+        }
     }
 
     private List<LeaderboardEntry> loadEntries(Path file) {
@@ -98,9 +145,11 @@ public class LeaderboardManager {
             return entries;
         }
 
+        boolean isSprint = file.getFileName().toString().contains("sprint");
+
         try {
             for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
-                LeaderboardEntry entry = parseLine(line);
+                LeaderboardEntry entry = parseLine(line, isSprint);
                 if (entry != null) {
                     entries.add(entry);
                 }
@@ -117,7 +166,7 @@ public class LeaderboardManager {
         for (int i = 0; i < limit; i++) {
             LeaderboardEntry entry = entries.get(i);
             lines.add(entry.getScore() + "," + entry.getSecondsElapsed() + "," + escape(entry.getDifficulty()) + ","
-                    + entry.getPlayedAt());
+                    + entry.getPlayedAt() + "," + entry.getLinesCleared());
         }
 
         try {
@@ -128,9 +177,9 @@ public class LeaderboardManager {
         }
     }
 
-    private LeaderboardEntry parseLine(String line) {
+    private LeaderboardEntry parseLine(String line, boolean isSprint) {
         String[] parts = line.split(",", -1);
-        if (parts.length != 4) {
+        if (parts.length < 4) {
             return null;
         }
 
@@ -139,7 +188,13 @@ public class LeaderboardManager {
             int secondsElapsed = Integer.parseInt(parts[1]);
             String difficulty = unescape(parts[2]);
             long playedAt = Long.parseLong(parts[3]);
-            return new LeaderboardEntry(score, secondsElapsed, difficulty, playedAt);
+            int linesCleared = 0;
+            if (parts.length >= 5) {
+                linesCleared = Integer.parseInt(parts[4]);
+            } else {
+                linesCleared = isSprint ? 40 : 0;
+            }
+            return new LeaderboardEntry(score, secondsElapsed, linesCleared, difficulty, playedAt);
         } catch (NumberFormatException e) {
             return null;
         }

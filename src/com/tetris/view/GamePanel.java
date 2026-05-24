@@ -5,6 +5,7 @@ import javax.swing.JPanel;
 import com.tetris.model.Board;
 import com.tetris.model.LeaderboardEntry;
 import com.tetris.model.Piece;
+import com.tetris.model.GameMode;
 
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -75,6 +76,11 @@ public class GamePanel extends JPanel {
     private boolean isDraggingBGM = false;
     private boolean isDraggingSFX = false;
 
+    // Game mode selection properties
+    private boolean showModeSelectInMenu = false;
+    private int selectedModeIndex = 0; // 0: ENDLESS, 1: SPRINT, 2: ULTRA, 3: SURVIVAL, 4: BACK
+    private final Rectangle[] modeOptionBounds = new Rectangle[5];
+
     // Difficulty selection properties
     private boolean showDifficultySelectInMenu = false;
     private int selectedDifficultyIndex = 0; // 0: EASY, 1: MEDIUM, 2: HARD, 3: BACK
@@ -83,6 +89,8 @@ public class GamePanel extends JPanel {
     // Leaderboard screen properties
     private com.tetris.controller.GameEngine.Difficulty selectedLeaderboardDifficulty = com.tetris.controller.GameEngine.Difficulty.NORMAL;
     private final Rectangle[] leaderboardTabBounds = new Rectangle[3];
+    private GameMode selectedLeaderboardMode = GameMode.ENDLESS;
+    private final Rectangle[] leaderboardModeTabBounds = new Rectangle[4];
 
     private static class FloatingPiece {
         int typeIndex;
@@ -348,7 +356,7 @@ public class GamePanel extends JPanel {
                         // BACK button click
                         if (menuSettingsBackButtonBounds != null && menuSettingsBackButtonBounds.contains(e.getPoint())) {
                             showSettingsInMenu = false;
-                            selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 3 : 2; // Return Indicator to SETTINGS
+                            selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 4 : 3; // Return Indicator to SETTINGS
                             repaint();
                             return;
                         }
@@ -374,6 +382,14 @@ public class GamePanel extends JPanel {
                             com.tetris.util.SoundManager.setSFXMuted(!com.tetris.util.SoundManager.isSFXMuted());
                             repaint();
                         }
+                    } else if (showModeSelectInMenu) {
+                        for (int i = 0; i < 5; i++) {
+                            if (modeOptionBounds[i] != null && modeOptionBounds[i].contains(e.getPoint())) {
+                                selectedModeIndex = i;
+                                triggerModeSelection();
+                                break;
+                            }
+                        }
                     } else if (showDifficultySelectInMenu) {
                         for (int i = 0; i < 4; i++) {
                             if (difficultyOptionBounds[i] != null && difficultyOptionBounds[i].contains(e.getPoint())) {
@@ -396,6 +412,15 @@ public class GamePanel extends JPanel {
                     if (backButtonBounds != null && backButtonBounds.contains(e.getPoint())) {
                         gameEngine.returnToMenu();
                     }
+                    // Mode tabs (Endless vs Sprint vs Ultra vs Survival)
+                    for (int i = 0; i < 4; i++) {
+                        if (leaderboardModeTabBounds[i] != null && leaderboardModeTabBounds[i].contains(e.getPoint())) {
+                            selectedLeaderboardMode = GameMode.values()[i];
+                            repaint();
+                            break;
+                        }
+                    }
+                    // Difficulty tabs
                     for (int i = 0; i < 3; i++) {
                         if (leaderboardTabBounds[i] != null && leaderboardTabBounds[i].contains(e.getPoint())) {
                             selectedLeaderboardDifficulty = com.tetris.controller.GameEngine.Difficulty.values()[i];
@@ -456,6 +481,16 @@ public class GamePanel extends JPanel {
                 if (state == com.tetris.controller.GameEngine.GameState.MENU) {
                     if (showSettingsInMenu) {
                         repaint();
+                    } else if (showModeSelectInMenu) {
+                        for (int i = 0; i < 5; i++) {
+                            if (modeOptionBounds[i] != null && modeOptionBounds[i].contains(e.getPoint())) {
+                                if (selectedModeIndex != i) {
+                                    selectedModeIndex = i;
+                                    repaint();
+                                }
+                                break;
+                            }
+                        }
                     } else if (showDifficultySelectInMenu) {
                         for (int i = 0; i < 4; i++) {
                             if (difficultyOptionBounds[i] != null && difficultyOptionBounds[i].contains(e.getPoint())) {
@@ -534,6 +569,20 @@ public class GamePanel extends JPanel {
         repaint();
     }
 
+    public boolean isShowModeSelectInMenu() {
+        return showModeSelectInMenu;
+    }
+
+    public void setShowModeSelectInMenu(boolean show) {
+        this.showModeSelectInMenu = show;
+        repaint();
+    }
+
+    public void setSelectedModeIndex(int index) {
+        this.selectedModeIndex = index;
+        repaint();
+    }
+
     public boolean isShowSettingsInPause() {
         return showSettingsInPause;
     }
@@ -547,6 +596,7 @@ public class GamePanel extends JPanel {
         showSettingsInMenu = false;
         showSettingsInPause = false;
         showDifficultySelectInMenu = false;
+        showModeSelectInMenu = false;
         selectedPauseIndex = 0;
         repaint();
     }
@@ -642,6 +692,8 @@ public class GamePanel extends JPanel {
     public void navigateMenu(int dir) {
         if (showDifficultySelectInMenu) {
             selectedDifficultyIndex = (selectedDifficultyIndex + dir + 4) % 4;
+        } else if (showModeSelectInMenu) {
+            selectedModeIndex = (selectedModeIndex + dir + 5) % 5;
         } else {
             int numOptions = com.tetris.util.SaveManager.hasSave() ? 7 : 6;
             selectedMenuIndex = (selectedMenuIndex + dir + numOptions) % numOptions;
@@ -653,6 +705,8 @@ public class GamePanel extends JPanel {
     public void selectCurrentOption() {
         if (showDifficultySelectInMenu) {
             triggerDifficultySelection();
+        } else if (showModeSelectInMenu) {
+            triggerModeSelection();
         } else {
             boolean hasSave = com.tetris.util.SaveManager.hasSave();
             if (hasSave) {
@@ -661,8 +715,8 @@ public class GamePanel extends JPanel {
                         gameEngine.loadGame();
                         break;
                     case 1:
-                        showDifficultySelectInMenu = true;
-                        selectedDifficultyIndex = 0; // Default to EASY
+                        showModeSelectInMenu = true;
+                        selectedModeIndex = 0; // Default to ENDLESS
                         break;
                     case 2:
                         // T-SPIN PRACTICE
@@ -688,8 +742,8 @@ public class GamePanel extends JPanel {
             } else {
                 switch (selectedMenuIndex) {
                     case 0:
-                        showDifficultySelectInMenu = true;
-                        selectedDifficultyIndex = 0; // Default to EASY
+                        showModeSelectInMenu = true;
+                        selectedModeIndex = 0; // Default to ENDLESS
                         break;
                     case 1:
                         // T-SPIN PRACTICE
@@ -717,6 +771,40 @@ public class GamePanel extends JPanel {
         repaint();
     }
 
+    private void triggerModeSelection() {
+        switch (selectedModeIndex) {
+            case 0: // ENDLESS
+                gameEngine.setGameMode(GameMode.ENDLESS);
+                showModeSelectInMenu = false;
+                showDifficultySelectInMenu = true;
+                selectedDifficultyIndex = 0; // Default to EASY
+                break;
+            case 1: // SPRINT
+                gameEngine.setGameMode(GameMode.SPRINT);
+                showModeSelectInMenu = false;
+                showDifficultySelectInMenu = true;
+                selectedDifficultyIndex = 0; // Default to EASY
+                break;
+            case 2: // ULTRA
+                gameEngine.setGameMode(GameMode.ULTRA);
+                showModeSelectInMenu = false;
+                showDifficultySelectInMenu = true;
+                selectedDifficultyIndex = 0; // Default to EASY
+                break;
+            case 3: // SURVIVAL
+                gameEngine.setGameMode(GameMode.SURVIVAL);
+                showModeSelectInMenu = false;
+                showDifficultySelectInMenu = true;
+                selectedDifficultyIndex = 0; // Default to EASY
+                break;
+            case 4: // BACK
+                showModeSelectInMenu = false;
+                selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 1 : 0; // Return to Play Game
+                break;
+        }
+        repaint();
+    }
+
     private void triggerDifficultySelection() {
         switch (selectedDifficultyIndex) {
             case 0:
@@ -736,7 +824,16 @@ public class GamePanel extends JPanel {
                 break;
             case 3:
                 showDifficultySelectInMenu = false;
-                selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 1 : 0; // Return to Play Game
+                showModeSelectInMenu = true; // Return to Mode Selection
+                if (gameEngine.getGameMode() == GameMode.SPRINT) {
+                    selectedModeIndex = 1;
+                } else if (gameEngine.getGameMode() == GameMode.ULTRA) {
+                    selectedModeIndex = 2;
+                } else if (gameEngine.getGameMode() == GameMode.SURVIVAL) {
+                    selectedModeIndex = 3;
+                } else {
+                    selectedModeIndex = 0;
+                }
                 break;
         }
         repaint();
@@ -817,6 +914,11 @@ public class GamePanel extends JPanel {
 
         if (showSettingsInMenu) {
             drawMenuSettings(g2d);
+            return;
+        }
+
+        if (showModeSelectInMenu) {
+            drawModeSelectScreen(g2d);
             return;
         }
 
@@ -957,21 +1059,77 @@ public class GamePanel extends JPanel {
         g2d.setColor(new Color(255, 215, 0)); // Gold
         String title = "TOP HIGH SCORES";
         FontMetrics fm = g2d.getFontMetrics();
-        g2d.drawString(title, (getWidth() - fm.stringWidth(title)) / 2, 80);
+        g2d.drawString(title, (getWidth() - fm.stringWidth(title)) / 2, 75);
 
         // Underline
         g2d.setColor(new Color(255, 215, 0, 150));
-        g2d.fillRect(60, 95, getWidth() - 120, 3);
+        g2d.fillRect(60, 90, getWidth() - 120, 3);
 
-        // Draw Tabs
-        int tabW = 90;
-        int tabH = 30;
-        int tabGap = 15;
-        int totalW = 3 * tabW + 2 * tabGap;
-        int startX = (getWidth() - totalW) / 2;
-        int tabY = 112;
+        // Draw Mode Tabs (Endless vs Sprint vs Ultra vs Survival)
+        int modeTabW = 75;
+        int modeTabH = 26;
+        int modeTabGap = 8;
+        int totalModeW = 324; // 4 * 75 + 3 * 8 = 324
+        int startModeX = (getWidth() - totalModeW) / 2;
+        int modeTabY = 104;
         
         java.awt.Point mousePos = getMousePosition();
+        
+        for (int i = 0; i < 4; i++) {
+            int x = startModeX + i * (modeTabW + modeTabGap);
+            leaderboardModeTabBounds[i] = new Rectangle(x, modeTabY, modeTabW, modeTabH);
+            
+            GameMode tabMode = GameMode.values()[i];
+            boolean isSelected = (selectedLeaderboardMode == tabMode);
+            boolean isHovered = (mousePos != null && leaderboardModeTabBounds[i].contains(mousePos));
+            
+            // Draw button background
+            if (isSelected) {
+                g2d.setColor(new Color(255, 100, 255, 55)); // Neon purple/pink glow
+                g2d.fillRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
+                g2d.setColor(new Color(255, 100, 255));
+                g2d.drawRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
+            } else if (isHovered) {
+                g2d.setColor(new Color(255, 255, 255, 30));
+                g2d.fillRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
+                g2d.setColor(new Color(255, 255, 255, 120));
+                g2d.drawRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
+            } else {
+                g2d.setColor(new Color(255, 255, 255, 10));
+                g2d.fillRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
+                g2d.setColor(new Color(255, 255, 255, 45));
+                g2d.drawRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
+            }
+            
+            // Draw label
+            g2d.setFont(new Font("Arial", Font.BOLD, 10));
+            if (isSelected) {
+                g2d.setColor(new Color(255, 100, 255));
+            } else {
+                g2d.setColor(new Color(200, 200, 200));
+            }
+            String modeLabel;
+            if (tabMode == GameMode.ENDLESS) {
+                modeLabel = "ENDLESS";
+            } else if (tabMode == GameMode.SPRINT) {
+                modeLabel = "SPRINT (40L)";
+            } else if (tabMode == GameMode.ULTRA) {
+                modeLabel = "ULTRA (2M)";
+            } else {
+                modeLabel = "SURVIVAL";
+            }
+            int labelW = g2d.getFontMetrics().stringWidth(modeLabel);
+            int labelH = g2d.getFontMetrics().getAscent();
+            g2d.drawString(modeLabel, x + (modeTabW - labelW) / 2, modeTabY + (modeTabH + labelH) / 2 - 2);
+        }
+
+        // Draw Difficulty Tabs
+        int tabW = 85;
+        int tabH = 26;
+        int tabGap = 12;
+        int totalW = 3 * tabW + 2 * tabGap;
+        int startX = (getWidth() - totalW) / 2;
+        int tabY = 140;
         
         for (int i = 0; i < 3; i++) {
             int x = startX + i * (tabW + tabGap);
@@ -1000,7 +1158,7 @@ public class GamePanel extends JPanel {
             }
             
             // Draw label
-            g2d.setFont(new Font("Arial", Font.BOLD, 12));
+            g2d.setFont(new Font("Arial", Font.BOLD, 11));
             if (isSelected) {
                 g2d.setColor(new Color(0, 255, 255));
             } else {
@@ -1013,21 +1171,29 @@ public class GamePanel extends JPanel {
         }
 
         // Columns headers
-        g2d.setFont(new Font("Arial", Font.BOLD, 14));
+        g2d.setFont(new Font("Arial", Font.BOLD, 13));
         g2d.setColor(new Color(0, 255, 255));
-        g2d.drawString("RANK", 50, 172);
-        g2d.drawString("SCORE", 110, 172);
-        g2d.drawString("DIFF", 210, 172);
-        g2d.drawString("DATE", 310, 172);
+        g2d.drawString("RANK", 50, 182);
+        if (selectedLeaderboardMode == GameMode.SPRINT) {
+            g2d.drawString("TIME", 110, 182);
+            g2d.drawString("LINES", 210, 182);
+        } else if (selectedLeaderboardMode == GameMode.SURVIVAL) {
+            g2d.drawString("TIME", 110, 182);
+            g2d.drawString("SCORE", 210, 182);
+        } else {
+            g2d.drawString("SCORE", 110, 182);
+            g2d.drawString("DIFF", 210, 182);
+        }
+        g2d.drawString("DATE", 310, 182);
 
         g2d.setColor(new Color(255, 255, 255, 50));
-        g2d.drawLine(40, 182, getWidth() - 40, 182);
+        g2d.drawLine(40, 192, getWidth() - 40, 192);
 
         // List
-        List<LeaderboardEntry> entries = gameEngine.getLeaderboardEntriesForDifficulty(selectedLeaderboardDifficulty);
-        g2d.setFont(new Font("Arial", Font.PLAIN, 14));
-        int y = 217;
-        int rowGap = 32;
+        List<LeaderboardEntry> entries = gameEngine.getLeaderboardEntriesForDifficultyAndMode(selectedLeaderboardDifficulty, selectedLeaderboardMode);
+        g2d.setFont(new Font("Arial", Font.PLAIN, 13));
+        int y = 220;
+        int rowGap = 30;
 
         if (entries == null || entries.isEmpty()) {
             g2d.setColor(new Color(150, 150, 180));
@@ -1040,7 +1206,7 @@ public class GamePanel extends JPanel {
 
                 if (rank % 2 == 1) {
                     g2d.setColor(new Color(255, 255, 255, 10));
-                    g2d.fillRect(40, y - 20, getWidth() - 80, 28);
+                    g2d.fillRect(40, y - 18, getWidth() - 80, 26);
                 }
 
                 if (rank == 1) g2d.setColor(new Color(255, 223, 0));
@@ -1049,9 +1215,22 @@ public class GamePanel extends JPanel {
                 else g2d.setColor(Color.WHITE);
 
                 g2d.drawString("#" + rank, 50, y);
-                g2d.drawString(String.valueOf(entry.getScore()), 110, y);
-                String diffDisp = "NORMAL".equalsIgnoreCase(entry.getDifficulty()) ? "MEDIUM" : entry.getDifficulty();
-                g2d.drawString(diffDisp, 210, y);
+                
+                if (selectedLeaderboardMode == GameMode.SPRINT) {
+                    int sec = entry.getSecondsElapsed();
+                    String timeVal = String.format("%02d:%02d", sec / 60, sec % 60);
+                    g2d.drawString(timeVal, 110, y);
+                    g2d.drawString(entry.getLinesCleared() + " / 40", 210, y);
+                } else if (selectedLeaderboardMode == GameMode.SURVIVAL) {
+                    int sec = entry.getSecondsElapsed();
+                    String timeVal = String.format("%02d:%02d", sec / 60, sec % 60);
+                    g2d.drawString(timeVal, 110, y);
+                    g2d.drawString(String.format("%,d", entry.getScore()), 210, y);
+                } else {
+                    g2d.drawString(String.format("%,d", entry.getScore()), 110, y);
+                    String diffDisp = "NORMAL".equalsIgnoreCase(entry.getDifficulty()) ? "MEDIUM" : entry.getDifficulty();
+                    g2d.drawString(diffDisp, 210, y);
+                }
                 g2d.drawString(entry.getPlayedAtDisplay(), 310, y);
 
                 y += rowGap;
@@ -1091,14 +1270,23 @@ public class GamePanel extends JPanel {
         // Help hints at the bottom
         g2d.setFont(new Font("Arial", Font.PLAIN, 11));
         g2d.setColor(new Color(120, 120, 140));
-        String tabHint = "Press \u2190 / \u2192 Arrows or Click Tabs to Switch Difficulty";
-        g2d.drawString(tabHint, (getWidth() - g2d.getFontMetrics().stringWidth(tabHint)) / 2, 560);
+        String tabHint1 = "Press \u2190 / \u2192 Arrows or Click Tabs to Switch Difficulty";
+        String tabHint2 = "Press \u2191 / \u2193 Arrows to Switch Game Modes";
+        g2d.drawString(tabHint1, (getWidth() - g2d.getFontMetrics().stringWidth(tabHint1)) / 2, 548);
+        g2d.drawString(tabHint2, (getWidth() - g2d.getFontMetrics().stringWidth(tabHint2)) / 2, 566);
     }
 
     public void navigateLeaderboardTabs(int dir) {
         int currentIndex = selectedLeaderboardDifficulty.ordinal();
         int nextIndex = (currentIndex + dir + 3) % 3;
         selectedLeaderboardDifficulty = com.tetris.controller.GameEngine.Difficulty.values()[nextIndex];
+        repaint();
+    }
+
+    public void navigateLeaderboardModes(int dir) {
+        int currentIndex = selectedLeaderboardMode.ordinal();
+        int nextIndex = (currentIndex + dir + 4) % 4;
+        selectedLeaderboardMode = GameMode.values()[nextIndex];
         repaint();
     }
 
@@ -1131,20 +1319,27 @@ public class GamePanel extends JPanel {
         g2d.fillRect(0, 0, width, height);
 
         // Draw a subtle neon red glowing border around the whole panel
-        g2d.setColor(new Color(255, 40, 80, 100));
+        // Draw a subtle neon glowing border around the whole panel
+        boolean isVictory = gameEngine.isVictory();
+        g2d.setColor(isVictory ? new Color(0, 255, 100, 100) : new Color(255, 40, 80, 100));
         g2d.setStroke(new java.awt.BasicStroke(3f));
         g2d.drawRect(5, 5, width - 10, height - 10);
         g2d.setStroke(new java.awt.BasicStroke(1f));
 
-        // 2. Header: Centered red neon "GAME OVER"
+        // 2. Header: Centered neon "VICTORY!" or "GAME OVER" or "TIME UP!"
         g2d.setFont(new Font("Impact", Font.BOLD | Font.ITALIC, 46));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = "GAME OVER";
+        String titleText;
+        if (isVictory) {
+            titleText = (gameEngine.getGameMode() == GameMode.ULTRA) ? "TIME UP!" : "VICTORY!";
+        } else {
+            titleText = "GAME OVER";
+        }
         int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 65;
 
         // Glow effect
-        g2d.setColor(new Color(255, 0, 50, 120));
+        g2d.setColor(isVictory ? new Color(0, 255, 100, 120) : new Color(255, 0, 50, 120));
         g2d.drawString(titleText, titleX + 2, titleY + 2);
         g2d.drawString(titleText, titleX - 2, titleY - 2);
         g2d.setColor(Color.WHITE);
@@ -1152,8 +1347,8 @@ public class GamePanel extends JPanel {
 
         // Neon violet subtitle "MISSION SUMMARY"
         g2d.setFont(new Font("Arial", Font.BOLD, 13));
-        g2d.setColor(new Color(180, 100, 255));
-        String subTitleText = "MISSION SUMMARY";
+        g2d.setColor(isVictory ? new Color(0, 255, 255) : new Color(180, 100, 255));
+        String subTitleText = isVictory ? "CHALLENGE COMPLETE" : "MISSION SUMMARY";
         int subTitleX = (width - g2d.getFontMetrics().stringWidth(subTitleText)) / 2;
         g2d.drawString(subTitleText, subTitleX, 92);
 
@@ -1178,8 +1373,18 @@ public class GamePanel extends JPanel {
         double tetrisRate = gameEngine.getTetrisRate();
 
         drawStatCard(g2d, col1X, row1Y, cardW, cardH, "FINAL SCORE", String.format("%,d", score), new Color(255, 215, 0));
-        drawStatCard(g2d, col2X, row1Y, cardW, cardH, "TIME ELAPSED", timeStr, new Color(0, 255, 255));
-        drawStatCard(g2d, col1X, row2Y, cardW, cardH, "LINES CLEARED", String.valueOf(lines), new Color(0, 255, 100));
+        String timeLabel;
+        if (gameEngine.getGameMode() == GameMode.SURVIVAL) {
+            timeLabel = "SURVIVED TIME";
+        } else if (gameEngine.getGameMode() == GameMode.ULTRA) {
+            timeLabel = "TIME ELAPSED";
+        } else {
+            timeLabel = isVictory ? "CLEAR TIME" : "TIME ELAPSED";
+        }
+        drawStatCard(g2d, col2X, row1Y, cardW, cardH, timeLabel, timeStr, new Color(0, 255, 255));
+        
+        String linesStr = (gameEngine.getGameMode() == GameMode.SPRINT) ? (lines + " / 40") : String.valueOf(lines);
+        drawStatCard(g2d, col1X, row2Y, cardW, cardH, "LINES CLEARED", linesStr, new Color(0, 255, 100));
         drawStatCard(g2d, col2X, row2Y, cardW, cardH, "PIECES SPAWNED", String.format("%d (%.1f PPM)", pieces, ppm), new Color(255, 140, 0));
         drawStatCard(g2d, col1X, row3Y, cardW, cardH, "TOTAL ACTIONS", String.format("%d (%.1f APM)", actions, apm), new Color(180, 100, 255));
         drawStatCard(g2d, col2X, row3Y, cardW, cardH, "TETRIS RATE", String.format("%.1f%%", tetrisRate), new Color(255, 50, 150));
@@ -1569,18 +1774,53 @@ public class GamePanel extends JPanel {
         g.setColor(Color.WHITE);
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
 
-        // 1. Draw Score
-        g.drawString("SCORE", startX + 20, 45);
-        g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 30));
-        g.drawString(String.valueOf(gameEngine.getScore()), startX + 20, 72);
+        // 1. Draw Score or Sprint Lines progress
+        if (gameEngine.getGameMode() == GameMode.SPRINT) {
+            g.drawString("LINES", startX + 20, 45);
+            g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 30));
+            g.drawString(gameEngine.getTotalLinesCleared() + " / 40", startX + 20, 72);
+        } else {
+            g.drawString("SCORE", startX + 20, 45);
+            g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 30));
+            g.drawString(String.valueOf(gameEngine.getScore()), startX + 20, 72);
+        }
 
         // 2. Draw Timer
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
         g.drawString("TIME", startX + 20, 108);
         g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 24));
         int seconds = gameEngine.getSecondsElapsed();
-        String timeStr = String.format("%02d:%02d", seconds / 60, seconds % 60);
+        String timeStr;
+        if (gameEngine.getGameMode() == GameMode.ULTRA) {
+            int timeLeft = Math.max(0, 120 - seconds);
+            timeStr = String.format("%02d:%02d", timeLeft / 60, timeLeft % 60);
+            if (timeLeft <= 10) {
+                g.setColor(new Color(255, 60, 60)); // Red alert
+            }
+        } else {
+            timeStr = String.format("%02d:%02d", seconds / 60, seconds % 60);
+        }
         g.drawString(timeStr, startX + 20, 133);
+        g.setColor(Color.WHITE); // reset color
+
+        // Draw Garbage Warning Countdown for Survival Mode
+        if (gameEngine.getGameMode() == GameMode.SURVIVAL) {
+            int interval = 15;
+            if (gameEngine.getDifficulty() == com.tetris.controller.GameEngine.Difficulty.EASY) {
+                interval = 20;
+            } else if (gameEngine.getDifficulty() == com.tetris.controller.GameEngine.Difficulty.HARD) {
+                interval = 10;
+            }
+            int timeLeft = interval - (seconds % interval);
+            g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
+            if (timeLeft <= 3) {
+                g.setColor(new Color(255, 60, 60)); // Red warning
+            } else {
+                g.setColor(new Color(255, 140, 0)); // Neon Orange/Gold
+            }
+            g.drawString("GARBAGE IN: " + timeLeft + "s", startX + 20, 150);
+            g.setColor(Color.WHITE);
+        }
 
         // 3. Draw Level
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
@@ -1592,6 +1832,13 @@ public class GamePanel extends JPanel {
         } else {
             g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 20));
             g.drawString(gameEngine.getDifficulty().getLabel(), startX + 20, 195);
+
+            // Draw Sprint score in small font on the side
+            if (gameEngine.getGameMode() == GameMode.SPRINT) {
+                g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
+                g.setColor(new Color(180, 180, 180));
+                g.drawString("Score: " + gameEngine.getScore(), startX + 110, 193);
+            }
         }
         g.setColor(Color.WHITE);
 
@@ -2319,6 +2566,135 @@ public class GamePanel extends JPanel {
         if (pct > 1f) pct = 1f;
         com.tetris.util.SoundManager.setSFXVolume(pct);
         repaint();
+    }
+
+    /**
+     * 繪製主畫面 GameMode 選擇卡片
+     */
+    private void drawModeSelectScreen(Graphics2D g2d) {
+        g2d.setFont(new Font("Impact", Font.BOLD, 46));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        String titleText = "SELECT MODE";
+        int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
+        int titleY = 120;
+
+        g2d.setColor(new Color(0, 255, 255, 70));
+        g2d.drawString(titleText, titleX + 2, titleY + 2);
+        g2d.setColor(new Color(0, 255, 255));
+        g2d.drawString(titleText, titleX, titleY);
+
+        int cardW = 340;
+        int cardH = 360;
+        int cardX = (getWidth() - cardW) / 2;
+        int cardY = 180;
+
+        // Draw card background
+        g2d.setColor(new Color(255, 255, 255, 15));
+        g2d.fillRoundRect(cardX, cardY, cardW, cardH, 15, 15);
+        g2d.setColor(new Color(255, 255, 255, 40));
+        g2d.drawRoundRect(cardX, cardY, cardW, cardH, 15, 15);
+
+        // Subtitle inside card
+        g2d.setFont(new Font("Arial", Font.BOLD, 15));
+        g2d.setColor(new Color(200, 200, 220));
+        String subText = "SELECT GAME MODE";
+        int subW = g2d.getFontMetrics().stringWidth(subText);
+        g2d.drawString(subText, cardX + (cardW - subW) / 2, cardY + 25);
+
+        int btnW = 240;
+        int btnH = 34;
+        int btnX = cardX + (cardW - btnW) / 2;
+        int startY = cardY + 50;
+        int gap = 42;
+
+        java.awt.Point mousePos = getMousePosition();
+
+        for (int i = 0; i < 5; i++) {
+            int y = startY + i * gap;
+            if (i == 4) {
+                // BACK button offset
+                y = cardY + 295;
+            }
+
+            modeOptionBounds[i] = new Rectangle(btnX, y, btnW, btnH);
+
+            boolean isSelected = (i == selectedModeIndex);
+            String label = "";
+            Color baseColor;
+            Color selectColor;
+            Color fillCol;
+
+            switch (i) {
+                case 0:
+                    label = "ENDLESS MODE";
+                    baseColor = new Color(0, 255, 255);
+                    selectColor = Color.WHITE;
+                    fillCol = new Color(0, 255, 255, isSelected ? 45 : 20);
+                    break;
+                case 1:
+                    label = "SPRINT (40 LINES)";
+                    baseColor = new Color(255, 100, 255);
+                    selectColor = Color.WHITE;
+                    fillCol = new Color(255, 100, 255, isSelected ? 45 : 20);
+                    break;
+                case 2:
+                    label = "ULTRA (2 MINUTES)";
+                    baseColor = new Color(255, 215, 0);
+                    selectColor = Color.WHITE;
+                    fillCol = new Color(255, 215, 0, isSelected ? 45 : 20);
+                    break;
+                case 3:
+                    label = "SURVIVAL MODE";
+                    baseColor = new Color(255, 140, 0);
+                    selectColor = Color.WHITE;
+                    fillCol = new Color(255, 140, 0, isSelected ? 45 : 20);
+                    break;
+                case 4:
+                default:
+                    label = "BACK";
+                    baseColor = new Color(160, 160, 180);
+                    selectColor = new Color(0, 255, 255);
+                    fillCol = new Color(255, 255, 255, isSelected ? 30 : 10);
+                    break;
+            }
+
+            // Draw button background
+            g2d.setColor(fillCol);
+            g2d.fillRoundRect(btnX, y, btnW, btnH, 8, 8);
+
+            // Draw border
+            if (isSelected) {
+                g2d.setColor(selectColor);
+                g2d.setStroke(new java.awt.BasicStroke(2.0f));
+            } else {
+                g2d.setColor(new Color(baseColor.getRed(), baseColor.getGreen(), baseColor.getBlue(), 80));
+                g2d.setStroke(new java.awt.BasicStroke(1.0f));
+            }
+            g2d.drawRoundRect(btnX, y, btnW, btnH, 8, 8);
+            g2d.setStroke(new java.awt.BasicStroke(1.0f));
+
+            // Draw text
+            g2d.setFont(new Font("Arial", Font.BOLD, 16));
+            FontMetrics fmOpt = g2d.getFontMetrics();
+            int labelW = fmOpt.stringWidth(label);
+            int labelH = fmOpt.getAscent();
+
+            if (isSelected) {
+                g2d.setColor(new Color(0, 0, 0, 150));
+                g2d.drawString(label, btnX + (btnW - labelW) / 2 + 1, y + (btnH + labelH) / 2 - 1);
+                g2d.setColor(Color.WHITE);
+                g2d.drawString(label, btnX + (btnW - labelW) / 2, y + (btnH + labelH) / 2 - 2);
+
+                // Glow block indicators
+                int sqSize = 6;
+                g2d.setColor(selectColor);
+                g2d.fillRect(btnX + 12, y + (btnH - sqSize) / 2, sqSize, sqSize);
+                g2d.fillRect(btnX + btnW - 18, y + (btnH - sqSize) / 2, sqSize, sqSize);
+            } else {
+                g2d.setColor(baseColor);
+                g2d.drawString(label, btnX + (btnW - labelW) / 2, y + (btnH + labelH) / 2 - 2);
+            }
+        }
     }
 
     /**
