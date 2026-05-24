@@ -1654,11 +1654,12 @@ public class GamePanel extends JPanel {
         if (showSettingsInPause) {
             drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 140, 55);
         } else {
-            // Draw temporary "Progress Saved!" text if it was saved within 3 seconds
+            // Draw temporary save status text if it was saved within 3 seconds
             if (System.currentTimeMillis() - lastSaveTime < 3000) {
                 g2d.setFont(new Font("Arial", Font.BOLD, 14));
-                g2d.setColor(new Color(0, 255, 100)); // Green confirmation
-                String savedText = "Progress Saved!";
+                boolean canSave = (gameEngine.getGameMode() == com.tetris.model.GameMode.ENDLESS);
+                String savedText = canSave ? "Progress Saved!" : "This mode cannot be saved!";
+                g2d.setColor(canSave ? new Color(0, 255, 100) : new Color(255, 60, 60)); // Green for success, Red for warning
                 int savedW = g2d.getFontMetrics().stringWidth(savedText);
                 g2d.drawString(savedText, cardX + (cardW - savedW) / 2, cardY + cardH - 15);
             }
