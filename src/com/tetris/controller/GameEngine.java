@@ -116,6 +116,8 @@ public class GameEngine {
     private Difficulty difficulty = Difficulty.NORMAL;
     private final LeaderboardManager leaderboardManager;
     private GameState gameState = GameState.MENU;
+    private boolean isEnteringName = false;
+    private final StringBuilder nameInputBuffer = new StringBuilder();
 
     public GameEngine(Board board, GamePanel panel) {
         this.board = board;
@@ -854,7 +856,14 @@ public class GameEngine {
                 SoundManager.stopBGM();
             }
 
-            recordFinalScore();
+            // Check if score qualifies for leaderboard
+            if (gameMode != GameMode.PVP && !usedAiThisSession && leaderboardManager.qualifiesForLeaderboard(score, secondsElapsed, totalLinesCleared, difficulty, gameMode)) {
+                isEnteringName = true;
+                nameInputBuffer.setLength(0);
+                panel.startAnimationTimer();
+            } else {
+                recordFinalScore();
+            }
             System.out.println("Game Over!");
         }
     }
@@ -865,8 +874,8 @@ public class GameEngine {
         }
 
         leaderboardRecorded = true;
-        if (!usedAiThisSession) {
-            leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode);
+        if (!usedAiThisSession && gameMode != GameMode.PVP) {
+            leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
         }
     }
 
@@ -996,6 +1005,10 @@ public class GameEngine {
 
     public List<LeaderboardEntry> getLeaderboardEntriesForDifficultyAndMode(Difficulty diff, GameMode mode) {
         return leaderboardManager.getTopEntries(diff, mode);
+    }
+
+    public List<LeaderboardEntry> getGlobalLeaderboardEntriesForDifficultyAndMode(Difficulty diff, GameMode mode) {
+        return leaderboardManager.getGlobalTopEntries(diff, mode);
     }
 
     public GameMode getGameMode() {
@@ -1473,6 +1486,48 @@ public class GameEngine {
         });
         delayTimer.setRepeats(false);
         delayTimer.start();
+    }
+
+    public boolean isEnteringName() {
+        return isEnteringName;
+    }
+
+    public StringBuilder getNameInputBuffer() {
+        return nameInputBuffer;
+    }
+
+    public void appendNameInput(char c) {
+        if (nameInputBuffer.length() < 10) {
+            nameInputBuffer.append(c);
+            panel.repaint();
+        }
+    }
+
+    public void backspaceNameInput() {
+        if (nameInputBuffer.length() > 0) {
+            nameInputBuffer.setLength(nameInputBuffer.length() - 1);
+            panel.repaint();
+        }
+    }
+
+    public void submitLeaderboardName() {
+        String name = nameInputBuffer.toString().trim();
+        if (name.isEmpty()) {
+            name = "Guest";
+        }
+        leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, name);
+        leaderboardManager.submitGlobalScoreAsync(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, name);
+        isEnteringName = false;
+        leaderboardRecorded = true;
+        panel.repaint();
+    }
+
+    public void submitDefaultName() {
+        leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
+        leaderboardManager.submitGlobalScoreAsync(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
+        isEnteringName = false;
+        leaderboardRecorded = true;
+        panel.repaint();
     }
 
 }

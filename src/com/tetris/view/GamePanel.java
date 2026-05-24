@@ -96,6 +96,10 @@ public class GamePanel extends JPanel {
     private final Rectangle[] difficultyOptionBounds = new Rectangle[4];
 
     // Leaderboard screen properties
+    public enum LeaderboardScope { LOCAL, GLOBAL }
+    private LeaderboardScope selectedLeaderboardScope = LeaderboardScope.LOCAL;
+    private final Rectangle[] leaderboardScopeTabBounds = new Rectangle[2];
+    private boolean isLeaderboardLoading = false;
     private com.tetris.controller.GameEngine.Difficulty selectedLeaderboardDifficulty = com.tetris.controller.GameEngine.Difficulty.NORMAL;
     private final Rectangle[] leaderboardTabBounds = new Rectangle[3];
     private GameMode selectedLeaderboardMode = GameMode.ENDLESS;
@@ -346,6 +350,9 @@ public class GamePanel extends JPanel {
                 System.currentTimeMillis() - perfectClearStartTime2 < PERFECT_CLEAR_DURATION) {
                 active = true;
             }
+            if (gameEngine != null && gameEngine.isEnteringName()) {
+                active = true;
+            }
             if (!active) {
                 ((Timer) e.getSource()).stop();
             } else {
@@ -449,11 +456,30 @@ public class GamePanel extends JPanel {
                     if (backButtonBounds != null && backButtonBounds.contains(e.getPoint())) {
                         gameEngine.returnToMenu();
                     }
+                    // Scope tabs (Local vs Global)
+                    for (int i = 0; i < 2; i++) {
+                        if (leaderboardScopeTabBounds[i] != null && leaderboardScopeTabBounds[i].contains(e.getPoint())) {
+                            LeaderboardScope nextScope = LeaderboardScope.values()[i];
+                            if (nextScope != selectedLeaderboardScope) {
+                                selectedLeaderboardScope = nextScope;
+                                if (selectedLeaderboardScope == LeaderboardScope.GLOBAL) {
+                                    triggerGlobalLeaderboardLoad();
+                                } else {
+                                    repaint();
+                                }
+                            }
+                            break;
+                        }
+                    }
                     // Mode tabs (Endless vs Sprint vs Ultra vs Survival)
                     for (int i = 0; i < 4; i++) {
                         if (leaderboardModeTabBounds[i] != null && leaderboardModeTabBounds[i].contains(e.getPoint())) {
                             selectedLeaderboardMode = GameMode.values()[i];
-                            repaint();
+                            if (selectedLeaderboardScope == LeaderboardScope.GLOBAL) {
+                                triggerGlobalLeaderboardLoad();
+                            } else {
+                                repaint();
+                            }
                             break;
                         }
                     }
@@ -461,7 +487,11 @@ public class GamePanel extends JPanel {
                     for (int i = 0; i < 3; i++) {
                         if (leaderboardTabBounds[i] != null && leaderboardTabBounds[i].contains(e.getPoint())) {
                             selectedLeaderboardDifficulty = com.tetris.controller.GameEngine.Difficulty.values()[i];
-                            repaint();
+                            if (selectedLeaderboardScope == LeaderboardScope.GLOBAL) {
+                                triggerGlobalLeaderboardLoad();
+                            } else {
+                                repaint();
+                            }
                             break;
                         }
                     }
@@ -809,6 +839,8 @@ public class GamePanel extends JPanel {
                     if (gameEngine.isGameOver()) {
                         if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
                             drawTutorialVictoryOverlay(g2d);
+                        } else if (gameEngine.isEnteringName()) {
+                            drawNameEntryOverlay(g2d);
                         } else {
                             drawGameOverOverlay(g2d);
                         }
@@ -1208,17 +1240,58 @@ public class GamePanel extends JPanel {
 
         // Underline
         g2d.setColor(new Color(255, 215, 0, 150));
-        g2d.fillRect(60, 90, getWidth() - 120, 3);
+        g2d.fillRect(60, 80, getWidth() - 120, 3);
+
+        java.awt.Point mousePos = getMousePosition();
+
+        // Draw Scope Tabs (Local vs Global)
+        int scopeTabW = 120;
+        int scopeTabH = 24;
+        int scopeTabGap = 16;
+        int totalScopeW = 2 * scopeTabW + scopeTabGap;
+        int startScopeX = (getWidth() - totalScopeW) / 2;
+        int scopeTabY = 90;
+        
+        for (int i = 0; i < 2; i++) {
+            int x = startScopeX + i * (scopeTabW + scopeTabGap);
+            leaderboardScopeTabBounds[i] = new Rectangle(x, scopeTabY, scopeTabW, scopeTabH);
+            
+            LeaderboardScope tabScope = LeaderboardScope.values()[i];
+            boolean isSelected = (selectedLeaderboardScope == tabScope);
+            boolean isHovered = (mousePos != null && leaderboardScopeTabBounds[i].contains(mousePos));
+            
+            if (isSelected) {
+                g2d.setColor(new Color(0, 255, 100, 55)); // Neon Green glow
+                g2d.fillRoundRect(x, scopeTabY, scopeTabW, scopeTabH, 8, 8);
+                g2d.setColor(new Color(0, 255, 100));
+                g2d.drawRoundRect(x, scopeTabY, scopeTabW, scopeTabH, 8, 8);
+            } else if (isHovered) {
+                g2d.setColor(new Color(255, 255, 255, 30));
+                g2d.fillRoundRect(x, scopeTabY, scopeTabW, scopeTabH, 8, 8);
+                g2d.setColor(new Color(255, 255, 255, 120));
+                g2d.drawRoundRect(x, scopeTabY, scopeTabW, scopeTabH, 8, 8);
+            } else {
+                g2d.setColor(new Color(255, 255, 255, 10));
+                g2d.fillRoundRect(x, scopeTabY, scopeTabW, scopeTabH, 8, 8);
+                g2d.setColor(new Color(255, 255, 255, 45));
+                g2d.drawRoundRect(x, scopeTabY, scopeTabW, scopeTabH, 8, 8);
+            }
+            
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 10));
+            g2d.setColor(isSelected ? new Color(0, 255, 100) : new Color(200, 200, 200));
+            String scopeLabel = (tabScope == LeaderboardScope.LOCAL) ? "本地榜單 (LOCAL)" : "全球榜單 (GLOBAL)";
+            int labelW = g2d.getFontMetrics().stringWidth(scopeLabel);
+            int labelH = g2d.getFontMetrics().getAscent();
+            g2d.drawString(scopeLabel, x + (scopeTabW - labelW) / 2, scopeTabY + (scopeTabH + labelH) / 2 - 2);
+        }
 
         // Draw Mode Tabs (Endless vs Sprint vs Ultra vs Survival)
         int modeTabW = 75;
         int modeTabH = 26;
         int modeTabGap = 8;
-        int totalModeW = 324; // 4 * 75 + 3 * 8 = 324
+        int totalModeW = 324;
         int startModeX = (getWidth() - totalModeW) / 2;
-        int modeTabY = 104;
-        
-        java.awt.Point mousePos = getMousePosition();
+        int modeTabY = 122;
         
         for (int i = 0; i < 4; i++) {
             int x = startModeX + i * (modeTabW + modeTabGap);
@@ -1228,7 +1301,6 @@ public class GamePanel extends JPanel {
             boolean isSelected = (selectedLeaderboardMode == tabMode);
             boolean isHovered = (mousePos != null && leaderboardModeTabBounds[i].contains(mousePos));
             
-            // Draw button background
             if (isSelected) {
                 g2d.setColor(new Color(255, 100, 255, 55)); // Neon purple/pink glow
                 g2d.fillRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
@@ -1246,13 +1318,8 @@ public class GamePanel extends JPanel {
                 g2d.drawRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
             }
             
-            // Draw label
-            g2d.setFont(new Font("Arial", Font.BOLD, 10));
-            if (isSelected) {
-                g2d.setColor(new Color(255, 100, 255));
-            } else {
-                g2d.setColor(new Color(200, 200, 200));
-            }
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 10));
+            g2d.setColor(isSelected ? new Color(255, 100, 255) : new Color(200, 200, 200));
             String modeLabel;
             if (tabMode == GameMode.ENDLESS) {
                 modeLabel = "ENDLESS";
@@ -1274,7 +1341,7 @@ public class GamePanel extends JPanel {
         int tabGap = 12;
         int totalW = 3 * tabW + 2 * tabGap;
         int startX = (getWidth() - totalW) / 2;
-        int tabY = 140;
+        int tabY = 154;
         
         for (int i = 0; i < 3; i++) {
             int x = startX + i * (tabW + tabGap);
@@ -1284,7 +1351,6 @@ public class GamePanel extends JPanel {
             boolean isSelected = (selectedLeaderboardDifficulty == tabDiff);
             boolean isHovered = (mousePos != null && leaderboardTabBounds[i].contains(mousePos));
             
-            // Draw button background
             if (isSelected) {
                 g2d.setColor(new Color(0, 255, 255, 55)); // Cyan glow
                 g2d.fillRoundRect(x, tabY, tabW, tabH, 8, 8);
@@ -1302,13 +1368,8 @@ public class GamePanel extends JPanel {
                 g2d.drawRoundRect(x, tabY, tabW, tabH, 8, 8);
             }
             
-            // Draw label
-            g2d.setFont(new Font("Arial", Font.BOLD, 11));
-            if (isSelected) {
-                g2d.setColor(new Color(0, 255, 255));
-            } else {
-                g2d.setColor(new Color(200, 200, 200));
-            }
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 11));
+            g2d.setColor(isSelected ? new Color(0, 255, 255) : new Color(200, 200, 200));
             String tabLabel = tabDiff.getLabel();
             int labelW = g2d.getFontMetrics().stringWidth(tabLabel);
             int labelH = g2d.getFontMetrics().getAscent();
@@ -1316,81 +1377,114 @@ public class GamePanel extends JPanel {
         }
 
         // Columns headers
-        g2d.setFont(new Font("Arial", Font.BOLD, 13));
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 13));
         g2d.setColor(new Color(0, 255, 255));
-        g2d.drawString("RANK", 50, 182);
+        g2d.drawString("RANK", 45, 190);
+        g2d.drawString("NAME", 95, 190);
         if (selectedLeaderboardMode == GameMode.SPRINT) {
-            g2d.drawString("TIME", 110, 182);
-            g2d.drawString("LINES", 210, 182);
+            g2d.drawString("TIME", 205, 190);
+            g2d.drawString("LINES", 295, 190);
         } else if (selectedLeaderboardMode == GameMode.SURVIVAL) {
-            g2d.drawString("TIME", 110, 182);
-            g2d.drawString("SCORE", 210, 182);
+            g2d.drawString("TIME", 205, 190);
+            g2d.drawString("SCORE", 295, 190);
         } else {
-            g2d.drawString("SCORE", 110, 182);
-            g2d.drawString("DIFF", 210, 182);
+            g2d.drawString("SCORE", 205, 190);
+            g2d.drawString("DIFF", 295, 190);
         }
-        g2d.drawString("DATE", 310, 182);
+        g2d.drawString("DATE", 385, 190);
 
         g2d.setColor(new Color(255, 255, 255, 50));
-        g2d.drawLine(40, 192, getWidth() - 40, 192);
+        g2d.drawLine(40, 200, getWidth() - 40, 200);
 
         // List
-        List<LeaderboardEntry> entries = gameEngine.getLeaderboardEntriesForDifficultyAndMode(selectedLeaderboardDifficulty, selectedLeaderboardMode);
-        g2d.setFont(new Font("Arial", Font.PLAIN, 13));
-        int y = 220;
-        int rowGap = 30;
-
-        if (entries == null || entries.isEmpty()) {
+        if (isLeaderboardLoading) {
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 15));
+            g2d.setColor(new Color(0, 255, 255));
+            String loadingText = "連線全球伺服器中...";
+            int loadingW = g2d.getFontMetrics().stringWidth(loadingText);
+            g2d.drawString(loadingText, (getWidth() - loadingW) / 2, 280);
+            
+            g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
             g2d.setColor(new Color(150, 150, 180));
-            g2d.drawString("No high scores recorded yet.", (getWidth() - g2d.getFontMetrics().stringWidth("No high scores recorded yet.")) / 2, 280);
-            g2d.drawString("Start playing and set a record!", (getWidth() - g2d.getFontMetrics().stringWidth("Start playing and set a record!")) / 2, 310);
+            String subText = "正在讀取全球排行榜數據...";
+            int subW = g2d.getFontMetrics().stringWidth(subText);
+            g2d.drawString(subText, (getWidth() - subW) / 2, 310);
+            
+            long time = System.currentTimeMillis();
+            double angle = (time % 2000) * (2 * Math.PI / 2000.0);
+            int circleX = getWidth() / 2 - 20;
+            int circleY = 340;
+            g2d.setStroke(new java.awt.BasicStroke(3f));
+            g2d.setColor(new Color(0, 255, 255, 60));
+            g2d.drawOval(circleX, circleY, 40, 40);
+            g2d.setColor(new Color(0, 255, 255));
+            g2d.drawArc(circleX, circleY, 40, 40, (int)Math.toDegrees(angle), 120);
+            g2d.setStroke(new java.awt.BasicStroke(1f));
         } else {
-            int rank = 1;
-            for (LeaderboardEntry entry : entries) {
-                if (rank > 8) break;
+            List<LeaderboardEntry> entries;
+            if (selectedLeaderboardScope == LeaderboardScope.GLOBAL) {
+                entries = gameEngine.getGlobalLeaderboardEntriesForDifficultyAndMode(selectedLeaderboardDifficulty, selectedLeaderboardMode);
+            } else {
+                entries = gameEngine.getLeaderboardEntriesForDifficultyAndMode(selectedLeaderboardDifficulty, selectedLeaderboardMode);
+            }
+            
+            g2d.setFont(new Font("SansSerif", Font.PLAIN, 13));
+            int y = 222;
+            int rowGap = 28;
 
-                if (rank % 2 == 1) {
-                    g2d.setColor(new Color(255, 255, 255, 10));
-                    g2d.fillRect(40, y - 18, getWidth() - 80, 26);
+            if (entries == null || entries.isEmpty()) {
+                g2d.setColor(new Color(150, 150, 180));
+                g2d.drawString("尚無紀錄 (No records yet)", (getWidth() - g2d.getFontMetrics().stringWidth("尚無紀錄 (No records yet)")) / 2, 280);
+                g2d.drawString("開始遊戲來締造新紀錄吧！", (getWidth() - g2d.getFontMetrics().stringWidth("開始遊戲來締造新紀錄吧！")) / 2, 310);
+            } else {
+                int rank = 1;
+                for (LeaderboardEntry entry : entries) {
+                    if (rank > 8) break;
+
+                    if (rank % 2 == 1) {
+                        g2d.setColor(new Color(255, 255, 255, 10));
+                        g2d.fillRect(40, y - 18, getWidth() - 80, 24);
+                    }
+
+                    if (rank == 1) g2d.setColor(new Color(255, 223, 0));
+                    else if (rank == 2) g2d.setColor(new Color(192, 192, 192));
+                    else if (rank == 3) g2d.setColor(new Color(205, 127, 50));
+                    else g2d.setColor(Color.WHITE);
+
+                    g2d.drawString("#" + rank, 45, y);
+                    g2d.drawString(entry.getPlayerName(), 95, y);
+                    
+                    if (selectedLeaderboardMode == GameMode.SPRINT) {
+                        int sec = entry.getSecondsElapsed();
+                        String timeVal = String.format("%02d:%02d", sec / 60, sec % 60);
+                        g2d.drawString(timeVal, 205, y);
+                        g2d.drawString(entry.getLinesCleared() + " / 40", 295, y);
+                    } else if (selectedLeaderboardMode == GameMode.SURVIVAL) {
+                        int sec = entry.getSecondsElapsed();
+                        String timeVal = String.format("%02d:%02d", sec / 60, sec % 60);
+                        g2d.drawString(timeVal, 205, y);
+                        g2d.drawString(String.format("%,d", entry.getScore()), 295, y);
+                    } else {
+                        g2d.drawString(String.format("%,d", entry.getScore()), 205, y);
+                        String diffDisp = "NORMAL".equalsIgnoreCase(entry.getDifficulty()) ? "MEDIUM" : entry.getDifficulty();
+                        g2d.drawString(diffDisp, 295, y);
+                    }
+                    g2d.drawString(entry.getPlayedAtDisplay(), 385, y);
+
+                    y += rowGap;
+                    rank++;
                 }
-
-                if (rank == 1) g2d.setColor(new Color(255, 223, 0));
-                else if (rank == 2) g2d.setColor(new Color(192, 192, 192));
-                else if (rank == 3) g2d.setColor(new Color(205, 127, 50));
-                else g2d.setColor(Color.WHITE);
-
-                g2d.drawString("#" + rank, 50, y);
-                
-                if (selectedLeaderboardMode == GameMode.SPRINT) {
-                    int sec = entry.getSecondsElapsed();
-                    String timeVal = String.format("%02d:%02d", sec / 60, sec % 60);
-                    g2d.drawString(timeVal, 110, y);
-                    g2d.drawString(entry.getLinesCleared() + " / 40", 210, y);
-                } else if (selectedLeaderboardMode == GameMode.SURVIVAL) {
-                    int sec = entry.getSecondsElapsed();
-                    String timeVal = String.format("%02d:%02d", sec / 60, sec % 60);
-                    g2d.drawString(timeVal, 110, y);
-                    g2d.drawString(String.format("%,d", entry.getScore()), 210, y);
-                } else {
-                    g2d.drawString(String.format("%,d", entry.getScore()), 110, y);
-                    String diffDisp = "NORMAL".equalsIgnoreCase(entry.getDifficulty()) ? "MEDIUM" : entry.getDifficulty();
-                    g2d.drawString(diffDisp, 210, y);
-                }
-                g2d.drawString(entry.getPlayedAtDisplay(), 310, y);
-
-                y += rowGap;
-                rank++;
             }
         }
 
         // Back Button
-        String backBtnText = "BACK TO MENU";
-        g2d.setFont(new Font("Arial", Font.BOLD, 18));
+        String backBtnText = "返回主選單 (BACK)";
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 18));
         FontMetrics fmBack = g2d.getFontMetrics();
         int btnW = fmBack.stringWidth(backBtnText) + 40;
         int btnH = 40;
         int btnX = (getWidth() - btnW) / 2;
-        int btnY = 505;
+        int btnY = 485;
 
         backButtonBounds = new Rectangle(btnX, btnY - 30, btnW, btnH);
 
@@ -1413,12 +1507,12 @@ public class GamePanel extends JPanel {
         g2d.drawString(backBtnText, btnX + 20, btnY - 11);
 
         // Help hints at the bottom
-        g2d.setFont(new Font("Arial", Font.PLAIN, 11));
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 11));
         g2d.setColor(new Color(120, 120, 140));
-        String tabHint1 = "Press \u2190 / \u2192 Arrows or Click Tabs to Switch Difficulty";
-        String tabHint2 = "Press \u2191 / \u2193 Arrows to Switch Game Modes";
-        g2d.drawString(tabHint1, (getWidth() - g2d.getFontMetrics().stringWidth(tabHint1)) / 2, 548);
-        g2d.drawString(tabHint2, (getWidth() - g2d.getFontMetrics().stringWidth(tabHint2)) / 2, 566);
+        String tabHint1 = "提示：點擊或按 ⬅ / ➡ 鍵切換難度，點擊或按 ⬆ / ⬇ 鍵切換模式";
+        String tabHint2 = "提示：點擊最上方按鈕可在 本地 與 全球 排行榜之間切換";
+        g2d.drawString(tabHint1, (getWidth() - g2d.getFontMetrics().stringWidth(tabHint1)) / 2, 535);
+        g2d.drawString(tabHint2, (getWidth() - g2d.getFontMetrics().stringWidth(tabHint2)) / 2, 555);
     }
 
     public void navigateLeaderboardTabs(int dir) {
@@ -1593,6 +1687,128 @@ public class GamePanel extends JPanel {
 
         g2d.drawString("Pieces Placed:", startX + 40, itemY);
         g2d.drawString(String.valueOf(engine.getPiecesSpawned()), startX + 260, itemY);
+    }
+
+    public void startAnimationTimer() {
+        if (animationTimer != null && !animationTimer.isRunning()) {
+            animationTimer.start();
+        }
+    }
+
+    private void triggerGlobalLeaderboardLoad() {
+        isLeaderboardLoading = true;
+        repaint();
+        new Thread(() -> {
+            try {
+                Thread.sleep(800);
+            } catch (InterruptedException e) {
+                // Ignore
+            }
+            isLeaderboardLoading = false;
+            repaint();
+        }).start();
+    }
+
+    private void drawNameEntryOverlay(Graphics2D g2d) {
+        int width = getWidth();
+        int height = getHeight();
+        if (width <= 0) width = COLS * TILE_SIZE + SIDEBAR_WIDTH;
+        if (height <= 0) height = ROWS * TILE_SIZE;
+
+        // 1. Semi-transparent background
+        g2d.setColor(new Color(15, 5, 25, 235));
+        g2d.fillRect(0, 0, width, height);
+
+        // Neon Golden breathing frame in the center
+        long now = System.currentTimeMillis();
+        float pulse = (float) (0.8 + 0.2 * Math.sin(now / 300.0));
+        g2d.setColor(new Color(255, 215, 0, (int)(255 * pulse * 0.4)));
+        g2d.setStroke(new java.awt.BasicStroke(4f));
+        g2d.drawRoundRect(40, 80, width - 80, 420, 16, 16);
+        g2d.setColor(new Color(255, 215, 0));
+        g2d.setStroke(new java.awt.BasicStroke(1.5f));
+        g2d.drawRoundRect(40, 80, width - 80, 420, 16, 16);
+        g2d.setStroke(new java.awt.BasicStroke(1f));
+
+        // Pulsing Golden Title
+        g2d.setFont(new Font("Impact", Font.BOLD | Font.ITALIC, 38));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        String titleText = "NEW HIGH SCORE!";
+        int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
+        g2d.setColor(new Color(255, 215, 0, (int)(255 * pulse)));
+        g2d.drawString(titleText, titleX, 140);
+
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 18));
+        g2d.setColor(new Color(0, 255, 255));
+        String subTitleText = "達成新紀錄！";
+        int subTitleX = (width - g2d.getFontMetrics().stringWidth(subTitleText)) / 2;
+        g2d.drawString(subTitleText, subTitleX, 175);
+
+        // Stats Box
+        int statsY = 215;
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 14));
+        g2d.setColor(Color.WHITE);
+        g2d.drawString("遊戲模式 (MODE): " + gameEngine.getGameMode().name(), 80, statsY);
+        g2d.drawString("難易度 (DIFF): " + gameEngine.getDifficulty().getLabel(), 80, statsY + 30);
+        
+        String scoreVal;
+        if (gameEngine.getGameMode() == GameMode.SPRINT) {
+            int sec = gameEngine.getSecondsElapsed();
+            scoreVal = String.format("%02d:%02d", sec / 60, sec % 60) + " (時間)";
+        } else if (gameEngine.getGameMode() == GameMode.SURVIVAL) {
+            int sec = gameEngine.getSecondsElapsed();
+            scoreVal = String.format("%02d:%02d", sec / 60, sec % 60) + " (生存) / " + String.format("%,d", gameEngine.getScore()) + " 分";
+        } else {
+            scoreVal = String.format("%,d", gameEngine.getScore()) + " 分";
+        }
+        g2d.drawString("最終成績 (SCORE): " + scoreVal, 80, statsY + 60);
+
+        // Name input prompt
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
+        g2d.setColor(new Color(255, 100, 255));
+        String prompt = "請輸入您的名字 (ENTER INITIALS):";
+        int promptX = (width - g2d.getFontMetrics().stringWidth(prompt)) / 2;
+        g2d.drawString(prompt, promptX, 330);
+
+        // Name text field
+        int fieldW = 280;
+        int fieldH = 45;
+        int fieldX = (width - fieldW) / 2;
+        int fieldY = 350;
+
+        // Render input field box
+        g2d.setColor(new Color(255, 255, 255, 10));
+        g2d.fillRoundRect(fieldX, fieldY, fieldW, fieldH, 8, 8);
+        g2d.setColor(new Color(255, 100, 255, 100));
+        g2d.drawRoundRect(fieldX, fieldY, fieldW, fieldH, 8, 8);
+
+        // Render current name in buffer
+        String name = gameEngine.getNameInputBuffer().toString();
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 24));
+        g2d.setColor(Color.WHITE);
+        int nameW = g2d.getFontMetrics().stringWidth(name);
+        int nameX = fieldX + (fieldW - nameW) / 2;
+        int nameY = fieldY + 31;
+        g2d.drawString(name, nameX, nameY);
+
+        // Render cursor
+        boolean cursorBlink = (now / 500) % 2 == 0;
+        if (cursorBlink) {
+            int cursorX = nameX + nameW + 2;
+            if (name.isEmpty()) {
+                cursorX = fieldX + fieldW / 2;
+            }
+            g2d.setColor(new Color(255, 100, 255));
+            g2d.fillRect(cursorX, fieldY + 12, 12, 22);
+        }
+
+        // Instructions
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        g2d.setColor(new Color(150, 150, 160));
+        String inst1 = "鍵盤直接輸入字母 / 按 Backspace 刪除";
+        String inst2 = "輸入完成後按下 ENTER 鍵確認，按 ESC 跳過";
+        g2d.drawString(inst1, (width - g2d.getFontMetrics().stringWidth(inst1)) / 2, 435);
+        g2d.drawString(inst2, (width - g2d.getFontMetrics().stringWidth(inst2)) / 2, 455);
     }
 
     // Draw game over screen overlay covering the full screen

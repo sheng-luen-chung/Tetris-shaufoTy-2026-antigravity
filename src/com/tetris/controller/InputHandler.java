@@ -338,6 +338,24 @@ public class InputHandler extends KeyAdapter {
                 return;
             }
 
+            if (engine.isEnteringName()) {
+                char keyChar = e.getKeyChar();
+                if (keyCode == KeyEvent.VK_ENTER) {
+                    if (engine.getNameInputBuffer().length() > 0) {
+                        engine.submitLeaderboardName();
+                    }
+                } else if (keyCode == KeyEvent.VK_BACK_SPACE) {
+                    engine.backspaceNameInput();
+                } else if (keyCode == KeyEvent.VK_ESCAPE) {
+                    engine.submitDefaultName();
+                } else {
+                    if (Character.isLetterOrDigit(keyChar) || keyChar == ' ' || keyChar == '_' || keyChar == '-') {
+                        engine.appendNameInput(keyChar);
+                    }
+                }
+                return;
+            }
+
             boolean bothGameOver = false;
             if (engine.getGameMode() == com.tetris.model.GameMode.PVP && engine2 != null) {
                 bothGameOver = engine.isGameOver() && engine2.isGameOver();
