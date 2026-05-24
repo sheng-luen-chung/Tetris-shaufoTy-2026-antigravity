@@ -27,6 +27,7 @@ public class Main {
         gamePanel.setGameEngine(engine); // Link engine to panel for info display
 
         InputHandler inputHandler = new InputHandler(engine);
+        engine.setInputHandler(inputHandler);
 
         // Set JFrame
         JFrame frame = new JFrame("Java Tetris Project");

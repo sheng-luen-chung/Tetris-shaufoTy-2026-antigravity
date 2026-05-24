@@ -36,6 +36,15 @@ public class GamePanel extends JPanel {
     private Piece currentPiece;
     private com.tetris.controller.GameEngine gameEngine;
     
+    // PVP Player 2 properties
+    private com.tetris.controller.GameEngine gameEngine2 = null;
+    private final List<ScorePopup> scorePopups2 = new ArrayList<>();
+    private final List<Particle> particles2 = new ArrayList<>();
+    private int shakeIntensity2 = 0;
+    private int shakeDuration2 = 100;
+    private long shakeEndTime2 = 0;
+    private long perfectClearStartTime2 = 0;
+    
     // Active score popups & particles
     private final List<ScorePopup> scorePopups = new ArrayList<>();
     private final List<Particle> particles = new ArrayList<>();
@@ -78,8 +87,8 @@ public class GamePanel extends JPanel {
 
     // Game mode selection properties
     private boolean showModeSelectInMenu = false;
-    private int selectedModeIndex = 0; // 0: ENDLESS, 1: SPRINT, 2: ULTRA, 3: SURVIVAL, 4: BACK
-    private final Rectangle[] modeOptionBounds = new Rectangle[5];
+    private int selectedModeIndex = 0; // 0: ENDLESS, 1: SPRINT, 2: ULTRA, 3: SURVIVAL, 4: PVP, 5: BACK
+    private final Rectangle[] modeOptionBounds = new Rectangle[6];
 
     // Difficulty selection properties
     private boolean showDifficultySelectInMenu = false;
@@ -104,6 +113,10 @@ public class GamePanel extends JPanel {
 
     // Add a score popup at a grid cell (col, row)
     public void addScorePopup(int gridCol, int gridRow, int score, int lines, com.tetris.controller.GameEngine.TSpinType tSpinType, int comboCount) {
+        addScorePopup(gridCol, gridRow, score, lines, tSpinType, comboCount, 1);
+    }
+
+    public void addScorePopup(int gridCol, int gridRow, int score, int lines, com.tetris.controller.GameEngine.TSpinType tSpinType, int comboCount, int playerNum) {
         String scoreText = "+" + score;
         String lineText = "";
         String comboText = (comboCount >= 1) ? ((comboCount + 1) + " COMBO!") : "";
@@ -198,8 +211,9 @@ public class GamePanel extends JPanel {
             py = 120; // Keep it low enough to not be cut off by top border
         }
 
-        synchronized (scorePopups) {
-            scorePopups.add(new ScorePopup(lineText, scoreText, comboText, px, py, popupColor, font));
+        synchronized (playerNum == 2 ? scorePopups2 : scorePopups) {
+            List<ScorePopup> targetList = (playerNum == 2) ? scorePopups2 : scorePopups;
+            targetList.add(new ScorePopup(lineText, scoreText, comboText, px, py, popupColor, font));
         }
         if (!animationTimer.isRunning()) {
             animationTimer.start();
@@ -209,7 +223,11 @@ public class GamePanel extends JPanel {
 
     // Draw and update active score popups
     private void drawScorePopups(Graphics g) {
-        if (scorePopups.isEmpty())
+        drawScorePopups(g, scorePopups);
+    }
+
+    private void drawScorePopups(Graphics g, List<ScorePopup> popupsList) {
+        if (popupsList.isEmpty())
             return;
 
         Graphics2D g2 = (Graphics2D) g.create();
@@ -217,8 +235,8 @@ public class GamePanel extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         long now = System.currentTimeMillis();
 
-        synchronized (scorePopups) {
-            Iterator<ScorePopup> it = scorePopups.iterator();
+        synchronized (popupsList) {
+            Iterator<ScorePopup> it = popupsList.iterator();
             while (it.hasNext()) {
                 ScorePopup sp = it.next();
                 float elapsed = now - sp.startTime;
@@ -290,6 +308,11 @@ public class GamePanel extends JPanel {
                     active = true;
                 }
             }
+            synchronized (scorePopups2) {
+                if (!scorePopups2.isEmpty()) {
+                    active = true;
+                }
+            }
             synchronized (particles) {
                 if (!particles.isEmpty()) {
                     active = true;
@@ -303,10 +326,24 @@ public class GamePanel extends JPanel {
                     }
                 }
             }
-            if (System.currentTimeMillis() < shakeEndTime) {
+            synchronized (particles2) {
+                if (!particles2.isEmpty()) {
+                    active = true;
+                    Iterator<Particle> it = particles2.iterator();
+                    while (it.hasNext()) {
+                        Particle p = it.next();
+                        p.update();
+                        if (p.life <= 0) {
+                            it.remove();
+                        }
+                    }
+                }
+            }
+            if (System.currentTimeMillis() < shakeEndTime || System.currentTimeMillis() < shakeEndTime2) {
                 active = true;
             }
-            if (System.currentTimeMillis() - perfectClearStartTime < PERFECT_CLEAR_DURATION) {
+            if (System.currentTimeMillis() - perfectClearStartTime < PERFECT_CLEAR_DURATION ||
+                System.currentTimeMillis() - perfectClearStartTime2 < PERFECT_CLEAR_DURATION) {
                 active = true;
             }
             if (!active) {
@@ -383,7 +420,7 @@ public class GamePanel extends JPanel {
                             repaint();
                         }
                     } else if (showModeSelectInMenu) {
-                        for (int i = 0; i < 5; i++) {
+                        for (int i = 0; i < 6; i++) {
                             if (modeOptionBounds[i] != null && modeOptionBounds[i].contains(e.getPoint())) {
                                 selectedModeIndex = i;
                                 triggerModeSelection();
@@ -482,7 +519,7 @@ public class GamePanel extends JPanel {
                     if (showSettingsInMenu) {
                         repaint();
                     } else if (showModeSelectInMenu) {
-                        for (int i = 0; i < 5; i++) {
+                        for (int i = 0; i < 6; i++) {
                             if (modeOptionBounds[i] != null && modeOptionBounds[i].contains(e.getPoint())) {
                                 if (selectedModeIndex != i) {
                                     selectedModeIndex = i;
@@ -549,6 +586,32 @@ public class GamePanel extends JPanel {
     // Set the game engine reference
     public void setGameEngine(com.tetris.controller.GameEngine gameEngine) {
         this.gameEngine = gameEngine;
+    }
+
+    public void setGameEngine2(com.tetris.controller.GameEngine gameEngine2) {
+        this.gameEngine2 = gameEngine2;
+        synchronized (particles2) {
+            particles2.clear();
+        }
+        synchronized (scorePopups2) {
+            scorePopups2.clear();
+        }
+        shakeIntensity2 = 0;
+        shakeEndTime2 = 0;
+    }
+
+    public void updateWindowSize() {
+        java.awt.Window window = javax.swing.SwingUtilities.getWindowAncestor(this);
+        if (window instanceof javax.swing.JFrame) {
+            javax.swing.JFrame frame = (javax.swing.JFrame) window;
+            if (gameEngine != null && gameEngine.getGameMode() == GameMode.PVP && gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
+                setPreferredSize(new Dimension(1000, ROWS * TILE_SIZE));
+            } else {
+                setPreferredSize(new Dimension(500, ROWS * TILE_SIZE));
+            }
+            frame.pack();
+            frame.setLocationRelativeTo(null);
+        }
     }
 
     public boolean isShowSettingsInMenu() {
@@ -630,58 +693,128 @@ public class GamePanel extends JPanel {
                 Graphics2D g2d = (Graphics2D) g;
                 java.awt.geom.AffineTransform oldTransform = g2d.getTransform();
 
-                int currentShakeX = 0;
-                int currentShakeY = 0;
-                if (System.currentTimeMillis() < shakeEndTime) {
-                    double progress = (shakeEndTime - System.currentTimeMillis()) / (double) shakeDuration;
-                    if (progress > 0) {
-                        int currentMaxOffset = (int) (shakeIntensity * progress);
-                        if (currentMaxOffset > 0) {
-                            currentShakeX = (int) (Math.random() * currentMaxOffset * 2 - currentMaxOffset);
-                            currentShakeY = (int) (Math.random() * currentMaxOffset * 2 - currentMaxOffset);
+                if (gameEngine.getGameMode() == GameMode.PVP && gameEngine2 != null) {
+                    // --- PLAYER 1 (Left: x=0) ---
+                    java.awt.geom.AffineTransform p1Transform = g2d.getTransform();
+                    int currentShakeX = 0;
+                    int currentShakeY = 0;
+                    if (System.currentTimeMillis() < shakeEndTime) {
+                        double progress = (shakeEndTime - System.currentTimeMillis()) / (double) shakeDuration;
+                        if (progress > 0) {
+                            int currentMaxOffset = (int) (shakeIntensity * progress);
+                            if (currentMaxOffset > 0) {
+                                currentShakeX = (int) (Math.random() * currentMaxOffset * 2 - currentMaxOffset);
+                                currentShakeY = (int) (Math.random() * currentMaxOffset * 2 - currentMaxOffset);
+                            }
                         }
                     }
-                }
-
-                if (currentShakeX != 0 || currentShakeY != 0) {
-                    g2d.translate(currentShakeX, currentShakeY);
-                }
-
-                // Draw Game Area (Left)
-                drawGrid(g2d);
-                drawFixedBlocks(g2d);
-                drawCurrentPiece(g2d);
-
-                // Draw particles inside the grid area
-                drawParticles(g2d);
-
-                // Draw active score popups on top of the grid
-                drawScorePopups(g2d);
-
-                // Draw Sidebar (Right)
-                drawSidebar(g2d);
-
-                // Draw Pause Overlay
-                if (gameEngine.isPaused()) {
-                    drawPauseOverlay(g2d);
-                }
-
-                // Draw Game Over Overlay
-                if (gameEngine.isGameOver()) {
-                    if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
-                        drawTutorialVictoryOverlay(g2d);
-                    } else {
-                        drawGameOverOverlay(g2d);
+                    if (currentShakeX != 0 || currentShakeY != 0) {
+                        g2d.translate(currentShakeX, currentShakeY);
                     }
-                }
 
-                // Draw Tutorial Overlays
-                if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
-                    drawTutorialOverlays(g2d);
-                }
+                    drawGrid(g2d);
+                    drawFixedBlocks(g2d, gameEngine.getBoard());
+                    drawCurrentPiece(g2d, gameEngine.getCurrentPiece(), gameEngine.getBoard(), gameEngine);
+                    drawParticles(g2d, particles);
+                    drawScorePopups(g2d, scorePopups);
+                    drawSidebar(g2d, gameEngine);
+                    drawPerfectClearOverlay(g2d, perfectClearStartTime);
+                    g2d.setTransform(p1Transform);
 
-                // Draw Perfect Clear Overlay
-                drawPerfectClearOverlay(g2d);
+                    // --- PLAYER 2 (Right: x=500) ---
+                    java.awt.geom.AffineTransform p2Transform = g2d.getTransform();
+                    g2d.translate(500, 0);
+                    int currentShakeX2 = 0;
+                    int currentShakeY2 = 0;
+                    if (System.currentTimeMillis() < shakeEndTime2) {
+                        double progress = (shakeEndTime2 - System.currentTimeMillis()) / (double) shakeDuration2;
+                        if (progress > 0) {
+                            int currentMaxOffset = (int) (shakeIntensity2 * progress);
+                            if (currentMaxOffset > 0) {
+                                currentShakeX2 = (int) (Math.random() * currentMaxOffset * 2 - currentMaxOffset);
+                                currentShakeY2 = (int) (Math.random() * currentMaxOffset * 2 - currentMaxOffset);
+                            }
+                        }
+                    }
+                    if (currentShakeX2 != 0 || currentShakeY2 != 0) {
+                        g2d.translate(currentShakeX2, currentShakeY2);
+                    }
+
+                    drawGrid(g2d);
+                    drawFixedBlocks(g2d, gameEngine2.getBoard());
+                    drawCurrentPiece(g2d, gameEngine2.getCurrentPiece(), gameEngine2.getBoard(), gameEngine2);
+                    drawParticles(g2d, particles2);
+                    drawScorePopups(g2d, scorePopups2);
+                    drawSidebar(g2d, gameEngine2);
+                    drawPerfectClearOverlay(g2d, perfectClearStartTime2);
+                    g2d.setTransform(p2Transform);
+
+                    // --- OVERLAYS (Centered over both windows) ---
+                    // Draw Pause Overlay
+                    if (gameEngine.isPaused()) {
+                        drawPauseOverlay(g2d);
+                    }
+
+                    // Draw Game Over Overlay
+                    if (gameEngine.isGameOver() || gameEngine2.isGameOver()) {
+                        drawPvpGameOverOverlay(g2d);
+                    }
+
+                } else {
+                    // Single Player Mode
+                    int currentShakeX = 0;
+                    int currentShakeY = 0;
+                    if (System.currentTimeMillis() < shakeEndTime) {
+                        double progress = (shakeEndTime - System.currentTimeMillis()) / (double) shakeDuration;
+                        if (progress > 0) {
+                            int currentMaxOffset = (int) (shakeIntensity * progress);
+                            if (currentMaxOffset > 0) {
+                                currentShakeX = (int) (Math.random() * currentMaxOffset * 2 - currentMaxOffset);
+                                currentShakeY = (int) (Math.random() * currentMaxOffset * 2 - currentMaxOffset);
+                            }
+                        }
+                    }
+
+                    if (currentShakeX != 0 || currentShakeY != 0) {
+                        g2d.translate(currentShakeX, currentShakeY);
+                    }
+
+                    // Draw Game Area (Left)
+                    drawGrid(g2d);
+                    drawFixedBlocks(g2d);
+                    drawCurrentPiece(g2d);
+
+                    // Draw particles inside the grid area
+                    drawParticles(g2d);
+
+                    // Draw active score popups on top of the grid
+                    drawScorePopups(g2d);
+
+                    // Draw Sidebar (Right)
+                    drawSidebar(g2d);
+
+                    // Draw Pause Overlay
+                    if (gameEngine.isPaused()) {
+                        drawPauseOverlay(g2d);
+                    }
+
+                    // Draw Game Over Overlay
+                    if (gameEngine.isGameOver()) {
+                        if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+                            drawTutorialVictoryOverlay(g2d);
+                        } else {
+                            drawGameOverOverlay(g2d);
+                        }
+                    }
+
+                    // Draw Tutorial Overlays
+                    if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+                        drawTutorialOverlays(g2d);
+                    }
+
+                    // Draw Perfect Clear Overlay
+                    drawPerfectClearOverlay(g2d);
+                }
 
                 g2d.setTransform(oldTransform);
                 break;
@@ -797,7 +930,12 @@ public class GamePanel extends JPanel {
                 showDifficultySelectInMenu = true;
                 selectedDifficultyIndex = 0; // Default to EASY
                 break;
-            case 4: // BACK
+            case 4: // PVP BATTLE
+                gameEngine.setGameMode(GameMode.PVP);
+                showModeSelectInMenu = false;
+                gameEngine.startGame();
+                break;
+            case 5: // BACK
                 showModeSelectInMenu = false;
                 selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 1 : 0; // Return to Play Game
                 break;
@@ -1302,6 +1440,112 @@ public class GamePanel extends JPanel {
         }
     }
 
+    private void drawPvpGameOverOverlay(Graphics2D g2d) {
+        int width = 1000;
+        int height = ROWS * TILE_SIZE;
+
+        g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // 1. Semi-transparent background
+        g2d.setColor(new Color(15, 5, 25, 240));
+        g2d.fillRect(0, 0, width, height);
+
+        // Neon glowing border
+        int winner = gameEngine.getPvpWinner();
+        Color themeColor = (winner == 1) ? new Color(0, 255, 255) : new Color(255, 100, 255);
+        g2d.setColor(new Color(themeColor.getRed(), themeColor.getGreen(), themeColor.getBlue(), 100));
+        g2d.setStroke(new java.awt.BasicStroke(3f));
+        g2d.drawRect(5, 5, width - 10, height - 10);
+        g2d.setStroke(new java.awt.BasicStroke(1f));
+
+        // 2. Header Title
+        g2d.setFont(new Font("Impact", Font.BOLD | Font.ITALIC, 54));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        String titleText = (winner == 1) ? "PLAYER 1 WINS!" : ((winner == 2) ? "PLAYER 2 WINS!" : "GAME OVER");
+        int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
+        int titleY = 80;
+
+        // Glow
+        g2d.setColor(new Color(themeColor.getRed(), themeColor.getGreen(), themeColor.getBlue(), 120));
+        g2d.drawString(titleText, titleX + 2, titleY + 2);
+        g2d.drawString(titleText, titleX - 2, titleY - 2);
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(titleText, titleX, titleY);
+
+        g2d.setFont(new Font("Arial", Font.BOLD, 14));
+        g2d.setColor(new Color(180, 100, 255));
+        String subTitleText = "LOCAL PVP BATTLE SUMMARY";
+        int subTitleX = (width - g2d.getFontMetrics().stringWidth(subTitleText)) / 2;
+        g2d.drawString(subTitleText, subTitleX, 110);
+
+        // 3. Side-by-side Player stats
+        int p1StartX = 50;
+        int p2StartX = 550;
+        int statsY = 150;
+        int cardW = 400;
+        int cardH = 320;
+
+        // Player 1 Card Background
+        g2d.setColor(new Color(0, 255, 255, 15));
+        g2d.fillRoundRect(p1StartX, statsY, cardW, cardH, 15, 15);
+        g2d.setColor(new Color(0, 255, 255, 50));
+        g2d.drawRoundRect(p1StartX, statsY, cardW, cardH, 15, 15);
+
+        // Player 2 Card Background
+        g2d.setColor(new Color(255, 100, 255, 15));
+        g2d.fillRoundRect(p2StartX, statsY, cardW, cardH, 15, 15);
+        g2d.setColor(new Color(255, 100, 255, 50));
+        g2d.drawRoundRect(p2StartX, statsY, cardW, cardH, 15, 15);
+
+        // Render Stats for P1
+        drawPlayerStatsCard(g2d, p1StartX, statsY, cardW, "PLAYER 1", gameEngine, new Color(0, 255, 255));
+
+        // Render Stats for P2
+        drawPlayerStatsCard(g2d, p2StartX, statsY, cardW, "PLAYER 2", gameEngine2, new Color(255, 100, 255));
+
+        // 4. Return Hint at bottom
+        g2d.setFont(new Font("Arial", Font.BOLD, 16));
+        g2d.setColor(new Color(120, 120, 150));
+        String hintText = "Press ENTER or SPACE to Return to Main Menu";
+        int hintX = (width - g2d.getFontMetrics().stringWidth(hintText)) / 2;
+        g2d.drawString(hintText, hintX, 520);
+    }
+
+    private void drawPlayerStatsCard(Graphics2D g2d, int startX, int startY, int cardW, String playerTitle, com.tetris.controller.GameEngine engine, Color themeColor) {
+        if (engine == null) return;
+        
+        g2d.setColor(themeColor);
+        g2d.setFont(new Font("Arial", Font.BOLD, 22));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        g2d.drawString(playerTitle, startX + (cardW - fmTitle.stringWidth(playerTitle)) / 2, startY + 35);
+
+        // Stats details
+        g2d.setFont(new Font("Arial", Font.PLAIN, 16));
+        g2d.setColor(Color.WHITE);
+        int itemY = startY + 80;
+        int gap = 40;
+
+        g2d.drawString("Final Score:", startX + 40, itemY);
+        g2d.drawString(String.format("%,d", engine.getScore()), startX + 260, itemY);
+        itemY += gap;
+
+        g2d.drawString("Lines Cleared:", startX + 40, itemY);
+        g2d.drawString(String.valueOf(engine.getTotalLinesCleared()), startX + 260, itemY);
+        itemY += gap;
+
+        g2d.drawString("T-Spins Cleared:", startX + 40, itemY);
+        g2d.drawString(String.valueOf(engine.getTSpins()), startX + 260, itemY);
+        itemY += gap;
+
+        g2d.drawString("Max Combo:", startX + 40, itemY);
+        g2d.drawString(String.valueOf(Math.max(0, engine.getMaxCombo())), startX + 260, itemY);
+        itemY += gap;
+
+        g2d.drawString("Pieces Placed:", startX + 40, itemY);
+        g2d.drawString(String.valueOf(engine.getPiecesSpawned()), startX + 260, itemY);
+    }
+
     // Draw game over screen overlay covering the full screen
     private void drawGameOverOverlay(Graphics g) {
         Graphics2D g2d = (Graphics2D) g;
@@ -1686,7 +1930,12 @@ public class GamePanel extends JPanel {
 
     // Draw fixed blocks
     private void drawFixedBlocks(Graphics g) {
-        Color[][] grid = board.getGrid();
+        drawFixedBlocks(g, board);
+    }
+
+    private void drawFixedBlocks(Graphics g, Board targetBoard) {
+        if (targetBoard == null) return;
+        Color[][] grid = targetBoard.getGrid();
 
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {
@@ -1699,16 +1948,20 @@ public class GamePanel extends JPanel {
 
     // Draw current piece
     private void drawCurrentPiece(Graphics g) {
-        if (currentPiece != null) {
+        drawCurrentPiece(g, currentPiece, board, gameEngine);
+    }
+
+    private void drawCurrentPiece(Graphics g, Piece targetPiece, Board targetBoard, com.tetris.controller.GameEngine targetEngine) {
+        if (targetPiece != null && targetBoard != null && targetEngine != null) {
             // Draw ghost first
             if (showGhostPiece) {
-                drawGhostPiece(g);
+                drawGhostPiece(g, targetPiece, targetBoard);
             }
 
-            Color color = currentPiece.getType().getColor();
+            Color color = targetPiece.getType().getColor();
 
             // Flash effect for Lock Delay
-            if (gameEngine.isLocking()) {
+            if (targetEngine.isLocking()) {
                 // Flash every 100ms for more urgency
                 if ((System.currentTimeMillis() / 100) % 2 == 0) {
                     // Switch to a semi-transparent version or white tint
@@ -1725,7 +1978,7 @@ public class GamePanel extends JPanel {
             }
 
             // Get the absolute coordinates of the current piece after rotation
-            for (int[] coord : currentPiece.getAbsoluteCoords()) {
+            for (int[] coord : targetPiece.getAbsoluteCoords()) {
                 drawSquare(g, coord[0], coord[1], color);
             }
         }
@@ -1733,23 +1986,27 @@ public class GamePanel extends JPanel {
 
     // Draw the ghost piece
     private void drawGhostPiece(Graphics g) {
-        if (currentPiece == null)
+        drawGhostPiece(g, currentPiece, board);
+    }
+
+    private void drawGhostPiece(Graphics g, Piece targetPiece, Board targetBoard) {
+        if (targetPiece == null || targetBoard == null)
             return;
 
         // Create a copy of the current piece at same pos/rotation
         com.tetris.model.Piece ghost = new com.tetris.model.Piece(
-            currentPiece.getType(), currentPiece.getRow(),
-            currentPiece.getCol(), currentPiece.getRotationIndex()
+            targetPiece.getType(), targetPiece.getRow(),
+            targetPiece.getCol(), targetPiece.getRotationIndex()
         );
 
         // Move ghost down
-        while (board.isValidMove(ghost)) {
+        while (targetBoard.isValidMove(ghost)) {
             ghost.move(1, 0);
         }
         ghost.move(-1, 0);
 
         // Draw ghost squares
-        Color baseColor = currentPiece.getType().getColor();
+        Color baseColor = targetPiece.getType().getColor();
         Color ghostColor = new Color(baseColor.getRed(), baseColor.getGreen(), baseColor.getBlue(), 75); // Mapped translucent color
         for (int[] coord : ghost.getAbsoluteCoords()) {
             drawSquare(g, coord[0], coord[1], ghostColor);
@@ -1758,6 +2015,13 @@ public class GamePanel extends JPanel {
 
     // Draw Sidebar
     private void drawSidebar(Graphics g) {
+        drawSidebar(g, gameEngine);
+    }
+
+    private void drawSidebar(Graphics g, com.tetris.controller.GameEngine targetEngine) {
+        if (targetEngine == null)
+            return;
+
         Graphics2D g2d = (Graphics2D) g;
         int startX = COLS * TILE_SIZE;
 
@@ -1769,30 +2033,27 @@ public class GamePanel extends JPanel {
         g.setColor(Color.GRAY);
         g.drawLine(startX, 0, startX, getHeight());
 
-        if (gameEngine == null)
-            return;
-
         g.setColor(Color.WHITE);
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
 
         // 1. Draw Score or Sprint Lines progress
-        if (gameEngine.getGameMode() == GameMode.SPRINT) {
+        if (targetEngine.getGameMode() == GameMode.SPRINT) {
             g.drawString("LINES", startX + 20, 45);
             g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 30));
-            g.drawString(gameEngine.getTotalLinesCleared() + " / 40", startX + 20, 72);
+            g.drawString(targetEngine.getTotalLinesCleared() + " / 40", startX + 20, 72);
         } else {
             g.drawString("SCORE", startX + 20, 45);
             g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 30));
-            g.drawString(String.valueOf(gameEngine.getScore()), startX + 20, 72);
+            g.drawString(String.valueOf(targetEngine.getScore()), startX + 20, 72);
         }
 
         // 2. Draw Timer
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
         g.drawString("TIME", startX + 20, 108);
         g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 24));
-        int seconds = gameEngine.getSecondsElapsed();
+        int seconds = targetEngine.getSecondsElapsed();
         String timeStr;
-        if (gameEngine.getGameMode() == GameMode.ULTRA) {
+        if (targetEngine.getGameMode() == GameMode.ULTRA) {
             int timeLeft = Math.max(0, 120 - seconds);
             timeStr = String.format("%02d:%02d", timeLeft / 60, timeLeft % 60);
             if (timeLeft <= 10) {
@@ -1805,11 +2066,11 @@ public class GamePanel extends JPanel {
         g.setColor(Color.WHITE); // reset color
 
         // Draw Garbage Warning Countdown for Survival Mode
-        if (gameEngine.getGameMode() == GameMode.SURVIVAL) {
+        if (targetEngine.getGameMode() == GameMode.SURVIVAL) {
             int interval = 15;
-            if (gameEngine.getDifficulty() == com.tetris.controller.GameEngine.Difficulty.EASY) {
+            if (targetEngine.getDifficulty() == com.tetris.controller.GameEngine.Difficulty.EASY) {
                 interval = 20;
-            } else if (gameEngine.getDifficulty() == com.tetris.controller.GameEngine.Difficulty.HARD) {
+            } else if (targetEngine.getDifficulty() == com.tetris.controller.GameEngine.Difficulty.HARD) {
                 interval = 10;
             }
             int timeLeft = interval - (seconds % interval);
@@ -1826,19 +2087,19 @@ public class GamePanel extends JPanel {
         // 3. Draw Level
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 18));
         g.drawString("LEVEL", startX + 20, 170);
-        if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+        if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
             g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 22));
             g.setColor(new Color(0, 255, 255));
-            g.drawString(gameEngine.getTutorialLevel() + " / 3", startX + 20, 195);
+            g.drawString(targetEngine.getTutorialLevel() + " / 3", startX + 20, 195);
         } else {
             g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 20));
-            g.drawString(gameEngine.getDifficulty().getLabel(), startX + 20, 195);
+            g.drawString(targetEngine.getDifficulty().getLabel(), startX + 20, 195);
 
             // Draw Sprint score in small font on the side
-            if (gameEngine.getGameMode() == GameMode.SPRINT) {
+            if (targetEngine.getGameMode() == GameMode.SPRINT) {
                 g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
                 g.setColor(new Color(180, 180, 180));
-                g.drawString("Score: " + gameEngine.getScore(), startX + 110, 193);
+                g.drawString("Score: " + targetEngine.getScore(), startX + 110, 193);
             }
         }
         g.setColor(Color.WHITE);
@@ -1859,7 +2120,7 @@ public class GamePanel extends JPanel {
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
         g.drawString("NEXT", nextBoxX + 8, boxY + 18);
 
-        Piece nextPiece = gameEngine.getNextPiece();
+        Piece nextPiece = targetEngine.getNextPiece();
         if (nextPiece != null) {
             drawCenteredPiece(g, nextPiece.getType(), nextBoxX, boxY + 20, boxW, boxH - 22);
         }
@@ -1875,7 +2136,7 @@ public class GamePanel extends JPanel {
         g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 12));
         g.drawString("HOLD", holdBoxX + 8, boxY + 18);
 
-        Piece heldPiece = gameEngine.getHeldPiece();
+        Piece heldPiece = targetEngine.getHeldPiece();
         if (heldPiece != null) {
             drawCenteredPiece(g, heldPiece.getType(), holdBoxX, boxY + 20, boxW, boxH - 22);
         } else {
@@ -1885,14 +2146,38 @@ public class GamePanel extends JPanel {
             g.drawString("[Empty]", holdBoxX + (boxW - emptyW) / 2, boxY + 20 + (boxH - 22)/2 + 4);
         }
 
-        // 5. Draw Leaderboard or Tutorial Hints
-        if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+        // 5. Draw Leaderboard or PVP info
+        if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
             drawTutorialHints(g, startX + 15, 330);
+        } else if (targetEngine.getGameMode() == GameMode.PVP) {
+            // Draw PvP stats!
+            int statsX = startX + 15;
+            int statsY = 320;
+            int statsW = 170;
+            int statsH = 160;
+            
+            // Draw card background
+            g2d.setColor(new Color(255, 255, 255, 10));
+            g2d.fillRoundRect(statsX, statsY, statsW, statsH, 8, 8);
+            g2d.setColor(new Color(255, 255, 255, 30));
+            g2d.drawRoundRect(statsX, statsY, statsW, statsH, 8, 8);
+            
+            g2d.setColor(new Color(0, 255, 255));
+            g2d.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 14));
+            String playerTitle = (targetEngine.getPlayerNum() == 1) ? "PLAYER 1 (WASD)" : "PLAYER 2 (ARROWS)";
+            g2d.drawString(playerTitle, statsX + 10, statsY + 22);
+            
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
+            g2d.drawString("Lines Cleared: " + targetEngine.getTotalLinesCleared(), statsX + 10, statsY + 50);
+            g2d.drawString("T-Spins: " + targetEngine.getTSpins(), statsX + 10, statsY + 75);
+            g2d.drawString("Max Combo: " + targetEngine.getMaxCombo(), statsX + 10, statsY + 100);
+            g2d.drawString("Pieces: " + targetEngine.getPiecesSpawned(), statsX + 10, statsY + 125);
         } else {
             drawLeaderboard(g, startX + 15, 330);
 
             // 6. AI Autoplay Status Overlay / Score Disqualification Warning
-            if (gameEngine.isAiPlay()) {
+            if (targetEngine.isAiPlay()) {
                 int aiX = startX + 15;
                 int aiY = 405;
                 int aiW = 170;
@@ -1921,7 +2206,7 @@ public class GamePanel extends JPanel {
                 g2d.setColor(new Color(185, 175, 200));
                 g2d.drawString("AI is playing the game.", aiX + 15, aiY + 44);
                 g2d.drawString("Press [A] to manual control", aiX + 15, aiY + 59);
-            } else if (gameEngine.hasUsedAiThisSession()) {
+            } else if (targetEngine.hasUsedAiThisSession()) {
                 int warnX = startX + 15;
                 int warnY = 405;
                 int warnW = 170;
@@ -2151,9 +2436,14 @@ public class GamePanel extends JPanel {
 
     // Spawns particles for row clears
     public void spawnRowClearParticles(int gridRow, Color[] rowColors) {
+        spawnRowClearParticles(gridRow, rowColors, 1);
+    }
+
+    public void spawnRowClearParticles(int gridRow, Color[] rowColors, int playerNum) {
         int py = gridRow * TILE_SIZE + TILE_SIZE / 2;
         Random rand = new Random();
-        synchronized (particles) {
+        synchronized (playerNum == 2 ? particles2 : particles) {
+            List<Particle> targetList = (playerNum == 2) ? particles2 : particles;
             for (int col = 0; col < COLS; col++) {
                 int px = col * TILE_SIZE + TILE_SIZE / 2;
                 Color colColor = rowColors[col];
@@ -2168,7 +2458,7 @@ public class GamePanel extends JPanel {
                     float decay = 0.015f + rand.nextFloat() * 0.02f;
                     int size = 3 + rand.nextInt(5);
                     
-                    particles.add(new Particle(px, py, colColor, size, angle, speed, decay));
+                    targetList.add(new Particle(px, py, colColor, size, angle, speed, decay));
                 }
             }
         }
@@ -2179,10 +2469,15 @@ public class GamePanel extends JPanel {
 
     // Spawns particles when a piece lands/hard drops
     public void spawnDropParticles(Piece piece) {
+        spawnDropParticles(piece, 1);
+    }
+
+    public void spawnDropParticles(Piece piece, int playerNum) {
         if (piece == null) return;
         Color color = piece.getType().getColor();
         Random rand = new Random();
-        synchronized (particles) {
+        synchronized (playerNum == 2 ? particles2 : particles) {
+            List<Particle> targetList = (playerNum == 2) ? particles2 : particles;
             for (int[] coord : piece.getAbsoluteCoords()) {
                 int col = coord[0];
                 int row = coord[1];
@@ -2197,7 +2492,7 @@ public class GamePanel extends JPanel {
                     float decay = 0.035f + rand.nextFloat() * 0.025f;
                     int size = 2 + rand.nextInt(3);
                     
-                    particles.add(new Particle(px, py, color, size, angle, speed, decay));
+                    targetList.add(new Particle(px, py, color, size, angle, speed, decay));
                 }
             }
         }
@@ -2209,9 +2504,19 @@ public class GamePanel extends JPanel {
 
     // Triggers a screenshake with intensity and duration
     public void triggerScreenshake(int intensity, int durationMs) {
-        this.shakeIntensity = intensity;
-        this.shakeDuration = durationMs;
-        this.shakeEndTime = System.currentTimeMillis() + durationMs;
+        triggerScreenshake(intensity, durationMs, 1);
+    }
+
+    public void triggerScreenshake(int intensity, int durationMs, int playerNum) {
+        if (playerNum == 2) {
+            this.shakeIntensity2 = intensity;
+            this.shakeDuration2 = durationMs;
+            this.shakeEndTime2 = System.currentTimeMillis() + durationMs;
+        } else {
+            this.shakeIntensity = intensity;
+            this.shakeDuration = durationMs;
+            this.shakeEndTime = System.currentTimeMillis() + durationMs;
+        }
         if (!animationTimer.isRunning()) {
             animationTimer.start();
         }
@@ -2219,7 +2524,15 @@ public class GamePanel extends JPanel {
 
     // Trigger Perfect Clear visual explosion and text display
     public void triggerPerfectClear() {
-        this.perfectClearStartTime = System.currentTimeMillis();
+        triggerPerfectClear(1);
+    }
+
+    public void triggerPerfectClear(int playerNum) {
+        if (playerNum == 2) {
+            this.perfectClearStartTime2 = System.currentTimeMillis();
+        } else {
+            this.perfectClearStartTime = System.currentTimeMillis();
+        }
 
         int boardW = COLS * TILE_SIZE;
         int boardH = ROWS * TILE_SIZE;
@@ -2227,7 +2540,8 @@ public class GamePanel extends JPanel {
         int cy = boardH / 2;
 
         Random rand = new Random();
-        synchronized (particles) {
+        synchronized (playerNum == 2 ? particles2 : particles) {
+            List<Particle> targetList = (playerNum == 2) ? particles2 : particles;
             for (int i = 0; i < 80; i++) {
                 double angle = rand.nextDouble() * Math.PI * 2;
                 double speed = 1.0 + rand.nextDouble() * 5.0;
@@ -2235,12 +2549,12 @@ public class GamePanel extends JPanel {
                 int size = 5 + rand.nextInt(8);
                 Color goldColor = new Color(255, 200 + rand.nextInt(56), 0); // golden colors
 
-                particles.add(new Particle(cx, cy, goldColor, size, angle, speed, decay, 1));
+                targetList.add(new Particle(cx, cy, goldColor, size, angle, speed, decay, 1));
             }
         }
 
         // Heavy screenshake shockwave!
-        triggerScreenshake(12, 400);
+        triggerScreenshake(12, 400, playerNum);
 
         if (!animationTimer.isRunning()) {
             animationTimer.start();
@@ -2264,7 +2578,11 @@ public class GamePanel extends JPanel {
 
     // Render expanding gold ring and pulsing golden text for Perfect Clear
     private void drawPerfectClearOverlay(Graphics2D g2d) {
-        long elapsed = System.currentTimeMillis() - perfectClearStartTime;
+        drawPerfectClearOverlay(g2d, perfectClearStartTime);
+    }
+
+    private void drawPerfectClearOverlay(Graphics2D g2d, long startTime) {
+        long elapsed = System.currentTimeMillis() - startTime;
         if (elapsed >= PERFECT_CLEAR_DURATION) {
             return;
         }
@@ -2327,12 +2645,16 @@ public class GamePanel extends JPanel {
 
     // Draw active particles in the grid area
     private void drawParticles(Graphics g) {
-        synchronized (particles) {
-            if (particles.isEmpty()) return;
+        drawParticles(g, particles);
+    }
+
+    private void drawParticles(Graphics g, List<Particle> particlesList) {
+        synchronized (particlesList) {
+            if (particlesList.isEmpty()) return;
             Graphics2D g2d = (Graphics2D) g.create();
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             
-            for (Particle p : particles) {
+            for (Particle p : particlesList) {
                 if (p.life <= 0) continue;
                 g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, p.life));
                 g2d.setColor(p.color);
@@ -2585,9 +2907,9 @@ public class GamePanel extends JPanel {
         g2d.drawString(titleText, titleX, titleY);
 
         int cardW = 340;
-        int cardH = 360;
+        int cardH = 405;
         int cardX = (getWidth() - cardW) / 2;
-        int cardY = 180;
+        int cardY = 170;
 
         // Draw card background
         g2d.setColor(new Color(255, 255, 255, 15));
@@ -2610,11 +2932,11 @@ public class GamePanel extends JPanel {
 
         java.awt.Point mousePos = getMousePosition();
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 6; i++) {
             int y = startY + i * gap;
-            if (i == 4) {
+            if (i == 5) {
                 // BACK button offset
-                y = cardY + 295;
+                y = cardY + 345;
             }
 
             modeOptionBounds[i] = new Rectangle(btnX, y, btnW, btnH);
@@ -2651,6 +2973,12 @@ public class GamePanel extends JPanel {
                     fillCol = new Color(255, 140, 0, isSelected ? 45 : 20);
                     break;
                 case 4:
+                    label = "PVP BATTLE";
+                    baseColor = new Color(255, 60, 60);
+                    selectColor = Color.WHITE;
+                    fillCol = new Color(255, 60, 60, isSelected ? 45 : 20);
+                    break;
+                case 5:
                 default:
                     label = "BACK";
                     baseColor = new Color(160, 160, 180);

@@ -4,5 +4,6 @@ public enum GameMode {
     ENDLESS,
     SPRINT,
     ULTRA,
-    SURVIVAL
+    SURVIVAL,
+    PVP
 }

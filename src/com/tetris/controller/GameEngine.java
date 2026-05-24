@@ -61,6 +61,12 @@ public class GameEngine {
     private Piece nextPiece;
     private Piece heldPiece = null;
     private boolean canHoldThisTurn = true;
+    
+    // PVP Mode fields
+    private GameEngine opponent = null;
+    private int playerNum = 1;
+    private int pvpWinner = 0; // 0: none, 1: P1, 2: P2
+    private InputHandler inputHandler = null;
     private Timer gameLoop;
     private Timer secondTimer;
     private boolean isGameOver = false;
@@ -199,6 +205,7 @@ public class GameEngine {
         tetrisClears = 0;
         tSpins = 0;
         maxCombo = 0;
+        pvpWinner = 0;
         nextPiece = generateRandomPiece();
         spawnNewPiece();
         usedAiThisSession = false;
@@ -213,6 +220,52 @@ public class GameEngine {
         secondTimer.stop();
         secondTimer.start();
 
+        if (gameMode == GameMode.PVP) {
+            playerNum = 1;
+            if (opponent == null) {
+                Board board2 = new Board();
+                opponent = new GameEngine(board2, panel);
+                opponent.setOpponent(this);
+                opponent.setPlayerNum(2);
+            }
+            panel.setGameEngine2(opponent);
+            if (inputHandler != null) {
+                inputHandler.setEngine2(opponent);
+            }
+
+            // Sync state and mode for opponent
+            opponent.setGameMode(GameMode.PVP);
+            opponent.gameState = GameState.PLAYING;
+            opponent.pvpWinner = 0;
+            opponent.board.clear();
+            opponent.score = 0;
+            opponent.secondsElapsed = 0;
+            opponent.comboCount = -1;
+            opponent.isGameOver = false;
+            opponent.isVictory = false;
+            opponent.isPaused = false;
+            opponent.heldPiece = null;
+            opponent.canHoldThisTurn = true;
+            opponent.piecesSpawned = 0;
+            opponent.totalActions = 0;
+            opponent.totalLinesCleared = 0;
+            opponent.tetrisClears = 0;
+            opponent.tSpins = 0;
+            opponent.maxCombo = 0;
+            opponent.nextPiece = opponent.generateRandomPiece();
+            opponent.spawnNewPiece();
+
+            opponent.gameLoop.stop();
+            opponent.gameLoop.setDelay(opponent.difficulty.getFallDelayMs());
+            opponent.gameLoop.setInitialDelay(opponent.difficulty.getFallDelayMs());
+            opponent.gameLoop.start();
+
+            opponent.secondTimer.stop();
+            opponent.secondTimer.start();
+        }
+
+        panel.updateWindowSize();
+
         // Play BGM
         SoundManager.playBGM("/resources/bgm.wav");
 
@@ -226,7 +279,14 @@ public class GameEngine {
         setAiPlay(false); // Stop AI Autoplay
         gameState = GameState.MENU;
         SoundManager.stopBGM();
+
+        if (gameMode == GameMode.PVP && opponent != null && opponent.getGameState() != GameState.MENU) {
+            opponent.returnToMenu();
+        }
+
         panel.resetUIState();
+        panel.setGameEngine2(null);
+        panel.updateWindowSize();
         panel.repaint();
     }
 
@@ -252,6 +312,9 @@ public class GameEngine {
             if (aiPlay && aiTimer != null && !aiTimer.isRunning()) {
                 aiTimer.start();
             }
+        }
+        if (gameMode == GameMode.PVP && opponent != null && opponent.isPaused() != isPaused) {
+            opponent.togglePause();
         }
         panel.repaint();
     }
@@ -394,8 +457,8 @@ public class GameEngine {
                 if (lines > 0) {
                     java.awt.Color[] rowColors = new java.awt.Color[Board.COLS];
                     java.util.Arrays.fill(rowColors, Tetromino.T.getColor());
-                    panel.spawnRowClearParticles(popupRow, rowColors);
-                    panel.triggerScreenshake(lines * 3, 200);
+                    panel.spawnRowClearParticles(popupRow, rowColors, playerNum);
+                    panel.triggerScreenshake(lines * 3, 200, playerNum);
                 }
                 tutorialSuccess();
             } else {
@@ -427,7 +490,7 @@ public class GameEngine {
                 for (int c = 0; c < Board.COLS; c++) {
                     rowColors[c] = grid[r][c];
                 }
-                panel.spawnRowClearParticles(r, rowColors);
+                panel.spawnRowClearParticles(r, rowColors, playerNum);
             }
         }
 
@@ -448,6 +511,35 @@ public class GameEngine {
             SoundManager.playSFX("/resources/clear.wav");
         } else {
             comboCount = -1;
+        }
+
+        // PVP Garbage Generation
+        if (gameMode == GameMode.PVP && opponent != null && (lines > 0 || isTSpin)) {
+            int garbageToSend = 0;
+            if (isTSpin) {
+                if (tSpinType == TSpinType.REGULAR) {
+                    switch (lines) {
+                        case 0: garbageToSend = 1; break;
+                        case 1: garbageToSend = 2; break;
+                        case 2: garbageToSend = 4; break;
+                        case 3: garbageToSend = 6; break;
+                    }
+                } else if (tSpinType == TSpinType.MINI) {
+                    garbageToSend = (lines >= 1) ? lines : 1;
+                }
+            } else {
+                switch (lines) {
+                    case 2: garbageToSend = 1; break;
+                    case 3: garbageToSend = 2; break;
+                    case 4: garbageToSend = 4; break;
+                }
+            }
+            if (comboCount >= 1) {
+                garbageToSend += comboCount;
+            }
+            if (garbageToSend > 0) {
+                opponent.receiveGarbage(garbageToSend);
+            }
         }
 
         // Check for Perfect Clear
@@ -487,7 +579,7 @@ public class GameEngine {
                 duration += 50;
             }
             if (intensity > 0) {
-                panel.triggerScreenshake(intensity, duration);
+                panel.triggerScreenshake(intensity, duration, playerNum);
             }
         }
 
@@ -509,10 +601,10 @@ public class GameEngine {
             }
             
             updateScore(points);
-            panel.addScorePopup(popupCol, popupRow, points, lines, tSpinType, comboCount);
+            panel.addScorePopup(popupCol, popupRow, points, lines, tSpinType, comboCount, playerNum);
 
             if (isPerfectClear) {
-                panel.triggerPerfectClear();
+                panel.triggerPerfectClear(playerNum);
             }
         }
 
@@ -536,6 +628,31 @@ public class GameEngine {
 
         spawnNewPiece(); // Spawn
         canHoldThisTurn = true; // Reset hold status for the next turn
+    }
+
+    public void receiveGarbage(int garbageLinesCount) {
+        if (isGameOver || isPaused) return;
+
+        // Generate garbage lines on this board
+        java.util.Random rand = new java.util.Random();
+        for (int i = 0; i < garbageLinesCount; i++) {
+            int holeCol = rand.nextInt(Board.COLS);
+            board.addGarbageLine(holeCol);
+        }
+
+        // If current piece collides and push it up if possible
+        if (currentPiece != null && !board.isValidMove(currentPiece)) {
+            currentPiece.move(-1, 0); // push up
+            if (!board.isValidMove(currentPiece)) {
+                currentPiece.move(1, 0); // push back if failed
+            }
+        }
+
+        // Trigger screenshake on this player's screen!
+        if (panel != null) {
+            panel.triggerScreenshake(garbageLinesCount * 2, 150, playerNum);
+            panel.repaint();
+        }
     }
 
     private TSpinType checkTSpinType() {
@@ -703,6 +820,19 @@ public class GameEngine {
                 secondTimer.stop();
             }
             SoundManager.stopBGM();
+
+            if (gameMode == GameMode.PVP && opponent != null) {
+                opponent.isGameOver = true;
+                opponent.isVictory = true;
+                int winner = (playerNum == 1) ? 2 : 1;
+                this.pvpWinner = winner;
+                opponent.pvpWinner = winner;
+
+                if (opponent.gameLoop != null) opponent.gameLoop.stop();
+                if (opponent.secondTimer != null) opponent.secondTimer.stop();
+                opponent.setAiPlay(false);
+            }
+
             recordFinalScore();
             System.out.println("Game Over!");
         }
@@ -779,6 +909,39 @@ public class GameEngine {
         SoundManager.pauseBGM();
 
         panel.repaint();
+    }
+
+    // Getters and Setters for PVP and Board state
+    public Board getBoard() {
+        return board;
+    }
+
+    public Piece getCurrentPiece() {
+        return currentPiece;
+    }
+
+    public void setOpponent(GameEngine opponent) {
+        this.opponent = opponent;
+    }
+
+    public GameEngine getOpponent() {
+        return opponent;
+    }
+
+    public void setPlayerNum(int playerNum) {
+        this.playerNum = playerNum;
+    }
+
+    public int getPlayerNum() {
+        return playerNum;
+    }
+
+    public void setInputHandler(InputHandler inputHandler) {
+        this.inputHandler = inputHandler;
+    }
+
+    public int getPvpWinner() {
+        return pvpWinner;
     }
 
     // Getters for UI
