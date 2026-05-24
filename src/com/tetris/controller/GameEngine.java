@@ -440,7 +440,7 @@ public class GameEngine {
         // 2. Check collision
         if (!board.isValidMove(currentPiece)) { // Collision
             currentPiece.move(-1, 0); // Reposition (move back up)
-            panel.spawnDropParticles(currentPiece); // Landing particles
+            panel.spawnDropParticles(currentPiece, playerNum); // Landing particles
             
             // Instead of immediate freeze, start lock delay
             if (!isLocking) {
@@ -817,7 +817,9 @@ public class GameEngine {
         nextPiece = nextPieces.get(0);
 
         // Update view
-        panel.setCurrentPiece(currentPiece);
+        if (playerNum == 1) {
+            panel.setCurrentPiece(currentPiece);
+        }
 
         // Restart gravity timer to give player a full tick window
         if (gameLoop != null) {
@@ -941,7 +943,9 @@ public class GameEngine {
         this.lastMoveWasRotation = false;
 
         // Sync view with restored piece
-        panel.setCurrentPiece(currentPiece);
+        if (playerNum == 1) {
+            panel.setCurrentPiece(currentPiece);
+        }
 
         // Restore board grid
         Color[][] currentGrid = board.getGrid();
@@ -970,6 +974,10 @@ public class GameEngine {
     // Getters and Setters for PVP and Board state
     public Board getBoard() {
         return board;
+    }
+
+    public GamePanel getPanel() {
+        return panel;
     }
 
     public Piece getCurrentPiece() {
@@ -1129,7 +1137,11 @@ public class GameEngine {
             }
         } else if (gameState == GameState.MENU) {
             if (panel.isShowSettingsInMenu()) {
-                panel.setShowSettingsInMenu(false);
+                if (panel.isShowControlSettings()) {
+                    panel.setShowControlSettings(false);
+                } else {
+                    panel.setShowSettingsInMenu(false);
+                }
             } else if (panel.isShowDifficultySelectInMenu()) {
                 panel.setShowDifficultySelectInMenu(false);
                 panel.setShowModeSelectInMenu(true); // Go back to Mode Select
@@ -1272,7 +1284,7 @@ public class GameEngine {
 
         int endRow = currentPiece.getRow();
         if (endRow > startRow) {
-            panel.spawnDropParticles(currentPiece);
+            panel.spawnDropParticles(currentPiece, playerNum);
             // Do NOT set lastMoveWasRotation = false here, so T-Spins can be triggered on Hard Drop
         }
 
@@ -1305,7 +1317,9 @@ public class GameEngine {
             
             // Reset current piece properties to spawn at the top
             currentPiece = temp;
-            panel.setCurrentPiece(currentPiece);
+            if (playerNum == 1) {
+                panel.setCurrentPiece(currentPiece);
+            }
             
             // Restart the gravity timer
             if (gameLoop != null) {

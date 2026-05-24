@@ -18,6 +18,7 @@ import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.KeyEvent;
 // import java.awt.event.MouseMotionAdapter;
 import java.util.List;
 import java.util.ArrayList;
@@ -83,6 +84,18 @@ public class GamePanel extends JPanel {
     private Rectangle menuSettingsBackButtonBounds = new Rectangle();
     private Rectangle menuSettingsThemeBounds = new Rectangle();
     private Rectangle menuSettingsPreviewCountBounds = new Rectangle();
+    private Rectangle menuSettingsControlBounds = new Rectangle();
+    private Rectangle controlBackButtonBounds = new Rectangle();
+    private Rectangle controlResetButtonBounds = new Rectangle();
+    private Rectangle controlP1TabBounds = new Rectangle();
+    private Rectangle controlP2TabBounds = new Rectangle();
+    private Rectangle controlDasBounds = new Rectangle();
+    private Rectangle controlArrBounds = new Rectangle();
+    private Rectangle controlSdrBounds = new Rectangle();
+    private final Rectangle[] controlKeyBounds = new Rectangle[6];
+    private boolean showControlSettings = false;
+    private int rebindingPlayer = 1;
+    private String rebindingAction = null;
     private int nextPiecesCount = 3;
     private boolean isDraggingBGM = false;
     private boolean isDraggingSFX = false;
@@ -399,6 +412,68 @@ public class GamePanel extends JPanel {
                 com.tetris.controller.GameEngine.GameState state = gameEngine.getGameState();
                 if (state == com.tetris.controller.GameEngine.GameState.MENU) {
                     if (showSettingsInMenu) {
+                        if (showControlSettings) {
+                            // Clicks inside control settings
+                            if (controlBackButtonBounds != null && controlBackButtonBounds.contains(e.getPoint())) {
+                                showControlSettings = false;
+                                rebindingAction = null;
+                                repaint();
+                                return;
+                            }
+                            if (controlResetButtonBounds != null && controlResetButtonBounds.contains(e.getPoint())) {
+                                com.tetris.controller.InputHandler.resetToDefault();
+                                rebindingAction = null;
+                                repaint();
+                                return;
+                            }
+                            if (controlP1TabBounds != null && controlP1TabBounds.contains(e.getPoint())) {
+                                rebindingPlayer = 1;
+                                rebindingAction = null;
+                                repaint();
+                                return;
+                            }
+                            if (controlP2TabBounds != null && controlP2TabBounds.contains(e.getPoint())) {
+                                rebindingPlayer = 2;
+                                rebindingAction = null;
+                                repaint();
+                                return;
+                            }
+                            // DAS Click
+                            if (controlDasBounds != null && controlDasBounds.contains(e.getPoint())) {
+                                int current = com.tetris.controller.InputHandler.getDasDelayMs();
+                                int next = (current >= 300) ? 100 : current + 20;
+                                com.tetris.controller.InputHandler.setDasDelayMs(next);
+                                repaint();
+                                return;
+                            }
+                            // ARR Click
+                            if (controlArrBounds != null && controlArrBounds.contains(e.getPoint())) {
+                                int current = com.tetris.controller.InputHandler.getArrRateMs();
+                                int next = (current >= 100) ? 10 : current + 10;
+                                com.tetris.controller.InputHandler.setArrRateMs(next);
+                                repaint();
+                                return;
+                            }
+                            // SDR Click
+                            if (controlSdrBounds != null && controlSdrBounds.contains(e.getPoint())) {
+                                int current = com.tetris.controller.InputHandler.getSoftDropIntervalMs();
+                                int next = (current >= 100) ? 10 : current + 10;
+                                com.tetris.controller.InputHandler.setSoftDropIntervalMs(next);
+                                repaint();
+                                return;
+                            }
+                            // Key Binding Clicks
+                            String[] actions = { "LEFT", "RIGHT", "ROTATE", "DOWN", "DROP", "HOLD" };
+                            for (int i = 0; i < 6; i++) {
+                                if (controlKeyBounds[i] != null && controlKeyBounds[i].contains(e.getPoint())) {
+                                    rebindingAction = actions[i];
+                                    repaint();
+                                    return;
+                                }
+                            }
+                            return; // swallow other clicks while in control settings
+                        }
+
                         // BACK button click
                         if (menuSettingsBackButtonBounds != null && menuSettingsBackButtonBounds.contains(e.getPoint())) {
                             showSettingsInMenu = false;
@@ -417,6 +492,15 @@ public class GamePanel extends JPanel {
                         // PREVIEW COUNT button click
                         if (menuSettingsPreviewCountBounds != null && menuSettingsPreviewCountBounds.contains(e.getPoint())) {
                             nextPiecesCount = nextPiecesCount % 5 + 1;
+                            repaint();
+                            return;
+                        }
+
+                        // CONTROL SETTINGS button click
+                        if (menuSettingsControlBounds != null && menuSettingsControlBounds.contains(e.getPoint())) {
+                            showControlSettings = true;
+                            rebindingPlayer = 1;
+                            rebindingAction = null;
                             repaint();
                             return;
                         }
@@ -700,9 +784,18 @@ public class GamePanel extends JPanel {
         showSettingsInPause = false;
         showDifficultySelectInMenu = false;
         showModeSelectInMenu = false;
+        showControlSettings = false;
+        rebindingAction = null;
         selectedPauseIndex = 0;
         repaint();
     }
+
+    public boolean isShowControlSettings() { return showControlSettings; }
+    public void setShowControlSettings(boolean val) { this.showControlSettings = val; }
+    public String getRebindingAction() { return rebindingAction; }
+    public void setRebindingAction(String val) { this.rebindingAction = val; }
+    public int getRebindingPlayer() { return rebindingPlayer; }
+    public void setRebindingPlayer(int val) { this.rebindingPlayer = val; }
 
     // Set the current piece
     public void setCurrentPiece(Piece piece) {
@@ -1099,7 +1192,11 @@ public class GamePanel extends JPanel {
         }
 
         if (showSettingsInMenu) {
-            drawMenuSettings(g2d);
+            if (showControlSettings) {
+                drawControlSettings(g2d);
+            } else {
+                drawMenuSettings(g2d);
+            }
             return;
         }
 
@@ -3134,7 +3231,7 @@ public class GamePanel extends JPanel {
         g2d.drawString(titleText, titleX, titleY);
 
         int cardW = 340;
-        int cardH = 335;
+        int cardH = 385;
         int cardX = (getWidth() - cardW) / 2;
         int cardY = 180;
 
@@ -3193,6 +3290,30 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(previewBtnX, previewBtnY, previewBtnW, previewBtnH, 10, 10);
         g2d.drawString(previewText, previewBtnX + (previewBtnW - fmPreview.stringWidth(previewText)) / 2, previewBtnY + 24);
 
+        // CONTROL SETTINGS button
+        String controlBtnText = "控制設定";
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
+        FontMetrics fmControl = g2d.getFontMetrics();
+        int ctrlBtnW = 240;
+        int ctrlBtnH = 36;
+        int ctrlBtnX = (getWidth() - ctrlBtnW) / 2;
+        int ctrlBtnY = cardY + 245;
+
+        menuSettingsControlBounds = new Rectangle(ctrlBtnX, ctrlBtnY, ctrlBtnW, ctrlBtnH);
+        boolean hoverControl = (mousePos != null && menuSettingsControlBounds.contains(mousePos));
+
+        if (hoverControl) {
+            g2d.setColor(new Color(255, 255, 255, 40));
+            g2d.fillRoundRect(ctrlBtnX, ctrlBtnY, ctrlBtnW, ctrlBtnH, 10, 10);
+            g2d.setColor(Color.WHITE);
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 15));
+            g2d.fillRoundRect(ctrlBtnX, ctrlBtnY, ctrlBtnW, ctrlBtnH, 10, 10);
+            g2d.setColor(new Color(200, 200, 200));
+        }
+        g2d.drawRoundRect(ctrlBtnX, ctrlBtnY, ctrlBtnW, ctrlBtnH, 10, 10);
+        g2d.drawString(controlBtnText, ctrlBtnX + (ctrlBtnW - fmControl.stringWidth(controlBtnText)) / 2, ctrlBtnY + 24);
+
         // BACK button
         String backText = "返回";
         g2d.setFont(new Font("SansSerif", Font.BOLD, 18));
@@ -3200,7 +3321,7 @@ public class GamePanel extends JPanel {
         int btnW = 120;
         int btnH = 36;
         int btnX = (getWidth() - btnW) / 2;
-        int btnY = cardY + 265;
+        int btnY = cardY + 315;
 
         menuSettingsBackButtonBounds = new Rectangle(btnX, btnY, btnW, btnH);
         boolean hoverBack = (mousePos != null && menuSettingsBackButtonBounds.contains(mousePos));
@@ -3648,5 +3769,232 @@ public class GamePanel extends JPanel {
             case MIDNIGHT_STEALTH: return "暗夜幽影";
             default: return theme.getLabel();
         }
+    }
+    /**
+     * 繪製雙欄控制設定卡片
+     */
+    private void drawControlSettings(Graphics2D g2d) {
+        java.awt.Point mousePos = getMousePosition();
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 42));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        String titleText = "控制設定";
+        int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
+        int titleY = 100;
+
+        g2d.setColor(new Color(0, 255, 255, 70));
+        g2d.drawString(titleText, titleX + 2, titleY + 2);
+        g2d.setColor(new Color(0, 255, 255));
+        g2d.drawString(titleText, titleX, titleY);
+
+        int cardW = 440;
+        int cardH = 400;
+        int cardX = (getWidth() - cardW) / 2;
+        int cardY = 135;
+
+        // Draw card background
+        g2d.setColor(new Color(255, 255, 255, 15));
+        g2d.fillRoundRect(cardX, cardY, cardW, cardH, 15, 15);
+        g2d.setColor(new Color(255, 255, 255, 40));
+        g2d.drawRoundRect(cardX, cardY, cardW, cardH, 15, 15);
+
+        // Column 1: Sensitivity & Gamepad (X starts around cardX + 20)
+        int col1X = cardX + 20;
+        int col1W = 185;
+
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
+        g2d.setColor(new Color(0, 255, 255));
+        g2d.drawString("靈敏度設定", col1X, cardY + 35);
+
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        g2d.setColor(Color.WHITE);
+
+        // DAS Button
+        int dasVal = com.tetris.controller.InputHandler.getDasDelayMs();
+        String dasText = "橫移延遲 (DAS): " + dasVal + " ms";
+        int btnH = 26;
+        controlDasBounds = new Rectangle(col1X, cardY + 50, col1W, btnH);
+        boolean hoverDas = (mousePos != null && controlDasBounds.contains(mousePos));
+        drawControlSubButton(g2d, dasText, controlDasBounds, hoverDas);
+
+        // ARR Button
+        int arrVal = com.tetris.controller.InputHandler.getArrRateMs();
+        String arrText = "橫移重複 (ARR): " + arrVal + " ms";
+        controlArrBounds = new Rectangle(col1X, cardY + 90, col1W, btnH);
+        boolean hoverArr = (mousePos != null && controlArrBounds.contains(mousePos));
+        drawControlSubButton(g2d, arrText, controlArrBounds, hoverArr);
+
+        // SDR Button
+        int sdrVal = com.tetris.controller.InputHandler.getSoftDropIntervalMs();
+        String sdrText = "軟降速度 (SDR): " + sdrVal + " ms";
+        controlSdrBounds = new Rectangle(col1X, cardY + 130, col1W, btnH);
+        boolean hoverSdr = (mousePos != null && controlSdrBounds.contains(mousePos));
+        drawControlSubButton(g2d, sdrText, controlSdrBounds, hoverSdr);
+
+        // Gamepad Guide Box
+        int guideY = cardY + 185;
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 15));
+        g2d.setColor(new Color(255, 160, 122)); // Coral Title
+        g2d.drawString("手把支援指引", col1X, guideY + 15);
+
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        g2d.setColor(new Color(180, 180, 195));
+        g2d.drawString("本遊戲基於純 Java 開發，", col1X, guideY + 38);
+        g2d.drawString("如需使用手把玩，推薦下載", col1X, guideY + 56);
+        g2d.drawString("免費的第三方按鍵映射軟體", col1X, guideY + 74);
+        g2d.drawString("如 [JoyToKey] 或 Steam 映射", col1X, guideY + 92);
+        g2d.drawString("將手把按鈕綁定到對應鍵盤。", col1X, guideY + 110);
+
+        // Column 2: Key Rebinding (X starts around cardX + 235)
+        int col2X = cardX + 235;
+        int col2W = 185;
+
+        // Player Tab Buttons (P1 / P2)
+        controlP1TabBounds = new Rectangle(col2X, cardY + 15, col2W / 2 - 2, 28);
+        controlP2TabBounds = new Rectangle(col2X + col2W / 2 + 2, cardY + 15, col2W / 2 - 2, 28);
+
+        boolean hoverP1 = (mousePos != null && controlP1TabBounds.contains(mousePos));
+        boolean hoverP2 = (mousePos != null && controlP2TabBounds.contains(mousePos));
+
+        // Draw Tabs
+        drawTabButton(g2d, "玩家 1", controlP1TabBounds, rebindingPlayer == 1, hoverP1);
+        drawTabButton(g2d, "玩家 2", controlP2TabBounds, rebindingPlayer == 2, hoverP2);
+
+        // Action Label and Buttons List
+        String[] actions = { "LEFT", "RIGHT", "ROTATE", "DOWN", "DROP", "HOLD" };
+        String[] labels = { "向左移動", "向右移動", "順時針轉", "軟降加速", "硬降直接", "暫存方塊" };
+
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        for (int i = 0; i < 6; i++) {
+            int y = cardY + 55 + i * 36;
+            controlKeyBounds[i] = new Rectangle(col2X + 75, y, col2W - 75, btnH);
+            
+            // Draw action description label
+            g2d.setColor(Color.WHITE);
+            g2d.drawString(labels[i], col2X, y + 17);
+
+            // Get Key Name
+            int code = getRegisteredKeyCode(rebindingPlayer, actions[i]);
+            String keyText = KeyEvent.getKeyText(code);
+
+            boolean isThisRebinding = (rebindingPlayer == getRebindingPlayer() && actions[i].equals(getRebindingAction()));
+            if (isThisRebinding) {
+                keyText = (System.currentTimeMillis() % 1000 < 500) ? "請按按鍵..." : "";
+            }
+
+            boolean hoverKey = (mousePos != null && controlKeyBounds[i].contains(mousePos));
+            drawKeyRebindButton(g2d, keyText, controlKeyBounds[i], hoverKey, isThisRebinding);
+        }
+
+        // Bottom Row: Reset and Back Buttons
+        int bottomY = cardY + 345;
+        controlResetButtonBounds = new Rectangle(cardX + 45, bottomY, 150, 34);
+        controlBackButtonBounds = new Rectangle(cardX + 245, bottomY, 150, 34);
+
+        boolean hoverReset = (mousePos != null && controlResetButtonBounds.contains(mousePos));
+        boolean hoverBack = (mousePos != null && controlBackButtonBounds.contains(mousePos));
+
+        // Draw Reset Button
+        if (hoverReset) {
+            g2d.setColor(new Color(255, 60, 60, 45));
+            g2d.fillRoundRect(controlResetButtonBounds.x, controlResetButtonBounds.y, controlResetButtonBounds.width, controlResetButtonBounds.height, 8, 8);
+            g2d.setColor(new Color(255, 100, 100));
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 10));
+            g2d.fillRoundRect(controlResetButtonBounds.x, controlResetButtonBounds.y, controlResetButtonBounds.width, controlResetButtonBounds.height, 8, 8);
+            g2d.setColor(new Color(255, 80, 80));
+        }
+        g2d.drawRoundRect(controlResetButtonBounds.x, controlResetButtonBounds.y, controlResetButtonBounds.width, controlResetButtonBounds.height, 8, 8);
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 14));
+        int rTextW = g2d.getFontMetrics().stringWidth("重設預設值");
+        g2d.drawString("重設預設值", controlResetButtonBounds.x + (controlResetButtonBounds.width - rTextW) / 2, bottomY + 22);
+
+        // Draw Back Button
+        if (hoverBack) {
+            g2d.setColor(new Color(255, 255, 255, 45));
+            g2d.fillRoundRect(controlBackButtonBounds.x, controlBackButtonBounds.y, controlBackButtonBounds.width, controlBackButtonBounds.height, 8, 8);
+            g2d.setColor(Color.WHITE);
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 10));
+            g2d.fillRoundRect(controlBackButtonBounds.x, controlBackButtonBounds.y, controlBackButtonBounds.width, controlBackButtonBounds.height, 8, 8);
+            g2d.setColor(new Color(200, 200, 200));
+        }
+        g2d.drawRoundRect(controlBackButtonBounds.x, controlBackButtonBounds.y, controlBackButtonBounds.width, controlBackButtonBounds.height, 8, 8);
+        int bTextW = g2d.getFontMetrics().stringWidth("返回");
+        g2d.drawString("返回", controlBackButtonBounds.x + (controlBackButtonBounds.width - bTextW) / 2, bottomY + 22);
+    }
+
+    private void drawControlSubButton(Graphics2D g2d, String text, Rectangle bounds, boolean hover) {
+        if (hover) {
+            g2d.setColor(new Color(255, 255, 255, 40));
+            g2d.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+            g2d.setColor(Color.WHITE);
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 15));
+            g2d.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+            g2d.setColor(new Color(200, 200, 200));
+        }
+        g2d.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        int textW = g2d.getFontMetrics().stringWidth(text);
+        g2d.drawString(text, bounds.x + (bounds.width - textW) / 2, bounds.y + 17);
+    }
+
+    private void drawTabButton(Graphics2D g2d, String text, Rectangle bounds, boolean active, boolean hover) {
+        if (active) {
+            g2d.setColor(new Color(0, 255, 255, 60));
+            g2d.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+            g2d.setColor(new Color(0, 255, 255));
+        } else if (hover) {
+            g2d.setColor(new Color(255, 255, 255, 30));
+            g2d.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+            g2d.setColor(Color.WHITE);
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 10));
+            g2d.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+            g2d.setColor(new Color(180, 180, 180));
+        }
+        g2d.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 12));
+        int textW = g2d.getFontMetrics().stringWidth(text);
+        g2d.drawString(text, bounds.x + (bounds.width - textW) / 2, bounds.y + 18);
+    }
+
+    private void drawKeyRebindButton(Graphics2D g2d, String text, Rectangle bounds, boolean hover, boolean active) {
+        if (active) {
+            g2d.setColor(new Color(255, 255, 0, 45)); // flashing yellow highlight
+            g2d.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+            g2d.setColor(Color.YELLOW);
+        } else if (hover) {
+            g2d.setColor(new Color(255, 255, 255, 45));
+            g2d.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+            g2d.setColor(Color.WHITE);
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 15));
+            g2d.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+            g2d.setColor(new Color(220, 220, 220));
+        }
+        g2d.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 11));
+        int textW = g2d.getFontMetrics().stringWidth(text);
+        g2d.drawString(text, bounds.x + (bounds.width - textW) / 2, bounds.y + 17);
+    }
+
+    private int getRegisteredKeyCode(int player, String action) {
+        if (player == 1) {
+            if ("LEFT".equals(action)) return com.tetris.controller.InputHandler.getP1KeyLeft();
+            if ("RIGHT".equals(action)) return com.tetris.controller.InputHandler.getP1KeyRight();
+            if ("ROTATE".equals(action)) return com.tetris.controller.InputHandler.getP1KeyRotate();
+            if ("DOWN".equals(action)) return com.tetris.controller.InputHandler.getP1KeyDown();
+            if ("DROP".equals(action)) return com.tetris.controller.InputHandler.getP1KeyDrop();
+            if ("HOLD".equals(action)) return com.tetris.controller.InputHandler.getP1KeyHold();
+        } else if (player == 2) {
+            if ("LEFT".equals(action)) return com.tetris.controller.InputHandler.getP2KeyLeft();
+            if ("RIGHT".equals(action)) return com.tetris.controller.InputHandler.getP2KeyRight();
+            if ("ROTATE".equals(action)) return com.tetris.controller.InputHandler.getP2KeyRotate();
+            if ("DOWN".equals(action)) return com.tetris.controller.InputHandler.getP2KeyDown();
+            if ("DROP".equals(action)) return com.tetris.controller.InputHandler.getP2KeyDrop();
+            if ("HOLD".equals(action)) return com.tetris.controller.InputHandler.getP2KeyHold();
+        }
+        return 0;
     }
 }

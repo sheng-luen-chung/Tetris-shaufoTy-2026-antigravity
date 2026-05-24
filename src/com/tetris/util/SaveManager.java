@@ -181,4 +181,56 @@ public class SaveManager {
         public int tSpins;
         public int maxCombo;
     }
+
+    private static final String SETTINGS_FILE_NAME = "settings.csv";
+
+    private static Path getSettingsFilePath() {
+        return Paths.get(System.getProperty("user.home"), ".tetris", SETTINGS_FILE_NAME);
+    }
+
+    public static void saveSettings(int das, int arr, int sdr, 
+                                    boolean p1Custom, int[] p1Keys, 
+                                    boolean p2Custom, int[] p2Keys) {
+        Path path = getSettingsFilePath();
+        try {
+            Files.createDirectories(path.getParent());
+            try (BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
+                writer.write("das=" + das + "\n");
+                writer.write("arr=" + arr + "\n");
+                writer.write("sdr=" + sdr + "\n");
+                writer.write("p1Custom=" + p1Custom + "\n");
+                if (p1Keys != null && p1Keys.length >= 6) {
+                    writer.write("p1Keys=" + p1Keys[0] + "," + p1Keys[1] + "," + p1Keys[2] + "," + p1Keys[3] + "," + p1Keys[4] + "," + p1Keys[5] + "\n");
+                }
+                writer.write("p2Custom=" + p2Custom + "\n");
+                if (p2Keys != null && p2Keys.length >= 6) {
+                    writer.write("p2Keys=" + p2Keys[0] + "," + p2Keys[1] + "," + p2Keys[2] + "," + p2Keys[3] + "," + p2Keys[4] + "," + p2Keys[5] + "\n");
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to save settings: " + e.getMessage());
+        }
+    }
+
+    public static Map<String, String> loadSettings() {
+        Path path = getSettingsFilePath();
+        if (!Files.exists(path)) {
+            return null;
+        }
+        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            Map<String, String> data = new HashMap<>();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                int eqIdx = line.indexOf('=');
+                if (eqIdx > 0) {
+                    data.put(line.substring(0, eqIdx).trim(), line.substring(eqIdx + 1).trim());
+                }
+            }
+            return data;
+        } catch (Exception e) {
+            System.err.println("Failed to load settings: " + e.getMessage());
+            return null;
+        }
+    }
 }
+
