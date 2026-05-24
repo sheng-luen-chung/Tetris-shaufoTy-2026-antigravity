@@ -819,18 +819,39 @@ public class GameEngine {
             if (secondTimer != null) {
                 secondTimer.stop();
             }
-            SoundManager.stopBGM();
 
             if (gameMode == GameMode.PVP && opponent != null) {
-                opponent.isGameOver = true;
-                opponent.isVictory = true;
-                int winner = (playerNum == 1) ? 2 : 1;
-                this.pvpWinner = winner;
-                opponent.pvpWinner = winner;
+                if (opponent.isGameOver()) {
+                    // Both players are now game over, determine the winner
+                    int winner = 0; // 0: none, 1: P1, 2: P2, 3: Tie
+                    int p1Score = (playerNum == 1) ? this.score : opponent.getScore();
+                    int p2Score = (playerNum == 1) ? opponent.getScore() : this.score;
+                    int p1Time = (playerNum == 1) ? this.secondsElapsed : opponent.getSecondsElapsed();
+                    int p2Time = (playerNum == 1) ? opponent.getSecondsElapsed() : this.secondsElapsed;
 
-                if (opponent.gameLoop != null) opponent.gameLoop.stop();
-                if (opponent.secondTimer != null) opponent.secondTimer.stop();
-                opponent.setAiPlay(false);
+                    if (p1Score > p2Score) {
+                        winner = 1;
+                    } else if (p2Score > p1Score) {
+                        winner = 2;
+                    } else {
+                        // Tie breaker: longer survival time wins
+                        if (p1Time > p2Time) {
+                            winner = 1;
+                        } else if (p2Time > p1Time) {
+                            winner = 2;
+                        } else {
+                            winner = 3; // True tie
+                        }
+                    }
+
+                    this.pvpWinner = winner;
+                    opponent.setPvpWinner(winner);
+                    SoundManager.stopBGM();
+                } else {
+                    // Opponent is still playing, do not stop BGM or determine winner yet
+                }
+            } else {
+                SoundManager.stopBGM();
             }
 
             recordFinalScore();
@@ -942,6 +963,10 @@ public class GameEngine {
 
     public int getPvpWinner() {
         return pvpWinner;
+    }
+
+    public void setPvpWinner(int winner) {
+        this.pvpWinner = winner;
     }
 
     // Getters for UI

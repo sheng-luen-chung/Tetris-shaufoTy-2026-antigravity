@@ -338,7 +338,14 @@ public class InputHandler extends KeyAdapter {
                 return;
             }
 
-            if (engine.isGameOver()) {
+            boolean bothGameOver = false;
+            if (engine.getGameMode() == com.tetris.model.GameMode.PVP && engine2 != null) {
+                bothGameOver = engine.isGameOver() && engine2.isGameOver();
+            } else {
+                bothGameOver = engine.isGameOver();
+            }
+
+            if (bothGameOver) {
                 if (keyCode == KeyEvent.VK_ENTER || keyCode == KeyEvent.VK_ESCAPE || keyCode == KeyEvent.VK_SPACE) {
                     engine.returnToMenu();
                 }

@@ -609,6 +609,7 @@ public class GamePanel extends JPanel {
             } else {
                 setPreferredSize(new Dimension(500, ROWS * TILE_SIZE));
             }
+            revalidate();
             frame.pack();
             frame.setLocationRelativeTo(null);
         }
@@ -719,6 +720,9 @@ public class GamePanel extends JPanel {
                     drawScorePopups(g2d, scorePopups);
                     drawSidebar(g2d, gameEngine);
                     drawPerfectClearOverlay(g2d, perfectClearStartTime);
+                    if (gameEngine.isGameOver() && !gameEngine2.isGameOver()) {
+                        drawLocalPvpGameOver(g2d);
+                    }
                     g2d.setTransform(p1Transform);
 
                     // --- PLAYER 2 (Right: x=500) ---
@@ -747,6 +751,9 @@ public class GamePanel extends JPanel {
                     drawScorePopups(g2d, scorePopups2);
                     drawSidebar(g2d, gameEngine2);
                     drawPerfectClearOverlay(g2d, perfectClearStartTime2);
+                    if (gameEngine2.isGameOver() && !gameEngine.isGameOver()) {
+                        drawLocalPvpGameOver(g2d);
+                    }
                     g2d.setTransform(p2Transform);
 
                     // --- OVERLAYS (Centered over both windows) ---
@@ -756,7 +763,7 @@ public class GamePanel extends JPanel {
                     }
 
                     // Draw Game Over Overlay
-                    if (gameEngine.isGameOver() || gameEngine2.isGameOver()) {
+                    if (gameEngine.isGameOver() && gameEngine2.isGameOver()) {
                         drawPvpGameOverOverlay(g2d);
                     }
 
@@ -1440,6 +1447,39 @@ public class GamePanel extends JPanel {
         }
     }
 
+    private void drawLocalPvpGameOver(Graphics2D g2d) {
+        int w = COLS * TILE_SIZE;
+        int h = ROWS * TILE_SIZE;
+
+        g2d.setColor(new Color(15, 5, 25, 200));
+        g2d.fillRect(0, 0, w, h);
+
+        g2d.setColor(new Color(255, 40, 80, 150));
+        g2d.setStroke(new java.awt.BasicStroke(2f));
+        g2d.drawRect(2, 2, w - 4, h - 4);
+        g2d.setStroke(new java.awt.BasicStroke(1f));
+
+        g2d.setFont(new Font("Impact", Font.BOLD, 36));
+        FontMetrics fm = g2d.getFontMetrics();
+        String text1 = "GAME OVER";
+        int x1 = (w - fm.stringWidth(text1)) / 2;
+        int y1 = h / 2 - 20;
+
+        g2d.setColor(new Color(255, 40, 80, 120));
+        g2d.drawString(text1, x1 + 2, y1 + 2);
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(text1, x1, y1);
+
+        g2d.setFont(new Font("Arial", Font.BOLD, 14));
+        FontMetrics fmSub = g2d.getFontMetrics();
+        String text2 = "WAITING FOR OPPONENT...";
+        int x2 = (w - fmSub.stringWidth(text2)) / 2;
+        int y2 = h / 2 + 20;
+
+        g2d.setColor(new Color(200, 200, 220));
+        g2d.drawString(text2, x2, y2);
+    }
+
     private void drawPvpGameOverOverlay(Graphics2D g2d) {
         int width = 1000;
         int height = ROWS * TILE_SIZE;
@@ -1453,7 +1493,14 @@ public class GamePanel extends JPanel {
 
         // Neon glowing border
         int winner = gameEngine.getPvpWinner();
-        Color themeColor = (winner == 1) ? new Color(0, 255, 255) : new Color(255, 100, 255);
+        Color themeColor = Color.WHITE;
+        if (winner == 1) {
+            themeColor = new Color(0, 255, 255); // Cyan
+        } else if (winner == 2) {
+            themeColor = new Color(255, 100, 255); // Purple
+        } else if (winner == 3) {
+            themeColor = new Color(255, 215, 0); // Gold
+        }
         g2d.setColor(new Color(themeColor.getRed(), themeColor.getGreen(), themeColor.getBlue(), 100));
         g2d.setStroke(new java.awt.BasicStroke(3f));
         g2d.drawRect(5, 5, width - 10, height - 10);
@@ -1462,7 +1509,9 @@ public class GamePanel extends JPanel {
         // 2. Header Title
         g2d.setFont(new Font("Impact", Font.BOLD | Font.ITALIC, 54));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = (winner == 1) ? "PLAYER 1 WINS!" : ((winner == 2) ? "PLAYER 2 WINS!" : "GAME OVER");
+        String titleText = (winner == 1) ? "PLAYER 1 WINS!" : 
+                           ((winner == 2) ? "PLAYER 2 WINS!" : 
+                           ((winner == 3) ? "IT'S A DRAW!" : "GAME OVER"));
         int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 80;
 
