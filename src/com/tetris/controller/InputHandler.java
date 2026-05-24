@@ -459,6 +459,26 @@ public class InputHandler extends KeyAdapter {
                     engine.handleBackAction();
                     break;
             }
+        } else if (state == GameEngine.GameState.TUTORIAL_SELECT) {
+            switch (keyCode) {
+                case KeyEvent.VK_UP:
+                    engine.getPanel().navigateTutorialSelect(-1);
+                    break;
+                case KeyEvent.VK_DOWN:
+                    engine.getPanel().navigateTutorialSelect(1);
+                    break;
+                case KeyEvent.VK_ENTER:
+                case KeyEvent.VK_SPACE:
+                    engine.getPanel().selectTutorialOption();
+                    break;
+                case KeyEvent.VK_ESCAPE:
+                    engine.returnToMenu();
+                    break;
+            }
+        } else if (state == GameEngine.GameState.ACHIEVEMENTS) {
+            if (keyCode == KeyEvent.VK_ESCAPE || keyCode == KeyEvent.VK_ENTER || keyCode == KeyEvent.VK_SPACE) {
+                engine.returnToMenu();
+            }
         } else if (state == GameEngine.GameState.LEADERBOARD) {
             switch (keyCode) {
                 case KeyEvent.VK_ENTER:
@@ -672,6 +692,8 @@ public class InputHandler extends KeyAdapter {
                 }
             } else if (keyCode == rotate) {
                 engine.rotatePiece();
+            } else if (keyCode == KeyEvent.VK_Z) {
+                engine.rotatePieceCounterClockwise();
             } else if (keyCode == drop) {
                 engine.dropPiece();
                 resetKeyStates(); // Reset keys after hard drop to prevent instant repeats
@@ -690,12 +712,12 @@ public class InputHandler extends KeyAdapter {
         GameEngine.GameState state = engine.getGameState();
         if (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL) {
             if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
-                int p1Left = p1Customized ? p1KeyLeft : KeyEvent.VK_A;
-                int p1Right = p1Customized ? p1KeyRight : KeyEvent.VK_D;
-                int p1Down = p1Customized ? p1KeyDown : KeyEvent.VK_S;
-                int p2Left = p2Customized ? p2KeyLeft : KeyEvent.VK_LEFT;
-                int p2Right = p2Customized ? p2KeyRight : KeyEvent.VK_RIGHT;
-                int p2Down = p2Customized ? p2KeyDown : KeyEvent.VK_DOWN;
+                int p1Left = p1Customized ? p1KeyLeft : KeyEvent.VK_LEFT;
+                int p1Right = p1Customized ? p1KeyRight : KeyEvent.VK_RIGHT;
+                int p1Down = p1Customized ? p1KeyDown : KeyEvent.VK_DOWN;
+                int p2Left = p2Customized ? p2KeyLeft : KeyEvent.VK_A;
+                int p2Right = p2Customized ? p2KeyRight : KeyEvent.VK_D;
+                int p2Down = p2Customized ? p2KeyDown : KeyEvent.VK_S;
 
                 if (keyCode == p1Left) {
                     p1LeftPressed = false;

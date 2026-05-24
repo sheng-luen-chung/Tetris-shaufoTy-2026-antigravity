@@ -53,10 +53,23 @@ public class GamePanel extends JPanel {
 
     // Menu properties
     private int selectedMenuIndex = 0;
-    private final Rectangle[] menuOptionBounds = new Rectangle[7];
+    private final Rectangle[] menuOptionBounds = new Rectangle[8];
     private Rectangle backButtonBounds = new Rectangle();
     private final List<FloatingPiece> floatingPieces = new ArrayList<>();
     private Timer menuAnimationTimer;
+
+    // Tutorial Select Screen properties
+    private int selectedTutorialIndex = 0;
+    private final Rectangle[] tutorialOptionBounds = new Rectangle[8];
+
+    // Achievements Screen properties
+    private Rectangle achievementsBackButtonBounds = new Rectangle();
+
+    // Toast Notification properties
+    private String activeToastTitle = null;
+    private String activeToastDesc = null;
+    private long toastStartTime = 0;
+    private static final int TOAST_DURATION = 3000;
 
     // Pause menu properties
     private int selectedPauseIndex = 0;
@@ -561,7 +574,7 @@ public class GamePanel extends JPanel {
                             }
                         }
                     } else {
-                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 7 : 6;
+                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 8 : 7;
                         for (int i = 0; i < numOptions; i++) {
                             if (menuOptionBounds[i] != null && menuOptionBounds[i].contains(e.getPoint())) {
                                 selectedMenuIndex = i;
@@ -569,6 +582,18 @@ public class GamePanel extends JPanel {
                                 break;
                             }
                         }
+                    }
+                } else if (state == com.tetris.controller.GameEngine.GameState.TUTORIAL_SELECT) {
+                    for (int i = 0; i < 8; i++) {
+                        if (tutorialOptionBounds[i] != null && tutorialOptionBounds[i].contains(e.getPoint())) {
+                            selectedTutorialIndex = i;
+                            selectTutorialOption();
+                            break;
+                        }
+                    }
+                } else if (state == com.tetris.controller.GameEngine.GameState.ACHIEVEMENTS) {
+                    if (achievementsBackButtonBounds != null && achievementsBackButtonBounds.contains(e.getPoint())) {
+                        gameEngine.returnToMenu();
                     }
                 } else if (state == com.tetris.controller.GameEngine.GameState.LEADERBOARD) {
                     if (backButtonBounds != null && backButtonBounds.contains(e.getPoint())) {
@@ -690,7 +715,7 @@ public class GamePanel extends JPanel {
                             }
                         }
                     } else {
-                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 7 : 6;
+                        int numOptions = com.tetris.util.SaveManager.hasSave() ? 8 : 7;
                         for (int i = 0; i < numOptions; i++) {
                             if (menuOptionBounds[i] != null && menuOptionBounds[i].contains(e.getPoint())) {
                                 if (selectedMenuIndex != i) {
@@ -701,6 +726,18 @@ public class GamePanel extends JPanel {
                             }
                         }
                     }
+                } else if (state == com.tetris.controller.GameEngine.GameState.TUTORIAL_SELECT) {
+                    for (int i = 0; i < 8; i++) {
+                        if (tutorialOptionBounds[i] != null && tutorialOptionBounds[i].contains(e.getPoint())) {
+                            if (selectedTutorialIndex != i) {
+                                selectedTutorialIndex = i;
+                                repaint();
+                            }
+                            break;
+                        }
+                    }
+                } else if (state == com.tetris.controller.GameEngine.GameState.ACHIEVEMENTS) {
+                    repaint(); // Repaint to update achievements back button hover state
                 } else if ((state == com.tetris.controller.GameEngine.GameState.PLAYING || state == com.tetris.controller.GameEngine.GameState.TUTORIAL) && gameEngine.isPaused()) {
                     int numPauseOptions = showSettingsInPause ? 5 : 4;
                     for (int i = 0; i < numPauseOptions; i++) {
@@ -848,6 +885,12 @@ public class GamePanel extends JPanel {
             case LEADERBOARD:
                 drawLeaderboardScreen(g);
                 break;
+            case TUTORIAL_SELECT:
+                drawTutorialSelectScreen(g);
+                break;
+            case ACHIEVEMENTS:
+                drawAchievementsScreen(g);
+                break;
             case PLAYING:
             case TUTORIAL:
             default:
@@ -948,6 +991,9 @@ public class GamePanel extends JPanel {
 
                     // Draw Game Area (Left)
                     drawGrid(g2d);
+                    if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+                        drawTutorialTargetZone(g2d);
+                    }
                     drawFixedBlocks(g2d);
                     drawCurrentPiece(g2d);
 
@@ -988,6 +1034,10 @@ public class GamePanel extends JPanel {
                 g2d.setTransform(oldTransform);
                 break;
         }
+        
+        if (activeToastTitle != null && System.currentTimeMillis() - toastStartTime < TOAST_DURATION) {
+            drawAchievementToast((Graphics2D) g);
+        }
     }
 
     // Menu navigation helper
@@ -997,7 +1047,7 @@ public class GamePanel extends JPanel {
         } else if (showModeSelectInMenu) {
             selectedModeIndex = (selectedModeIndex + dir + 5) % 5;
         } else {
-            int numOptions = com.tetris.util.SaveManager.hasSave() ? 7 : 6;
+            int numOptions = com.tetris.util.SaveManager.hasSave() ? 8 : 7;
             selectedMenuIndex = (selectedMenuIndex + dir + numOptions) % numOptions;
         }
         repaint();
@@ -1021,7 +1071,6 @@ public class GamePanel extends JPanel {
                         selectedModeIndex = 0; // Default to ENDLESS
                         break;
                     case 2:
-                        // T-SPIN PRACTICE
                         gameEngine.startTutorial();
                         break;
                     case 3:
@@ -1035,9 +1084,12 @@ public class GamePanel extends JPanel {
                         showSettingsInMenu = true;
                         break;
                     case 5:
-                        gameEngine.showLeaderboard();
+                        gameEngine.setGameState(com.tetris.controller.GameEngine.GameState.ACHIEVEMENTS);
                         break;
                     case 6:
+                        gameEngine.showLeaderboard();
+                        break;
+                    case 7:
                         System.exit(0);
                         break;
                 }
@@ -1048,7 +1100,6 @@ public class GamePanel extends JPanel {
                         selectedModeIndex = 0; // Default to ENDLESS
                         break;
                     case 1:
-                        // T-SPIN PRACTICE
                         gameEngine.startTutorial();
                         break;
                     case 2:
@@ -1062,9 +1113,12 @@ public class GamePanel extends JPanel {
                         showSettingsInMenu = true;
                         break;
                     case 4:
-                        gameEngine.showLeaderboard();
+                        gameEngine.setGameState(com.tetris.controller.GameEngine.GameState.ACHIEVEMENTS);
                         break;
                     case 5:
+                        gameEngine.showLeaderboard();
+                        break;
+                    case 6:
                         System.exit(0);
                         break;
                 }
@@ -1283,9 +1337,9 @@ public class GamePanel extends JPanel {
 
         // Options
         boolean hasSave = com.tetris.util.SaveManager.hasSave();
-        int numOptions = hasSave ? 7 : 6;
-        int startY = hasSave ? 200 : 225;
-        int gap = 40;
+        int numOptions = hasSave ? 8 : 7;
+        int startY = hasSave ? 180 : 205;
+        int gap = 38;
         g2d.setFont(new Font("SansSerif", Font.BOLD, 20));
         FontMetrics fmOption = g2d.getFontMetrics();
 
@@ -1295,20 +1349,22 @@ public class GamePanel extends JPanel {
                 switch (i) {
                     case 0: label = "繼續上一局"; break;
                     case 1: label = "開始新遊戲"; break;
-                    case 2: label = "T-Spin 練習模式"; break;
+                    case 2: label = "教學與新手引導"; break;
                     case 3: label = "AI 自動遊玩演示"; break;
                     case 4: label = "遊戲設定"; break;
-                    case 5: label = "高分排行榜"; break;
-                    case 6: label = "結束遊戲"; break;
+                    case 5: label = "成就與說明"; break;
+                    case 6: label = "高分排行榜"; break;
+                    case 7: label = "結束遊戲"; break;
                 }
             } else {
                 switch (i) {
                     case 0: label = "開始新遊戲"; break;
-                    case 1: label = "T-Spin 練習模式"; break;
+                    case 1: label = "教學與新手引導"; break;
                     case 2: label = "AI 自動遊玩演示"; break;
                     case 3: label = "遊戲設定"; break;
-                    case 4: label = "高分排行榜"; break;
-                    case 5: label = "結束遊戲"; break;
+                    case 4: label = "成就與說明"; break;
+                    case 5: label = "高分排行榜"; break;
+                    case 6: label = "結束遊戲"; break;
                 }
             }
 
@@ -2510,7 +2566,7 @@ public class GamePanel extends JPanel {
         if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
             g.setColor(new Color(0, 255, 255));
-            g.drawString("教學 " + targetEngine.getTutorialLevel() + " / 3", startX + 20, 195);
+            g.drawString("教學 " + targetEngine.getTutorialLevel() + " / 7", startX + 20, 195);
         } else {
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 20));
             String diffStr = "中等";
@@ -2675,6 +2731,9 @@ public class GamePanel extends JPanel {
                 g2d.setColor(new Color(230, 200, 185));
                 g2d.drawString("本局曾使用自動遊玩", warnX + 10, aiY + 40);
                 g2d.drawString("分數將不寫入排行榜", warnX + 10, aiY + 53);
+            }
+            if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING && targetEngine.getGameMode() != GameMode.PVP && !targetEngine.isAiPlay() && !targetEngine.hasUsedAiThisSession()) {
+                drawSidebarTipBox(g2d, startX + 15, 470, 170, 110);
             }
         }
     }
@@ -3754,32 +3813,78 @@ public class GamePanel extends JPanel {
         String[] lines;
         if (level == 1) {
             lines = new String[] {
-                "關卡 1：T-Spin Single",
+                "關卡 1：移動與軟降",
+                "目標：填補最左側的空缺以消行。",
+                "",
+                "1. 按 ⬅ 方向鍵將 I 方塊",
+                "   向左移動到最左側第 1 欄。",
+                "2. 按住 ⬇ 方向鍵（軟降）",
+                "   讓方塊加速落入窄道中。",
+                "3. 填滿空缺，成功消行！"
+            };
+        } else if (level == 2) {
+            lines = new String[] {
+                "關卡 2：旋轉方塊",
+                "目標：旋轉方塊並消行。",
+                "",
+                "1. I 方塊初始為橫向，",
+                "   無法穿過第 5 欄的窄道。",
+                "2. 按下 ⬆ 方向鍵（旋轉）或",
+                "   Z 鍵，將 I 方塊轉為直向。",
+                "3. 方塊落入洞中，完成消行！"
+            };
+        } else if (level == 3) {
+            lines = new String[] {
+                "關卡 3：暫存區 Hold 的使用",
+                "目標：利用暫存功能完成消行。",
+                "",
+                "1. 當前為 Z 方塊，不適合",
+                "   填補第 6 欄直向深槽。",
+                "2. 按下 [C] 鍵將 Z 方塊暫存",
+                "   至暫存區，並取出 I 方塊。",
+                "3. 將直向 I 方塊對準第 6 欄",
+                "   落下，填滿並消行通關！"
+            };
+        } else if (level == 4) {
+            lines = new String[] {
+                "關卡 4：硬降與消行",
+                "目標：使用硬降瞬間落底消行。",
+                "",
+                "1. 將方形 O 方塊向右移動",
+                "   對齊第 5 與第 6 欄的空缺。",
+                "2. 確認對齊後，按下 [空白鍵]",
+                "   進行硬降 (Hard Drop)。",
+                "3. 方塊將瞬間鎖定並消除",
+                "   底部兩行！"
+            };
+        } else if (level == 5) {
+            lines = new String[] {
+                "關卡 5：T-Spin Single 基礎",
                 "目標：以 T-Spin 消除 1 行。",
                 "",
                 "1. 將 T 方塊右朝下 (指向右)",
-                "   放入右側凹槽中。",
+                "   放入右側入口通道中。",
                 "2. 當它到達底部時，",
                 "   按下 ⬆ 方向鍵進行",
                 "   順時針旋轉 (指向下)。",
                 "3. 成功完成 T-spin Single！"
             };
-        } else if (level == 2) {
+        } else if (level == 6) {
             lines = new String[] {
-                "關卡 2：T-Spin Double",
-                "目標：以 T-Spin 消除 2 行。",
+                "關卡 6：T-Spin Double 右旋",
+                "目標：右旋 T-Spin 消除 2 行。",
                 "",
-                "1. 本關結構與關卡 1 對稱，",
+                "1. 本關結構與關卡 5 相似，",
                 "   但是凹槽深度更深。",
                 "2. 將 T 方塊右朝下 (指向右)",
-                "   放入入口並塞入底部。",
+                "   放入入口並塞入最底部。",
                 "3. 按下 ⬆ 方向鍵順時針",
                 "   旋轉，一次消除 2 行！"
             };
-        } else { // Level 3
+        } else { // Level 7
             lines = new String[] {
-                "關卡 3：左側 T-Spin Double",
-                "目標：消除左側凹槽 2 行。",
+                "關卡 7：T-Spin Double 左旋",
+                "目標：左旋 T-Spin 消除 2 行。",
                 "",
                 "1. 這次的凹槽位於左側。",
                 "2. 將 T 方塊左朝下 (指向左)",
@@ -4135,5 +4240,356 @@ public class GamePanel extends JPanel {
             if ("HOLD".equals(action)) return com.tetris.controller.InputHandler.getP2KeyHold();
         }
         return 0;
+    }
+
+    // Novice guide tips array (Pre-split for width formatting)
+    private static final String[][] SIDEBAR_TIPS = {
+        { "按 [C] 鍵可將當前方塊", "存入暫存區，需要時", "再按 C 取出。" },
+        { "按 [空白鍵] 可以執行硬降", "讓方塊瞬間落底並鎖定。" },
+        { "在方塊落地的瞬間，您有", "短暫的鎖定延遲時間可以", "進行移動或旋轉。" },
+        { "進行 T-Spin 旋轉消行", "在實戰中可以獲得極高的", "分數與攻擊力！" },
+        { "達成 Combo 連擊或一次", "消除四行 (Tetris) 可以", "獲得顯著的分數加成。" },
+        { "完美的版面全消 (PC)", "會為您帶來額外的", "2000 分大獎！" },
+        { "靈敏度（DAS 與 ARR）", "可以在設定選單中調整，", "幫助您移動得更快。" }
+    };
+
+    private void drawSidebarTipBox(Graphics2D g2d, int x, int y, int w, int h) {
+        g2d.setColor(new Color(255, 255, 255, 12));
+        g2d.fillRoundRect(x, y, w, h, 10, 10);
+        g2d.setColor(new Color(255, 215, 120, 65));
+        g2d.drawRoundRect(x, y, w, h, 10, 10);
+
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 12));
+        g2d.setColor(new Color(255, 215, 120));
+        g2d.drawString("💡 新手小撇步", x + 10, y + 20);
+
+        int tipIndex = (gameEngine.getSecondsElapsed() / 12) % SIDEBAR_TIPS.length;
+        String[] lines = SIDEBAR_TIPS[tipIndex];
+
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        g2d.setColor(new Color(220, 220, 240));
+
+        int textY = y + 42;
+        for (String line : lines) {
+            g2d.drawString(line, x + 10, textY);
+            textY += 17;
+        }
+    }
+
+    // Tutorial level target areas
+    private List<java.awt.Point> getTutorialTargetCells() {
+        List<java.awt.Point> cells = new ArrayList<>();
+        if (gameEngine == null || gameEngine.getGameState() != com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+            return cells;
+        }
+        int level = gameEngine.getTutorialLevel();
+        if (level == 1) {
+            cells.add(new java.awt.Point(0, 16));
+            cells.add(new java.awt.Point(0, 17));
+            cells.add(new java.awt.Point(0, 18));
+            cells.add(new java.awt.Point(0, 19));
+        } else if (level == 2) {
+            cells.add(new java.awt.Point(4, 16));
+            cells.add(new java.awt.Point(4, 17));
+            cells.add(new java.awt.Point(4, 18));
+            cells.add(new java.awt.Point(4, 19));
+        } else if (level == 3) {
+            cells.add(new java.awt.Point(5, 16));
+            cells.add(new java.awt.Point(5, 17));
+            cells.add(new java.awt.Point(5, 18));
+            cells.add(new java.awt.Point(5, 19));
+        } else if (level == 4) {
+            cells.add(new java.awt.Point(4, 18));
+            cells.add(new java.awt.Point(5, 18));
+            cells.add(new java.awt.Point(4, 19));
+            cells.add(new java.awt.Point(5, 19));
+        } else if (level == 5) {
+            cells.add(new java.awt.Point(2, 18));
+            cells.add(new java.awt.Point(3, 18));
+            cells.add(new java.awt.Point(4, 18));
+            cells.add(new java.awt.Point(3, 19));
+        } else if (level == 6) {
+            cells.add(new java.awt.Point(3, 17));
+            cells.add(new java.awt.Point(3, 18));
+            cells.add(new java.awt.Point(4, 18));
+            cells.add(new java.awt.Point(3, 19));
+        } else if (level == 7) {
+            cells.add(new java.awt.Point(6, 17));
+            cells.add(new java.awt.Point(5, 18));
+            cells.add(new java.awt.Point(6, 18));
+            cells.add(new java.awt.Point(6, 19));
+        }
+        return cells;
+    }
+
+    private void drawTutorialTargetZone(Graphics2D g2d) {
+        List<java.awt.Point> targets = getTutorialTargetCells();
+        if (targets.isEmpty()) return;
+
+        g2d.setColor(new Color(0, 255, 255, 80));
+        java.awt.Stroke oldStroke = g2d.getStroke();
+        g2d.setStroke(new java.awt.BasicStroke(2.0f, java.awt.BasicStroke.CAP_BUTT, java.awt.BasicStroke.JOIN_MITER, 10.0f, new float[]{5.0f}, 0.0f));
+        for (java.awt.Point p : targets) {
+            g2d.drawRect(p.x * TILE_SIZE + 2, p.y * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            g2d.fillRect(p.x * TILE_SIZE + 4, p.y * TILE_SIZE + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+        }
+        g2d.setStroke(oldStroke);
+    }
+
+    // Draw Tutorial Select Screen
+    private void drawTutorialSelectScreen(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
+        java.awt.GradientPaint gp = new java.awt.GradientPaint(0, 0, new Color(10, 10, 25), 0, getHeight(), new Color(30, 15, 50));
+        g2d.setPaint(gp);
+        g2d.fillRect(0, 0, getWidth(), getHeight());
+
+        for (FloatingPiece fp : floatingPieces) {
+            drawFloatingPiece(g2d, fp);
+        }
+
+        g2d.setFont(new Font("Impact", Font.BOLD, 42));
+        g2d.setColor(new Color(0, 255, 255));
+        String title = "互動教學與新手引導";
+        FontMetrics fm = g2d.getFontMetrics();
+        g2d.drawString(title, (getWidth() - fm.stringWidth(title)) / 2, 75);
+
+        g2d.setColor(new Color(0, 255, 255, 150));
+        g2d.fillRect(40, 85, getWidth() - 80, 3);
+
+        int startY = 120;
+        int gap = 48;
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 18));
+        FontMetrics fmOpt = g2d.getFontMetrics();
+
+        String[] levels = {
+            "1. 基礎移動與軟降練習",
+            "2. 方塊旋轉與卡位技巧",
+            "3. 暫存區 (Hold) 靈活使用",
+            "4. 硬降 (Hard Drop) 與快速消行",
+            "5. T-Spin 基礎：單次消行 (Single)",
+            "6. T-Spin 進階：雙重消行 (Double 右旋)",
+            "7. T-Spin 進階：雙重消行 (Double 左旋)",
+            "返回主選單"
+        };
+
+        for (int i = 0; i < 8; i++) {
+            int textWidth = fmOpt.stringWidth(levels[i]);
+            int textHeight = fmOpt.getHeight();
+            int x = (getWidth() - textWidth) / 2;
+            int y = startY + i * gap;
+
+            tutorialOptionBounds[i] = new Rectangle(x - 20, y - textHeight + 5, textWidth + 40, textHeight + 10);
+
+            boolean isSelected = (i == selectedTutorialIndex);
+            if (isSelected) {
+                g2d.setColor(new Color(0, 255, 255, 35));
+                g2d.fillRoundRect(tutorialOptionBounds[i].x, tutorialOptionBounds[i].y, tutorialOptionBounds[i].width, tutorialOptionBounds[i].height, 10, 10);
+                g2d.setColor(new Color(0, 255, 255));
+                g2d.drawRoundRect(tutorialOptionBounds[i].x, tutorialOptionBounds[i].y, tutorialOptionBounds[i].width, tutorialOptionBounds[i].height, 10, 10);
+
+                g2d.setColor(Color.WHITE);
+                g2d.drawString(levels[i], x, y);
+
+                int sqSize = 8;
+                g2d.fillRect(tutorialOptionBounds[i].x + 6, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
+                g2d.fillRect(tutorialOptionBounds[i].x + tutorialOptionBounds[i].width - 14, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
+            } else {
+                g2d.setColor(new Color(150, 150, 180));
+                g2d.drawString(levels[i], x, y);
+            }
+        }
+    }
+
+    public void navigateTutorialSelect(int dir) {
+        selectedTutorialIndex = (selectedTutorialIndex + dir + 8) % 8;
+        repaint();
+    }
+
+    public void selectTutorialOption() {
+        if (selectedTutorialIndex == 7) {
+            gameEngine.returnToMenu();
+        } else {
+            gameEngine.startTutorialLevel(selectedTutorialIndex + 1);
+        }
+    }
+
+    // Draw Achievements Screen
+    private void drawAchievementsScreen(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
+        java.awt.GradientPaint gp = new java.awt.GradientPaint(0, 0, new Color(10, 10, 25), 0, getHeight(), new Color(30, 15, 50));
+        g2d.setPaint(gp);
+        g2d.fillRect(0, 0, getWidth(), getHeight());
+
+        for (FloatingPiece fp : floatingPieces) {
+            drawFloatingPiece(g2d, fp);
+        }
+
+        g2d.setFont(new Font("Impact", Font.BOLD, 42));
+        g2d.setColor(new Color(255, 215, 0));
+        String title = "成就與說明";
+        FontMetrics fm = g2d.getFontMetrics();
+        g2d.drawString(title, (getWidth() - fm.stringWidth(title)) / 2, 75);
+
+        g2d.setColor(new Color(255, 215, 0, 150));
+        g2d.fillRect(40, 85, getWidth() - 80, 3);
+
+        int cardW = 460;
+        int cardH = 390;
+        int cardX = (getWidth() - cardW) / 2;
+        int cardY = 105;
+
+        g2d.setColor(new Color(255, 255, 255, 12));
+        g2d.fillRoundRect(cardX, cardY, cardW, cardH, 15, 15);
+        g2d.setColor(new Color(255, 255, 255, 30));
+        g2d.drawRoundRect(cardX, cardY, cardW, cardH, 15, 15);
+
+        List<com.tetris.util.AchievementManager.AchievementInfo> list = com.tetris.util.AchievementManager.getAchievements();
+        int startX1 = cardX + 15;
+        int startX2 = cardX + 235;
+        int itemH = 68;
+        int startItemY = cardY + 20;
+
+        for (int i = 0; i < list.size(); i++) {
+            com.tetris.util.AchievementManager.AchievementInfo info = list.get(i);
+            int col = i % 2;
+            int row = i / 2;
+
+            int x = (col == 0) ? startX1 : startX2;
+            int y = startItemY + row * itemH;
+
+            // Draw item container
+            if (info.unlocked) {
+                g2d.setColor(new Color(0, 255, 100, 15));
+                g2d.fillRoundRect(x, y, 210, 60, 8, 8);
+                g2d.setColor(new Color(0, 255, 100, 50));
+            } else {
+                g2d.setColor(new Color(255, 255, 255, 5));
+                g2d.fillRoundRect(x, y, 210, 60, 8, 8);
+                g2d.setColor(new Color(255, 255, 255, 15));
+            }
+            g2d.drawRoundRect(x, y, 210, 60, 8, 8);
+
+            // Draw status icon
+            if (info.unlocked) {
+                g2d.setFont(new Font("SansSerif", Font.PLAIN, 18));
+                g2d.drawString("🏆", x + 10, y + 36);
+                g2d.setColor(Color.WHITE);
+            } else {
+                g2d.setFont(new Font("SansSerif", Font.PLAIN, 18));
+                g2d.drawString("🔒", x + 10, y + 36);
+                g2d.setColor(new Color(120, 120, 130));
+            }
+
+            // Draw title
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 13));
+            g2d.drawString(info.title, x + 40, y + 20);
+
+            // Draw desc and requirement
+            g2d.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            if (info.unlocked) {
+                g2d.setColor(new Color(200, 200, 200));
+                g2d.drawString(info.desc, x + 40, y + 36);
+                g2d.setColor(new Color(0, 255, 100));
+                g2d.drawString("解鎖條件: " + info.requirement, x + 40, y + 50);
+            } else {
+                g2d.setColor(new Color(110, 110, 120));
+                g2d.drawString("???", x + 40, y + 36);
+                g2d.drawString("解鎖條件: " + info.requirement, x + 40, y + 50);
+            }
+        }
+
+        // Back Button
+        int btnW = 120;
+        int btnH = 34;
+        int btnX = (getWidth() - btnW) / 2;
+        int btnY = cardY + cardH + 15;
+        achievementsBackButtonBounds = new Rectangle(btnX, btnY, btnW, btnH);
+
+        java.awt.Point mousePos = getMousePosition();
+        boolean hover = (mousePos != null && achievementsBackButtonBounds.contains(mousePos));
+
+        if (hover) {
+            g2d.setColor(new Color(255, 255, 255, 30));
+            g2d.fillRoundRect(btnX, btnY, btnW, btnH, 8, 8);
+            g2d.setColor(new Color(0, 255, 255));
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 12));
+            g2d.fillRoundRect(btnX, btnY, btnW, btnH, 8, 8);
+            g2d.setColor(new Color(200, 200, 220));
+        }
+        g2d.drawRoundRect(btnX, btnY, btnW, btnH, 8, 8);
+
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 14));
+        int textW = g2d.getFontMetrics().stringWidth("返回主選單");
+        g2d.drawString("返回主選單", btnX + (btnW - textW) / 2, btnY + 22);
+    }
+
+    // Draw Toast notification for achievements
+    private void drawAchievementToast(Graphics2D g2d) {
+        long elapsed = System.currentTimeMillis() - toastStartTime;
+        float progress;
+        float alpha;
+        int yOffset;
+
+        if (elapsed < 400) { // fade in & slide down
+            progress = elapsed / 400.0f;
+            alpha = progress;
+            yOffset = (int) (-40 + 60 * progress);
+        } else if (elapsed > TOAST_DURATION - 400) { // fade out & slide up
+            progress = (TOAST_DURATION - elapsed) / 400.0f;
+            alpha = progress;
+            yOffset = (int) (-40 + 60 * progress);
+        } else {
+            alpha = 1.0f;
+            yOffset = 20;
+        }
+
+        int toastW = 300;
+        int toastH = 50;
+        int toastX = (getWidth() - toastW) / 2;
+        int toastY = yOffset;
+
+        java.awt.Composite oldComp = g2d.getComposite();
+        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+
+        // Background card
+        g2d.setColor(new Color(15, 15, 30, 230));
+        g2d.fillRoundRect(toastX, toastY, toastW, toastH, 12, 12);
+
+        // Gold border
+        g2d.setColor(new Color(255, 215, 0, 220));
+        g2d.setStroke(new java.awt.BasicStroke(1.5f));
+        g2d.drawRoundRect(toastX, toastY, toastW, toastH, 12, 12);
+        g2d.setStroke(new java.awt.BasicStroke(1.0f));
+
+        // Icon
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 20));
+        g2d.drawString("🏆", toastX + 15, toastY + 33);
+
+        // Title text
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 12));
+        g2d.setColor(new Color(255, 215, 0));
+        g2d.drawString("成就解鎖！", toastX + 50, toastY + 20);
+
+        // Achievement Title
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 13));
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(activeToastTitle, toastX + 50, toastY + 38);
+
+        g2d.setComposite(oldComp);
+    }
+
+    public void showAchievementToast(String title, String desc) {
+        this.activeToastTitle = title;
+        this.activeToastDesc = desc;
+        this.toastStartTime = System.currentTimeMillis();
+        
+        // Play clear sound as achievement chime
+        com.tetris.util.SoundManager.playSFX("/resources/clear.wav");
+        
+        if (!animationTimer.isRunning()) {
+            animationTimer.start();
+        }
+        repaint();
     }
 }

@@ -18,7 +18,9 @@ public class GameEngine {
         MENU,
         PLAYING,
         LEADERBOARD,
-        TUTORIAL
+        TUTORIAL,
+        TUTORIAL_SELECT,
+        ACHIEVEMENTS
     }
 
     public enum Difficulty {
@@ -124,6 +126,7 @@ public class GameEngine {
         this.board = board;
         this.panel = panel;
         this.leaderboardManager = new LeaderboardManager();
+        com.tetris.util.AchievementManager.init(this);
 
         // Initialize pieces
         nextPieces.clear();
@@ -154,6 +157,9 @@ public class GameEngine {
                     SoundManager.playSFX("/resources/clear.wav");
                     recordFinalScore();
                 } else if (gameMode == GameMode.SURVIVAL) {
+                    if (!usedAiThisSession && secondsElapsed >= 180) {
+                        com.tetris.util.AchievementManager.unlockAchievement("survival_master");
+                    }
                     int interval = 15;
                     if (difficulty == Difficulty.EASY) {
                         interval = 20;
@@ -462,18 +468,47 @@ public class GameEngine {
         board.freezePiece(currentPiece); // Freeze
 
         if (gameState == GameState.TUTORIAL) {
+            boolean success = false;
+            
+            // Check T-Spin status BEFORE clearing lines!
             TSpinType tSpinType = checkTSpinType();
-            // A regular T-spin is required to pass
-            if (tSpinType == TSpinType.REGULAR) {
-                // Clear the lines, which clears the row blocks
-                int lines = board.clearLines();
-                tSpins++;
+            
+            int lines = board.clearLines();
+            
+            if (tutorialLevel == 1) {
+                if (lines > 0) {
+                    success = true;
+                    com.tetris.util.AchievementManager.unlockAchievement("first_steps");
+                }
+            } else if (tutorialLevel == 2) {
+                if (lines > 0) {
+                    success = true;
+                }
+            } else if (tutorialLevel == 3) {
+                if (lines > 0) {
+                    success = true;
+                }
+            } else if (tutorialLevel == 4) {
+                if (lines > 0) {
+                    success = true;
+                }
+            } else { // Level 5, 6, 7
+                if (tSpinType == TSpinType.REGULAR) {
+                    success = true;
+                    tSpins++;
+                }
+            }
+
+            if (success) {
                 SoundManager.playSFX("/resources/clear.wav");
                 if (lines > 0) {
                     java.awt.Color[] rowColors = new java.awt.Color[Board.COLS];
-                    java.util.Arrays.fill(rowColors, Tetromino.T.getColor());
+                    java.util.Arrays.fill(rowColors, currentPiece.getType().getColor());
                     panel.spawnRowClearParticles(popupRow, rowColors, playerNum);
                     panel.triggerScreenshake(lines * 3, 200, playerNum);
+                }
+                if (tutorialLevel == 7) {
+                    com.tetris.util.AchievementManager.unlockAchievement("tspin_master");
                 }
                 tutorialSuccess();
             } else {
@@ -574,6 +609,25 @@ public class GameEngine {
             }
         }
 
+        // Trigger achievements in normal gameplay (only when playing and AI not used)
+        if (gameState == GameState.PLAYING && !usedAiThisSession) {
+            if (lines >= 1) {
+                com.tetris.util.AchievementManager.unlockAchievement("first_clear");
+            }
+            if (lines == 4) {
+                com.tetris.util.AchievementManager.unlockAchievement("tetris_clear");
+            }
+            if (comboCount >= 5) {
+                com.tetris.util.AchievementManager.unlockAchievement("combo_master");
+            }
+            if (isTSpin && tSpinType == TSpinType.REGULAR) {
+                com.tetris.util.AchievementManager.unlockAchievement("tspin_regular");
+            }
+            if (isPerfectClear) {
+                com.tetris.util.AchievementManager.unlockAchievement("perfect_clear");
+            }
+        }
+
         // Trigger screenshake based on clears, T-spins, or high combos
         if (lines > 0 || isTSpin) {
             int intensity = 0;
@@ -629,6 +683,9 @@ public class GameEngine {
             isVictory = true;
             isGameOver = true;
             setAiPlay(false);
+            if (!usedAiThisSession) {
+                com.tetris.util.AchievementManager.unlockAchievement("sprint_finisher");
+            }
             if (gameLoop != null) {
                 gameLoop.stop();
             }
@@ -767,6 +824,9 @@ public class GameEngine {
     private void updateScore(int points) {
         score += points;
         panel.setScore(score);
+        if (gameState == GameState.PLAYING && gameMode == GameMode.ENDLESS && !usedAiThisSession && score >= 50000) {
+            com.tetris.util.AchievementManager.unlockAchievement("score_master");
+        }
     }
 
     private int getCurrentPieceCenterCol() {
@@ -792,7 +852,16 @@ public class GameEngine {
     // Generate a random piece
     private Piece generateRandomPiece() {
         if (gameState == GameState.TUTORIAL) {
-            return new Piece(Tetromino.T);
+            switch (tutorialLevel) {
+                case 1:
+                case 2:
+                case 3:
+                    return new Piece(Tetromino.I);
+                case 4:
+                    return new Piece(Tetromino.O);
+                default:
+                    return new Piece(Tetromino.T);
+            }
         }
         Tetromino[] types = Tetromino.values();
         Tetromino randomType = types[new Random().nextInt(types.length)];
@@ -1246,6 +1315,57 @@ public class GameEngine {
         panel.repaint();
     }
 
+    // Rotate piece counter-clockwise
+    public void rotatePieceCounterClockwise() {
+        if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
+            return;
+        totalActions++;
+        
+        int fromState = currentPiece.getRotationIndex();
+        currentPiece.undoRotate();
+        int toState = currentPiece.getRotationIndex();
+        
+        // 1. Check if the rotated position is immediately valid
+        if (board.isValidMove(currentPiece)) {
+            lastMoveWasRotation = true;
+            lastRotationKickOffset = new int[] {0, 0};
+            resetLockDelay();
+            SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
+            panel.repaint();
+            return;
+        }
+        
+        // 2. Wall Kick / Floor Kick Mechanism (SRS)
+        int[][] kickOffsets = getSrsKickOffsets(currentPiece.getType(), fromState, toState);
+        
+        boolean kickSuccessful = false;
+        int[] successfulOffset = null;
+        for (int[] offset : kickOffsets) {
+            int dr = offset[0];
+            int dc = offset[1];
+            
+            currentPiece.move(dr, dc);
+            if (board.isValidMove(currentPiece)) {
+                kickSuccessful = true;
+                successfulOffset = offset;
+                break;
+            }
+            // Undo this kick attempt before trying next
+            currentPiece.move(-dr, -dc);
+        }
+        
+        if (kickSuccessful) {
+            lastMoveWasRotation = true;
+            lastRotationKickOffset = successfulOffset;
+            resetLockDelay();
+            SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
+        } else {
+            // All kicks failed, undo counter-clockwise rotation (by rotating clockwise)
+            currentPiece.rotate();
+        }
+        panel.repaint();
+    }
+
     private int[][] getSrsKickOffsets(Tetromino type, int fromState, int toState) {
         if (type == Tetromino.O) {
             return new int[0][2];
@@ -1458,8 +1578,8 @@ public class GameEngine {
     }
 
     public void startTutorial() {
-        tutorialLevel = 1;
-        startTutorialLevel(tutorialLevel);
+        gameState = GameState.TUTORIAL_SELECT;
+        panel.repaint();
     }
 
     public void startTutorialLevel(int level) {
@@ -1482,8 +1602,23 @@ public class GameEngine {
         maxCombo = 0;
         
         nextPieces.clear();
-        for (int i = 0; i < 5; i++) {
-            nextPieces.add(new Piece(Tetromino.T));
+        if (level == 1 || level == 2) {
+            for (int i = 0; i < 5; i++) {
+                nextPieces.add(new Piece(Tetromino.I));
+            }
+        } else if (level == 3) {
+            nextPieces.add(new Piece(Tetromino.Z));
+            for (int i = 0; i < 4; i++) {
+                nextPieces.add(new Piece(Tetromino.I));
+            }
+        } else if (level == 4) {
+            for (int i = 0; i < 5; i++) {
+                nextPieces.add(new Piece(Tetromino.O));
+            }
+        } else {
+            for (int i = 0; i < 5; i++) {
+                nextPieces.add(new Piece(Tetromino.T));
+            }
         }
         nextPiece = nextPieces.get(0);
         spawnNewPiece();
@@ -1516,7 +1651,7 @@ public class GameEngine {
         panel.repaint();
         
         javax.swing.Timer delayTimer = new javax.swing.Timer(1200, e -> {
-            if (tutorialLevel < 3) {
+            if (tutorialLevel < 7) {
                 startTutorialLevel(tutorialLevel + 1);
             } else {
                 isGameOver = true;

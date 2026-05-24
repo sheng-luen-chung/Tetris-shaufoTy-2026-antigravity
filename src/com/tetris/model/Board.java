@@ -106,10 +106,40 @@ public class Board {
         }
     }
 
-    // Set up the board grid for T-spin tutorial levels
+    // Set up the board grid for tutorial levels (1-7)
     public void setupTutorialLevel(int level) {
         clear();
-        if (level == 1) { // TSS (T-Spin Single)
+        if (level == 1) { // 移動與軟降 (Movement & Soft Drop) - gap at col 0, rows 16-19
+            for (int r = 16; r < ROWS; r++) {
+                for (int c = 1; c < COLS; c++) {
+                    grid[r][c] = Color.GRAY;
+                }
+            }
+        } else if (level == 2) { // 旋轉方塊 (Rotation) - gap at col 4, rows 16-19
+            for (int r = 16; r < ROWS; r++) {
+                for (int c = 0; c < COLS; c++) {
+                    if (c != 4) {
+                        grid[r][c] = Color.GRAY;
+                    }
+                }
+            }
+        } else if (level == 3) { // 暫存區 Hold 的使用 - gap at col 5, rows 16-19
+            for (int r = 16; r < ROWS; r++) {
+                for (int c = 0; c < COLS; c++) {
+                    if (c != 5) {
+                        grid[r][c] = Color.GRAY;
+                    }
+                }
+            }
+        } else if (level == 4) { // 硬降與消行 - gap at col 4, 5, rows 18-19
+            for (int r = 18; r < ROWS; r++) {
+                for (int c = 0; c < COLS; c++) {
+                    if (c != 4 && c != 5) {
+                        grid[r][c] = Color.GRAY;
+                    }
+                }
+            }
+        } else if (level == 5) { // T-Spin Single (old Level 1)
             // Row 17: Overhang on col 2, entry path at cols 3-4
             for (int c = 0; c < COLS; c++) {
                 if (c != 3 && c != 4) {
@@ -128,7 +158,7 @@ public class Board {
                     grid[19][c] = Color.GRAY;
                 }
             }
-        } else if (level == 2) { // TSD Right (T-Spin Double Right-facing)
+        } else if (level == 6) { // T-Spin Double Right (old Level 2)
             // Row 17: Overhang on col 2, entry path at cols 3-4
             for (int c = 0; c < COLS; c++) {
                 if (c != 3 && c != 4) {
@@ -147,7 +177,7 @@ public class Board {
                     grid[19][c] = Color.GRAY;
                 }
             }
-        } else if (level == 3) { // TSD Left (T-Spin Double Left-facing)
+        } else if (level == 7) { // T-Spin Double Left (old Level 3)
             // Row 17: Overhang on col 7, entry path at cols 5-6
             for (int c = 0; c < COLS; c++) {
                 if (c != 5 && c != 6) {
