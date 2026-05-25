@@ -39,6 +39,9 @@ public class SoundManager {
     private static boolean bgmPaused = false;
     private static SoundPack currentSoundPack = SoundPack.CLASSIC;
     
+    // Memory cache for audio file bytes to avoid repeated disk IO
+    private static final java.util.Map<String, byte[]> audioCache = new java.util.concurrent.ConcurrentHashMap<>();
+
     // 使用執行緒池來非同步播放 SFX，避免頻繁建立執行緒造成的資源開銷。
     private static final ExecutorService sfxExecutor = Executors.newCachedThreadPool(runnable -> {
         Thread thread = new Thread(runnable);
@@ -46,6 +49,54 @@ public class SoundManager {
         thread.setName("Tetris-SFX-Thread");
         return thread;
     });
+
+    static {
+        preloadResources();
+    }
+
+    private static byte[] readAllBytes(InputStream is) throws IOException {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        byte[] data = new byte[16384];
+        int nRead;
+        while ((nRead = is.read(data, 0, data.length)) != -1) {
+            buffer.write(data, 0, nRead);
+        }
+        return buffer.toByteArray();
+    }
+
+    public static void preloadResources() {
+        sfxExecutor.submit(() -> {
+            String[] files = { "/resources/bgm.wav", "/resources/clear.wav" };
+            for (String file : files) {
+                try {
+                    InputStream is = SoundManager.class.getResourceAsStream(file);
+                    if (is == null) {
+                        String alt = file.startsWith("/") ? file.substring(1) : "/" + file;
+                        is = SoundManager.class.getResourceAsStream(alt);
+                    }
+                    if (is == null) {
+                        File f = new File(file);
+                        if (!f.exists() || !f.isFile()) {
+                            String srcPath = file.startsWith("/") ? "src" + file : "src/" + file;
+                            f = new File(srcPath);
+                        }
+                        if (f.exists() && f.isFile()) {
+                            is = new java.io.FileInputStream(f);
+                        }
+                    }
+                    if (is != null) {
+                        try (InputStream bis = new BufferedInputStream(is)) {
+                            byte[] bytes = readAllBytes(bis);
+                            audioCache.put(file, bytes);
+                            System.out.println("[SoundManager] Preloaded: " + file + " (" + bytes.length + " bytes)");
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("[SoundManager] Error preloading: " + file + " - " + e.getMessage());
+                }
+            }
+        });
+    }
 
     public static synchronized SoundPack getCurrentSoundPack() {
         return currentSoundPack;
@@ -371,37 +422,39 @@ public class SoundManager {
             return null;
         }
 
+        // Check memory cache first
+        byte[] cachedBytes = audioCache.get(filePath);
+        if (cachedBytes != null) {
+            return AudioSystem.getAudioInputStream(new java.io.ByteArrayInputStream(cachedBytes));
+        }
+
+        // Fallback to load and cache
+        InputStream is = null;
         URL resourceUrl = SoundManager.class.getResource(filePath);
         if (resourceUrl != null) {
-            return AudioSystem.getAudioInputStream(resourceUrl);
+            is = resourceUrl.openStream();
+        } else {
+            is = SoundManager.class.getResourceAsStream(filePath);
+            if (is == null) {
+                File file = new File(filePath);
+                if (file.exists() && file.isFile()) {
+                    is = new java.io.FileInputStream(file);
+                } else {
+                    String srcPath = filePath.startsWith("/") ? "src" + filePath : "src/" + filePath;
+                    File srcFile = new File(srcPath);
+                    if (srcFile.exists() && srcFile.isFile()) {
+                        is = new java.io.FileInputStream(srcFile);
+                    }
+                }
+            }
         }
 
-        InputStream is = SoundManager.class.getResourceAsStream(filePath);
         if (is != null) {
-            return AudioSystem.getAudioInputStream(new BufferedInputStream(is));
-        }
-
-        File file = new File(filePath);
-        if (file.exists() && file.isFile()) {
-            return AudioSystem.getAudioInputStream(file);
-        }
-
-        String srcPath = filePath.startsWith("/") ? "src" + filePath : "src/" + filePath;
-        File srcFile = new File(srcPath);
-        if (srcFile.exists() && srcFile.isFile()) {
-            return AudioSystem.getAudioInputStream(srcFile);
-        }
-
-        String altPath = filePath.startsWith("/") ? filePath.substring(1) : "/" + filePath;
-        
-        resourceUrl = SoundManager.class.getResource(altPath);
-        if (resourceUrl != null) {
-            return AudioSystem.getAudioInputStream(resourceUrl);
-        }
-
-        is = SoundManager.class.getResourceAsStream(altPath);
-        if (is != null) {
-            return AudioSystem.getAudioInputStream(new BufferedInputStream(is));
+            try (InputStream bis = new BufferedInputStream(is)) {
+                byte[] bytes = readAllBytes(bis);
+                audioCache.put(filePath, bytes);
+                return AudioSystem.getAudioInputStream(new java.io.ByteArrayInputStream(bytes));
+            }
         }
 
         return null;

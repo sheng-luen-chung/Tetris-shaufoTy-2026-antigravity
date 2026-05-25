@@ -189,8 +189,9 @@ public class SaveManager {
     }
 
     public static void saveSettings(int das, int arr, int sdr, 
-                                    boolean p1Custom, int[] p1Keys, 
-                                    boolean p2Custom, int[] p2Keys,
+                                    boolean singleCustom, int[] singleKeys, 
+                                    boolean pvpP1Custom, int[] pvpP1Keys,
+                                    boolean pvpP2Custom, int[] pvpP2Keys,
                                     float bgmVol, float sfxVol,
                                     boolean bgmMute, boolean sfxMute,
                                     String theme, String colorBlind,
@@ -202,13 +203,17 @@ public class SaveManager {
                 writer.write("das=" + das + "\n");
                 writer.write("arr=" + arr + "\n");
                 writer.write("sdr=" + sdr + "\n");
-                writer.write("p1Custom=" + p1Custom + "\n");
-                if (p1Keys != null && p1Keys.length >= 6) {
-                    writer.write("p1Keys=" + p1Keys[0] + "," + p1Keys[1] + "," + p1Keys[2] + "," + p1Keys[3] + "," + p1Keys[4] + "," + p1Keys[5] + "\n");
+                writer.write("singleCustom=" + singleCustom + "\n");
+                if (singleKeys != null && singleKeys.length >= 6) {
+                    writer.write("singleKeys=" + singleKeys[0] + "," + singleKeys[1] + "," + singleKeys[2] + "," + singleKeys[3] + "," + singleKeys[4] + "," + singleKeys[5] + "\n");
                 }
-                writer.write("p2Custom=" + p2Custom + "\n");
-                if (p2Keys != null && p2Keys.length >= 6) {
-                    writer.write("p2Keys=" + p2Keys[0] + "," + p2Keys[1] + "," + p2Keys[2] + "," + p2Keys[3] + "," + p2Keys[4] + "," + p2Keys[5] + "\n");
+                writer.write("pvpP1Custom=" + pvpP1Custom + "\n");
+                if (pvpP1Keys != null && pvpP1Keys.length >= 6) {
+                    writer.write("pvpP1Keys=" + pvpP1Keys[0] + "," + pvpP1Keys[1] + "," + pvpP1Keys[2] + "," + pvpP1Keys[3] + "," + pvpP1Keys[4] + "," + pvpP1Keys[5] + "\n");
+                }
+                writer.write("pvpP2Custom=" + pvpP2Custom + "\n");
+                if (pvpP2Keys != null && pvpP2Keys.length >= 6) {
+                    writer.write("pvpP2Keys=" + pvpP2Keys[0] + "," + pvpP2Keys[1] + "," + pvpP2Keys[2] + "," + pvpP2Keys[3] + "," + pvpP2Keys[4] + "," + pvpP2Keys[5] + "\n");
                 }
                 writer.write("bgmVol=" + bgmVol + "\n");
                 writer.write("sfxVol=" + sfxVol + "\n");

@@ -9,9 +9,9 @@ public class InputHandler extends KeyAdapter {
     private GameEngine engine2 = null;
 
     // Movement state flags for Player 1
-    private boolean p1LeftPressed = false;
-    private boolean p1RightPressed = false;
-    private boolean p1DownPressed = false;
+    private volatile boolean p1LeftPressed = false;
+    private volatile boolean p1RightPressed = false;
+    private volatile boolean p1DownPressed = false;
     private int p1LeftHoldTime = 0;
     private int p1RightHoldTime = 0;
     private int p1DownHoldTime = 0;
@@ -19,9 +19,9 @@ public class InputHandler extends KeyAdapter {
     private int p1RightRepeatCounter = 0;
 
     // Movement state flags for Player 2
-    private boolean p2LeftPressed = false;
-    private boolean p2RightPressed = false;
-    private boolean p2DownPressed = false;
+    private volatile boolean p2LeftPressed = false;
+    private volatile boolean p2RightPressed = false;
+    private volatile boolean p2DownPressed = false;
     private int p2LeftHoldTime = 0;
     private int p2RightHoldTime = 0;
     private int p2DownHoldTime = 0;
@@ -29,9 +29,9 @@ public class InputHandler extends KeyAdapter {
     private int p2RightRepeatCounter = 0;
 
     // Backward compatibility for single player
-    private boolean leftPressed = false;
-    private boolean rightPressed = false;
-    private boolean downPressed = false;
+    private volatile boolean leftPressed = false;
+    private volatile boolean rightPressed = false;
+    private volatile boolean downPressed = false;
     private int leftHoldTime = 0;
     private int rightHoldTime = 0;
     private int downHoldTime = 0;
@@ -43,23 +43,32 @@ public class InputHandler extends KeyAdapter {
     private static int arrRateMs = 45;
     private static int softDropIntervalMs = 30;
 
-    // Player 1 Custom Keys (Left, Right, Down, Rotate, Drop, Hold)
-    private static boolean p1Customized = false;
-    private static int p1KeyLeft = KeyEvent.VK_LEFT;
-    private static int p1KeyRight = KeyEvent.VK_RIGHT;
-    private static int p1KeyDown = KeyEvent.VK_DOWN;
-    private static int p1KeyRotate = KeyEvent.VK_UP;
-    private static int p1KeyDrop = KeyEvent.VK_SPACE;
-    private static int p1KeyHold = KeyEvent.VK_C;
+    // Single Player Keys
+    private static boolean singleCustomized = false;
+    private static int singleKeyLeft = KeyEvent.VK_LEFT;
+    private static int singleKeyRight = KeyEvent.VK_RIGHT;
+    private static int singleKeyDown = KeyEvent.VK_DOWN;
+    private static int singleKeyRotate = KeyEvent.VK_UP;
+    private static int singleKeyDrop = KeyEvent.VK_SPACE;
+    private static int singleKeyHold = KeyEvent.VK_C;
 
-    // Player 2 Custom Keys
-    private static boolean p2Customized = false;
-    private static int p2KeyLeft = KeyEvent.VK_A;
-    private static int p2KeyRight = KeyEvent.VK_D;
-    private static int p2KeyDown = KeyEvent.VK_S;
-    private static int p2KeyRotate = KeyEvent.VK_W;
-    private static int p2KeyDrop = KeyEvent.VK_Q;
-    private static int p2KeyHold = KeyEvent.VK_E;
+    // PvP Player 1 (Left) Keys
+    private static boolean pvpP1Customized = false;
+    private static int pvpP1KeyLeft = KeyEvent.VK_A;
+    private static int pvpP1KeyRight = KeyEvent.VK_D;
+    private static int pvpP1KeyDown = KeyEvent.VK_S;
+    private static int pvpP1KeyRotate = KeyEvent.VK_W;
+    private static int pvpP1KeyDrop = KeyEvent.VK_SPACE;
+    private static int pvpP1KeyHold = KeyEvent.VK_C;
+
+    // PvP Player 2 (Right) Keys
+    private static boolean pvpP2Customized = false;
+    private static int pvpP2KeyLeft = KeyEvent.VK_LEFT;
+    private static int pvpP2KeyRight = KeyEvent.VK_RIGHT;
+    private static int pvpP2KeyDown = KeyEvent.VK_DOWN;
+    private static int pvpP2KeyRotate = KeyEvent.VK_UP;
+    private static int pvpP2KeyDrop = KeyEvent.VK_ENTER;
+    private static int pvpP2KeyHold = KeyEvent.VK_SHIFT;
 
     public static int getDasDelayMs() { return dasDelayMs; }
     public static void setDasDelayMs(int val) { dasDelayMs = val; saveConfig(); }
@@ -68,30 +77,59 @@ public class InputHandler extends KeyAdapter {
     public static int getSoftDropIntervalMs() { return softDropIntervalMs; }
     public static void setSoftDropIntervalMs(int val) { softDropIntervalMs = val; saveConfig(); }
 
-    public static boolean isP1Customized() { return p1Customized; }
-    public static void setP1Customized(boolean val) { p1Customized = val; saveConfig(); }
-    public static int getP1KeyLeft() { return p1KeyLeft; }
-    public static int getP1KeyRight() { return p1KeyRight; }
-    public static int getP1KeyDown() { return p1KeyDown; }
-    public static int getP1KeyRotate() { return p1KeyRotate; }
-    public static int getP1KeyDrop() { return p1KeyDrop; }
-    public static int getP1KeyHold() { return p1KeyHold; }
+    public static boolean isSingleCustomized() { return singleCustomized; }
+    public static void setSingleCustomized(boolean val) { singleCustomized = val; saveConfig(); }
+    public static int getSingleKeyLeft() { return singleKeyLeft; }
+    public static void setSingleKeyLeft(int val) { singleKeyLeft = val; }
+    public static int getSingleKeyRight() { return singleKeyRight; }
+    public static void setSingleKeyRight(int val) { singleKeyRight = val; }
+    public static int getSingleKeyDown() { return singleKeyDown; }
+    public static void setSingleKeyDown(int val) { singleKeyDown = val; }
+    public static int getSingleKeyRotate() { return singleKeyRotate; }
+    public static void setSingleKeyRotate(int val) { singleKeyRotate = val; }
+    public static int getSingleKeyDrop() { return singleKeyDrop; }
+    public static void setSingleKeyDrop(int val) { singleKeyDrop = val; }
+    public static int getSingleKeyHold() { return singleKeyHold; }
+    public static void setSingleKeyHold(int val) { singleKeyHold = val; }
 
-    public static boolean isP2Customized() { return p2Customized; }
-    public static void setP2Customized(boolean val) { p2Customized = val; saveConfig(); }
-    public static int getP2KeyLeft() { return p2KeyLeft; }
-    public static int getP2KeyRight() { return p2KeyRight; }
-    public static int getP2KeyDown() { return p2KeyDown; }
-    public static int getP2KeyRotate() { return p2KeyRotate; }
-    public static int getP2KeyDrop() { return p2KeyDrop; }
-    public static int getP2KeyHold() { return p2KeyHold; }
+    public static boolean isPvpP1Customized() { return pvpP1Customized; }
+    public static void setPvpP1Customized(boolean val) { pvpP1Customized = val; saveConfig(); }
+    public static int getPvpP1KeyLeft() { return pvpP1KeyLeft; }
+    public static void setPvpP1KeyLeft(int val) { pvpP1KeyLeft = val; }
+    public static int getPvpP1KeyRight() { return pvpP1KeyRight; }
+    public static void setPvpP1KeyRight(int val) { pvpP1KeyRight = val; }
+    public static int getPvpP1KeyDown() { return pvpP1KeyDown; }
+    public static void setPvpP1KeyDown(int val) { pvpP1KeyDown = val; }
+    public static int getPvpP1KeyRotate() { return pvpP1KeyRotate; }
+    public static void setPvpP1KeyRotate(int val) { pvpP1KeyRotate = val; }
+    public static int getPvpP1KeyDrop() { return pvpP1KeyDrop; }
+    public static void setPvpP1KeyDrop(int val) { pvpP1KeyDrop = val; }
+    public static int getPvpP1KeyHold() { return pvpP1KeyHold; }
+    public static void setPvpP1KeyHold(int val) { pvpP1KeyHold = val; }
+
+    public static boolean isPvpP2Customized() { return pvpP2Customized; }
+    public static void setPvpP2Customized(boolean val) { pvpP2Customized = val; saveConfig(); }
+    public static int getPvpP2KeyLeft() { return pvpP2KeyLeft; }
+    public static void setPvpP2KeyLeft(int val) { pvpP2KeyLeft = val; }
+    public static int getPvpP2KeyRight() { return pvpP2KeyRight; }
+    public static void setPvpP2KeyRight(int val) { pvpP2KeyRight = val; }
+    public static int getPvpP2KeyDown() { return pvpP2KeyDown; }
+    public static void setPvpP2KeyDown(int val) { pvpP2KeyDown = val; }
+    public static int getPvpP2KeyRotate() { return pvpP2KeyRotate; }
+    public static void setPvpP2KeyRotate(int val) { pvpP2KeyRotate = val; }
+    public static int getPvpP2KeyDrop() { return pvpP2KeyDrop; }
+    public static void setPvpP2KeyDrop(int val) { pvpP2KeyDrop = val; }
+    public static int getPvpP2KeyHold() { return pvpP2KeyHold; }
+    public static void setPvpP2KeyHold(int val) { pvpP2KeyHold = val; }
 
     public static void saveConfig() {
-        int[] p1Keys = { p1KeyLeft, p1KeyRight, p1KeyDown, p1KeyRotate, p1KeyDrop, p1KeyHold };
-        int[] p2Keys = { p2KeyLeft, p2KeyRight, p2KeyDown, p2KeyRotate, p2KeyDrop, p2KeyHold };
+        int[] singleKeys = { singleKeyLeft, singleKeyRight, singleKeyDown, singleKeyRotate, singleKeyDrop, singleKeyHold };
+        int[] pvpP1Keys = { pvpP1KeyLeft, pvpP1KeyRight, pvpP1KeyDown, pvpP1KeyRotate, pvpP1KeyDrop, pvpP1KeyHold };
+        int[] pvpP2Keys = { pvpP2KeyLeft, pvpP2KeyRight, pvpP2KeyDown, pvpP2KeyRotate, pvpP2KeyDrop, pvpP2KeyHold };
         com.tetris.util.SaveManager.saveSettings(dasDelayMs, arrRateMs, softDropIntervalMs, 
-                                                p1Customized, p1Keys, 
-                                                p2Customized, p2Keys,
+                                                singleCustomized, singleKeys, 
+                                                pvpP1Customized, pvpP1Keys,
+                                                pvpP2Customized, pvpP2Keys,
                                                 com.tetris.util.SoundManager.getBGMVolume(),
                                                 com.tetris.util.SoundManager.getSFXVolume(),
                                                 com.tetris.util.SoundManager.isBGMMuted(),
@@ -105,25 +143,32 @@ public class InputHandler extends KeyAdapter {
         dasDelayMs = 170;
         arrRateMs = 45;
         softDropIntervalMs = 30;
-        p1Customized = false;
-        p1KeyLeft = KeyEvent.VK_LEFT;
-        p1KeyRight = KeyEvent.VK_RIGHT;
-        p1KeyDown = KeyEvent.VK_DOWN;
-        p1KeyRotate = KeyEvent.VK_UP;
-        p1KeyDrop = KeyEvent.VK_SPACE;
-        p1KeyHold = KeyEvent.VK_C;
-        p2Customized = false;
-        p2KeyLeft = KeyEvent.VK_A;
-        p2KeyRight = KeyEvent.VK_D;
-        p2KeyDown = KeyEvent.VK_S;
-        p2KeyRotate = KeyEvent.VK_W;
-        p2KeyDrop = KeyEvent.VK_Q;
-        p2KeyHold = KeyEvent.VK_E;
+        
+        singleCustomized = false;
+        singleKeyLeft = KeyEvent.VK_LEFT;
+        singleKeyRight = KeyEvent.VK_RIGHT;
+        singleKeyDown = KeyEvent.VK_DOWN;
+        singleKeyRotate = KeyEvent.VK_UP;
+        singleKeyDrop = KeyEvent.VK_SPACE;
+        singleKeyHold = KeyEvent.VK_C;
+
+        pvpP1Customized = false;
+        pvpP1KeyLeft = KeyEvent.VK_A;
+        pvpP1KeyRight = KeyEvent.VK_D;
+        pvpP1KeyDown = KeyEvent.VK_S;
+        pvpP1KeyRotate = KeyEvent.VK_W;
+        pvpP1KeyDrop = KeyEvent.VK_SPACE;
+        pvpP1KeyHold = KeyEvent.VK_C;
+
+        pvpP2Customized = false;
+        pvpP2KeyLeft = KeyEvent.VK_LEFT;
+        pvpP2KeyRight = KeyEvent.VK_RIGHT;
+        pvpP2KeyDown = KeyEvent.VK_DOWN;
+        pvpP2KeyRotate = KeyEvent.VK_UP;
+        pvpP2KeyDrop = KeyEvent.VK_ENTER;
+        pvpP2KeyHold = KeyEvent.VK_SHIFT;
         saveConfig();
     }
-
-    private final javax.swing.Timer inputTimer;
-    private long lastTickTime = System.currentTimeMillis();
 
     public InputHandler(GameEngine engine) {
         this.engine = engine;
@@ -135,30 +180,79 @@ public class InputHandler extends KeyAdapter {
                 if (config.containsKey("das")) dasDelayMs = Integer.parseInt(config.get("das"));
                 if (config.containsKey("arr")) arrRateMs = Integer.parseInt(config.get("arr"));
                 if (config.containsKey("sdr")) softDropIntervalMs = Integer.parseInt(config.get("sdr"));
-                if (config.containsKey("p1Custom")) p1Customized = Boolean.parseBoolean(config.get("p1Custom"));
-                if (config.containsKey("p1Keys")) {
+                if (config.containsKey("singleCustom")) singleCustomized = Boolean.parseBoolean(config.get("singleCustom"));
+                if (config.containsKey("singleKeys")) {
+                    String[] parts = config.get("singleKeys").split(",");
+                    if (parts.length >= 6) {
+                        singleKeyLeft = Integer.parseInt(parts[0]);
+                        singleKeyRight = Integer.parseInt(parts[1]);
+                        singleKeyDown = Integer.parseInt(parts[2]);
+                        singleKeyRotate = Integer.parseInt(parts[3]);
+                        singleKeyDrop = Integer.parseInt(parts[4]);
+                        singleKeyHold = Integer.parseInt(parts[5]);
+                    }
+                }
+                if (config.containsKey("pvpP1Custom")) pvpP1Customized = Boolean.parseBoolean(config.get("pvpP1Custom"));
+                if (config.containsKey("pvpP1Keys")) {
+                    String[] parts = config.get("pvpP1Keys").split(",");
+                    if (parts.length >= 6) {
+                        pvpP1KeyLeft = Integer.parseInt(parts[0]);
+                        pvpP1KeyRight = Integer.parseInt(parts[1]);
+                        pvpP1KeyDown = Integer.parseInt(parts[2]);
+                        pvpP1KeyRotate = Integer.parseInt(parts[3]);
+                        pvpP1KeyDrop = Integer.parseInt(parts[4]);
+                        pvpP1KeyHold = Integer.parseInt(parts[5]);
+                    }
+                }
+                if (config.containsKey("pvpP2Custom")) pvpP2Customized = Boolean.parseBoolean(config.get("pvpP2Custom"));
+                if (config.containsKey("pvpP2Keys")) {
+                    String[] parts = config.get("pvpP2Keys").split(",");
+                    if (parts.length >= 6) {
+                        pvpP2KeyLeft = Integer.parseInt(parts[0]);
+                        pvpP2KeyRight = Integer.parseInt(parts[1]);
+                        pvpP2KeyDown = Integer.parseInt(parts[2]);
+                        pvpP2KeyRotate = Integer.parseInt(parts[3]);
+                        pvpP2KeyDrop = Integer.parseInt(parts[4]);
+                        pvpP2KeyHold = Integer.parseInt(parts[5]);
+                    }
+                }
+                
+                // Fallback support for old settings config
+                if (!config.containsKey("singleKeys") && config.containsKey("p1Keys")) {
                     String[] parts = config.get("p1Keys").split(",");
                     if (parts.length >= 6) {
-                        p1KeyLeft = Integer.parseInt(parts[0]);
-                        p1KeyRight = Integer.parseInt(parts[1]);
-                        p1KeyDown = Integer.parseInt(parts[2]);
-                        p1KeyRotate = Integer.parseInt(parts[3]);
-                        p1KeyDrop = Integer.parseInt(parts[4]);
-                        p1KeyHold = Integer.parseInt(parts[5]);
+                        int kl = Integer.parseInt(parts[0]);
+                        int kr = Integer.parseInt(parts[1]);
+                        int kd = Integer.parseInt(parts[2]);
+                        int kro = Integer.parseInt(parts[3]);
+                        int kdr = Integer.parseInt(parts[4]);
+                        int kh = Integer.parseInt(parts[5]);
+                        singleKeyLeft = pvpP2KeyLeft = kl;
+                        singleKeyRight = pvpP2KeyRight = kr;
+                        singleKeyDown = pvpP2KeyDown = kd;
+                        singleKeyRotate = pvpP2KeyRotate = kro;
+                        singleKeyDrop = pvpP2KeyDrop = kdr;
+                        singleKeyHold = pvpP2KeyHold = kh;
                     }
                 }
-                if (config.containsKey("p2Custom")) p2Customized = Boolean.parseBoolean(config.get("p2Custom"));
-                if (config.containsKey("p2Keys")) {
+                if (!config.containsKey("pvpP1Keys") && config.containsKey("p2Keys")) {
                     String[] parts = config.get("p2Keys").split(",");
                     if (parts.length >= 6) {
-                        p2KeyLeft = Integer.parseInt(parts[0]);
-                        p2KeyRight = Integer.parseInt(parts[1]);
-                        p2KeyDown = Integer.parseInt(parts[2]);
-                        p2KeyRotate = Integer.parseInt(parts[3]);
-                        p2KeyDrop = Integer.parseInt(parts[4]);
-                        p2KeyHold = Integer.parseInt(parts[5]);
+                        int kl = Integer.parseInt(parts[0]);
+                        int kr = Integer.parseInt(parts[1]);
+                        int kd = Integer.parseInt(parts[2]);
+                        int kro = Integer.parseInt(parts[3]);
+                        int kdr = Integer.parseInt(parts[4]);
+                        int kh = Integer.parseInt(parts[5]);
+                        pvpP1KeyLeft = kl;
+                        pvpP1KeyRight = kr;
+                        pvpP1KeyDown = kd;
+                        pvpP1KeyRotate = kro;
+                        pvpP1KeyDrop = kdr;
+                        pvpP1KeyHold = kh;
                     }
                 }
+                
                 if (config.containsKey("bgmVol")) com.tetris.util.SoundManager.setBGMVolume(Float.parseFloat(config.get("bgmVol")));
                 if (config.containsKey("sfxVol")) com.tetris.util.SoundManager.setSFXVolume(Float.parseFloat(config.get("sfxVol")));
                 if (config.containsKey("bgmMute")) com.tetris.util.SoundManager.setBGMMuted(Boolean.parseBoolean(config.get("bgmMute")));
@@ -170,47 +264,36 @@ public class InputHandler extends KeyAdapter {
                 System.err.println("Error parsing controls config: " + ex.getMessage());
             }
         }
+    }
 
-        // High-frequency input polling loop (10ms for lower perceived latency)
-        this.inputTimer = new javax.swing.Timer(10, e -> {
-            long now = System.currentTimeMillis();
-            int deltaTime = (int) (now - lastTickTime);
-            lastTickTime = now;
-
-            GameEngine.GameState state = engine.getGameState();
-            boolean isActiveState = (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL);
-            if (isActiveState) {
-                if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
-                    if (engine2 != null && !engine.isPaused()) {
-                        if (!engine.isGameOver()) {
-                            updateP1Inputs(deltaTime);
-                            engine.tickLockDelay();
-                        } else {
-                            resetP1KeyStates();
-                        }
-
-                        if (!engine2.isGameOver()) {
-                            updateP2Inputs(deltaTime);
-                            engine2.tickLockDelay();
-                        } else {
-                            resetP2KeyStates();
-                        }
-                    }
-                } else {
-                    if (!engine.isGameOver() && !engine.isPaused() && !engine.isTransitioning()) {
-                        updateInputs(deltaTime);
-                        engine.tickLockDelay();
+    public void tickInputs(int deltaTime) {
+        GameEngine.GameState state = engine.getGameState();
+        boolean isActiveState = (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL);
+        if (isActiveState) {
+            if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
+                if (engine2 != null && !engine.isPaused()) {
+                    if (!engine.isGameOver()) {
+                        updateP1Inputs(deltaTime);
                     } else {
-                        resetKeyStates();
-                        lastTickTime = now;
+                        resetP1KeyStates();
+                    }
+
+                    if (!engine2.isGameOver()) {
+                        updateP2Inputs(deltaTime);
+                    } else {
+                        resetP2KeyStates();
                     }
                 }
             } else {
-                resetKeyStates();
-                lastTickTime = now;
+                if (!engine.isGameOver() && !engine.isPaused() && !engine.isTransitioning()) {
+                    updateInputs(deltaTime);
+                } else {
+                    resetKeyStates();
+                }
             }
-        });
-        this.inputTimer.start();
+        } else {
+            resetKeyStates();
+        }
     }
 
     public void setEngine2(GameEngine engine2) {
@@ -421,21 +504,29 @@ public class InputHandler extends KeyAdapter {
             String action = engine.getPanel().getRebindingAction();
             int player = engine.getPanel().getRebindingPlayer();
             if (player == 1) {
-                p1Customized = true;
-                if ("LEFT".equals(action)) p1KeyLeft = keyCode;
-                else if ("RIGHT".equals(action)) p1KeyRight = keyCode;
-                else if ("ROTATE".equals(action)) p1KeyRotate = keyCode;
-                else if ("DOWN".equals(action)) p1KeyDown = keyCode;
-                else if ("DROP".equals(action)) p1KeyDrop = keyCode;
-                else if ("HOLD".equals(action)) p1KeyHold = keyCode;
+                singleCustomized = true;
+                if ("LEFT".equals(action)) singleKeyLeft = keyCode;
+                else if ("RIGHT".equals(action)) singleKeyRight = keyCode;
+                else if ("ROTATE".equals(action)) singleKeyRotate = keyCode;
+                else if ("DOWN".equals(action)) singleKeyDown = keyCode;
+                else if ("DROP".equals(action)) singleKeyDrop = keyCode;
+                else if ("HOLD".equals(action)) singleKeyHold = keyCode;
             } else if (player == 2) {
-                p2Customized = true;
-                if ("LEFT".equals(action)) p2KeyLeft = keyCode;
-                else if ("RIGHT".equals(action)) p2KeyRight = keyCode;
-                else if ("ROTATE".equals(action)) p2KeyRotate = keyCode;
-                else if ("DOWN".equals(action)) p2KeyDown = keyCode;
-                else if ("DROP".equals(action)) p2KeyDrop = keyCode;
-                else if ("HOLD".equals(action)) p2KeyHold = keyCode;
+                pvpP1Customized = true;
+                if ("LEFT".equals(action)) pvpP1KeyLeft = keyCode;
+                else if ("RIGHT".equals(action)) pvpP1KeyRight = keyCode;
+                else if ("ROTATE".equals(action)) pvpP1KeyRotate = keyCode;
+                else if ("DOWN".equals(action)) pvpP1KeyDown = keyCode;
+                else if ("DROP".equals(action)) pvpP1KeyDrop = keyCode;
+                else if ("HOLD".equals(action)) pvpP1KeyHold = keyCode;
+            } else if (player == 3) {
+                pvpP2Customized = true;
+                if ("LEFT".equals(action)) pvpP2KeyLeft = keyCode;
+                else if ("RIGHT".equals(action)) pvpP2KeyRight = keyCode;
+                else if ("ROTATE".equals(action)) pvpP2KeyRotate = keyCode;
+                else if ("DOWN".equals(action)) pvpP2KeyDown = keyCode;
+                else if ("DROP".equals(action)) pvpP2KeyDrop = keyCode;
+                else if ("HOLD".equals(action)) pvpP2KeyHold = keyCode;
             }
             engine.getPanel().setRebindingAction(null); // clear rebinding status
             saveConfig(); // save settings!
@@ -565,19 +656,19 @@ public class InputHandler extends KeyAdapter {
             if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
                 // PVP Controls
                 // Resolve dynamic keys
-                int p1Left = p1Customized ? p1KeyLeft : KeyEvent.VK_LEFT;
-                int p1Right = p1Customized ? p1KeyRight : KeyEvent.VK_RIGHT;
-                int p1Down = p1Customized ? p1KeyDown : KeyEvent.VK_DOWN;
-                int p1Rotate = p1Customized ? p1KeyRotate : KeyEvent.VK_UP;
-                int p1Drop = p1Customized ? p1KeyDrop : KeyEvent.VK_SPACE;
-                int p1Hold = p1Customized ? p1KeyHold : KeyEvent.VK_C;
+                int p1Left = pvpP1KeyLeft;
+                int p1Right = pvpP1KeyRight;
+                int p1Down = pvpP1KeyDown;
+                int p1Rotate = pvpP1KeyRotate;
+                int p1Drop = pvpP1KeyDrop;
+                int p1Hold = pvpP1KeyHold;
 
-                int p2Left = p2Customized ? p2KeyLeft : KeyEvent.VK_A;
-                int p2Right = p2Customized ? p2KeyRight : KeyEvent.VK_D;
-                int p2Down = p2Customized ? p2KeyDown : KeyEvent.VK_S;
-                int p2Rotate = p2Customized ? p2KeyRotate : KeyEvent.VK_W;
-                int p2Drop = p2Customized ? p2KeyDrop : KeyEvent.VK_Q;
-                int p2Hold = p2Customized ? p2KeyHold : KeyEvent.VK_E;
+                int p2Left = pvpP2KeyLeft;
+                int p2Right = pvpP2KeyRight;
+                int p2Down = pvpP2KeyDown;
+                int p2Rotate = pvpP2KeyRotate;
+                int p2Drop = pvpP2KeyDrop;
+                int p2Hold = pvpP2KeyHold;
 
                 // Player 1
                 if (keyCode == p1Left) {
@@ -663,12 +754,12 @@ public class InputHandler extends KeyAdapter {
             }
 
             // Single Player dynamic keys
-            int left = p1Customized ? p1KeyLeft : KeyEvent.VK_LEFT;
-            int right = p1Customized ? p1KeyRight : KeyEvent.VK_RIGHT;
-            int down = p1Customized ? p1KeyDown : KeyEvent.VK_DOWN;
-            int rotate = p1Customized ? p1KeyRotate : KeyEvent.VK_UP;
-            int drop = p1Customized ? p1KeyDrop : KeyEvent.VK_SPACE;
-            int hold = p1Customized ? p1KeyHold : KeyEvent.VK_C;
+            int left = singleKeyLeft;
+            int right = singleKeyRight;
+            int down = singleKeyDown;
+            int rotate = singleKeyRotate;
+            int drop = singleKeyDrop;
+            int hold = singleKeyHold;
 
             if (keyCode == left) {
                 if (!leftPressed) {
@@ -712,12 +803,12 @@ public class InputHandler extends KeyAdapter {
         GameEngine.GameState state = engine.getGameState();
         if (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL) {
             if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
-                int p1Left = p1Customized ? p1KeyLeft : KeyEvent.VK_LEFT;
-                int p1Right = p1Customized ? p1KeyRight : KeyEvent.VK_RIGHT;
-                int p1Down = p1Customized ? p1KeyDown : KeyEvent.VK_DOWN;
-                int p2Left = p2Customized ? p2KeyLeft : KeyEvent.VK_A;
-                int p2Right = p2Customized ? p2KeyRight : KeyEvent.VK_D;
-                int p2Down = p2Customized ? p2KeyDown : KeyEvent.VK_S;
+                int p1Left = pvpP1KeyLeft;
+                int p1Right = pvpP1KeyRight;
+                int p1Down = pvpP1KeyDown;
+                int p2Left = pvpP2KeyLeft;
+                int p2Right = pvpP2KeyRight;
+                int p2Down = pvpP2KeyDown;
 
                 if (keyCode == p1Left) {
                     p1LeftPressed = false;
@@ -733,9 +824,9 @@ public class InputHandler extends KeyAdapter {
                     p2DownPressed = false;
                 }
             } else {
-                int left = p1Customized ? p1KeyLeft : KeyEvent.VK_LEFT;
-                int right = p1Customized ? p1KeyRight : KeyEvent.VK_RIGHT;
-                int down = p1Customized ? p1KeyDown : KeyEvent.VK_DOWN;
+                int left = singleKeyLeft;
+                int right = singleKeyRight;
+                int down = singleKeyDown;
 
                 if (keyCode == left) {
                     leftPressed = false;

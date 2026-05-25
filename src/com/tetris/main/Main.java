@@ -41,6 +41,9 @@ public class Main {
         frame.setVisible(true); // Display window
 
         frame.addKeyListener(inputHandler); // Key listener
+        gamePanel.addKeyListener(inputHandler);
+        gamePanel.setFocusable(true);
+        gamePanel.requestFocusInWindow();
 
         engine.start();
     }

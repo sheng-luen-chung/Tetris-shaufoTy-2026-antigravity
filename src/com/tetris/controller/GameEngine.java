@@ -70,8 +70,14 @@ public class GameEngine {
     private int playerNum = 1;
     private int pvpWinner = 0; // 0: none, 1: P1, 2: P2
     private InputHandler inputHandler = null;
-    private Timer gameLoop;
-    private Timer secondTimer;
+
+    // Multi-threaded Game Loop fields (Fixed Timestep)
+    private Thread gameLoopThread;
+    private volatile boolean running = false;
+    private int gravityAccumulator = 0;
+    private int secondAccumulator = 0;
+    private int aiAccumulator = 0;
+    private int menuAccumulator = 0;
     private boolean isGameOver = false;
     private boolean isPaused = false;
     private boolean leaderboardRecorded = false;
@@ -111,7 +117,6 @@ public class GameEngine {
     // AI Autoplay Mechanism
     private boolean aiPlay = false;
     private boolean usedAiThisSession = false;
-    private Timer aiTimer;
     private int targetRotation = 0;
     private int targetCol = 0;
     private boolean needsAiCalculation = true;
@@ -135,67 +140,140 @@ public class GameEngine {
         }
         nextPiece = nextPieces.get(0);
         spawnNewPiece();
-
-        // Set game loop (falling piece)
-        gameLoop = new Timer(difficulty.getFallDelayMs(), e -> {
-            if (!isPaused) {
-                update();
-            }
-        });
-
-        // Set second timer (game time)
-        secondTimer = new Timer(1000, e -> {
-            if (!isGameOver && !isPaused) {
-                secondsElapsed++;
-                if (gameMode == GameMode.ULTRA && secondsElapsed >= 120) {
-                    isVictory = true;
-                    isGameOver = true;
-                    setAiPlay(false);
-                    gameLoop.stop();
-                    secondTimer.stop();
-                    SoundManager.stopBGM();
-                    SoundManager.playSFX("/resources/clear.wav");
-                    recordFinalScore();
-                } else if (gameMode == GameMode.SURVIVAL) {
-                    if (!usedAiThisSession && secondsElapsed >= 180) {
-                        com.tetris.util.AchievementManager.unlockAchievement("survival_master");
-                    }
-                    int interval = 15;
-                    if (difficulty == Difficulty.EASY) {
-                        interval = 20;
-                    } else if (difficulty == Difficulty.HARD) {
-                        interval = 10;
-                    }
-                    if (secondsElapsed > 0 && secondsElapsed % interval == 0) {
-                        int holeCol = new Random().nextInt(com.tetris.model.Board.COLS);
-                        board.addGarbageLine(holeCol);
-                        // Check if current piece collides and push it up if possible
-                        if (currentPiece != null && !board.isValidMove(currentPiece)) {
-                            currentPiece.move(-1, 0); // push up
-                            if (!board.isValidMove(currentPiece)) {
-                                currentPiece.move(1, 0); // push back if failed
-                            }
-                        }
-                        SoundManager.playSFX("/resources/clear.wav");
-                    }
-                }
-                panel.repaint(); // Refresh UI to show timer
-            }
-        });
-
-        // Set AI autoplay timer (ticks every 80ms)
-        aiTimer = new Timer(80, e -> {
-            if (gameState == GameState.PLAYING && !isPaused && !isGameOver && aiPlay) {
-                runAIStep();
-            }
-        });
     }
 
-    // Start the game
-    public void start() {
-        if (gameState == GameState.PLAYING) {
-            gameLoop.start();
-            secondTimer.start();
+    // Start the game loop thread
+    public synchronized void start() {
+        if (running) return;
+        running = true;
+        gameLoopThread = new Thread(this::runGameLoop, "Tetris-GameLoop-" + playerNum);
+        gameLoopThread.setDaemon(true);
+        gameLoopThread.start();
+    }
+
+    public synchronized void stop() {
+        running = false;
+        if (gameLoopThread != null) {
+            try {
+                gameLoopThread.join(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            gameLoopThread = null;
+        }
+    }
+
+    private void runGameLoop() {
+        long lastTime = System.nanoTime();
+        double tickTimeNs = 1000000000.0 / 100.0; // 100Hz logic tick
+        double unprocessed = 0;
+
+        long lastFrameTime = System.nanoTime();
+        double frameTimeNs = 1000000000.0 / 60.0; // 60 FPS target
+
+        while (running) {
+            long now = System.nanoTime();
+            unprocessed += (now - lastTime) / tickTimeNs;
+            lastTime = now;
+
+            boolean ticked = false;
+            while (unprocessed >= 1) {
+                tickLogic(10);
+                unprocessed--;
+                ticked = true;
+            }
+
+            if (ticked) {
+                long frameNow = System.nanoTime();
+                if (frameNow - lastFrameTime >= frameTimeNs) {
+                    panel.renderOffscreen();
+                    lastFrameTime = frameNow;
+                }
+            }
+
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private void tickLogic(int dt) {
+        // 1. Tick inputs
+        if (inputHandler != null) {
+            inputHandler.tickInputs(dt);
+        }
+
+        // 2. Tick game state
+        if (gameState == GameState.PLAYING || gameState == GameState.TUTORIAL) {
+            if (!isGameOver && !isPaused && !isTransitioning) {
+                // Gravity
+                gravityAccumulator += dt;
+                if (gravityAccumulator >= difficulty.getFallDelayMs()) {
+                    gravityAccumulator = 0;
+                    update();
+                }
+
+                // Lock delay
+                tickLockDelay();
+
+                // Game time (second timer)
+                secondAccumulator += dt;
+                if (secondAccumulator >= 1000) {
+                    secondAccumulator -= 1000;
+                    secondsElapsed++;
+                    handleSecondsTick();
+                }
+
+                // AI step timer
+                if (aiPlay) {
+                    aiAccumulator += dt;
+                    if (aiAccumulator >= 80) {
+                        aiAccumulator -= 80;
+                        runAIStep();
+                    }
+                }
+            }
+        } else if (gameState == GameState.MENU || gameState == GameState.LEADERBOARD) {
+            // Menu floating pieces animation
+            menuAccumulator += dt;
+            if (menuAccumulator >= 33) {
+                menuAccumulator -= 33;
+                panel.repaint();
+            }
+        }
+    }
+
+    private void handleSecondsTick() {
+        if (gameMode == GameMode.ULTRA && secondsElapsed >= 120) {
+            isGameOver = true;
+            isVictory = true;
+            setAiPlay(false);
+            SoundManager.stopBGM();
+            SoundManager.playSFX("/resources/clear.wav");
+            recordFinalScore();
+        } else if (gameMode == GameMode.SURVIVAL) {
+            if (!usedAiThisSession && secondsElapsed >= 180) {
+                com.tetris.util.AchievementManager.unlockAchievement("survival_master");
+            }
+            int interval = 15;
+            if (difficulty == Difficulty.EASY) {
+                interval = 20;
+            } else if (difficulty == Difficulty.HARD) {
+                interval = 10;
+            }
+            if (secondsElapsed > 0 && secondsElapsed % interval == 0) {
+                int holeCol = new Random().nextInt(com.tetris.model.Board.COLS);
+                board.addGarbageLine(holeCol);
+                if (currentPiece != null && !board.isValidMove(currentPiece)) {
+                    currentPiece.move(-1, 0); // push up
+                    if (!board.isValidMove(currentPiece)) {
+                        currentPiece.move(1, 0); // push back if failed
+                    }
+                }
+                SoundManager.playSFX("/resources/clear.wav");
+            }
         }
     }
 
@@ -228,14 +306,10 @@ public class GameEngine {
         usedAiThisSession = false;
         gameState = GameState.PLAYING;
 
-        // Restart loops
-        gameLoop.stop();
-        gameLoop.setDelay(difficulty.getFallDelayMs());
-        gameLoop.setInitialDelay(difficulty.getFallDelayMs());
-        gameLoop.start();
-
-        secondTimer.stop();
-        secondTimer.start();
+        // Reset logic accumulators
+        gravityAccumulator = 0;
+        secondAccumulator = 0;
+        aiAccumulator = 0;
 
         if (gameMode == GameMode.PVP) {
             playerNum = 1;
@@ -276,13 +350,10 @@ public class GameEngine {
             opponent.nextPiece = opponent.nextPieces.get(0);
             opponent.spawnNewPiece();
 
-            opponent.gameLoop.stop();
-            opponent.gameLoop.setDelay(opponent.difficulty.getFallDelayMs());
-            opponent.gameLoop.setInitialDelay(opponent.difficulty.getFallDelayMs());
-            opponent.gameLoop.start();
-
-            opponent.secondTimer.stop();
-            opponent.secondTimer.start();
+            opponent.start(); // Ensure opponent thread is running
+            opponent.gravityAccumulator = 0;
+            opponent.secondAccumulator = 0;
+            opponent.aiAccumulator = 0;
         }
 
         panel.updateWindowSize();
@@ -295,8 +366,6 @@ public class GameEngine {
 
     // Return to main menu
     public void returnToMenu() {
-        gameLoop.stop();
-        secondTimer.stop();
         setAiPlay(false); // Stop AI Autoplay
         gameState = GameState.MENU;
         SoundManager.stopBGM();
@@ -326,13 +395,9 @@ public class GameEngine {
         isPaused = !isPaused;
         if (isPaused) {
             SoundManager.pauseBGM();
-            if (aiTimer != null) aiTimer.stop();
         } else {
             SoundManager.resumeBGM();
             panel.resetUIState();
-            if (aiPlay && aiTimer != null && !aiTimer.isRunning()) {
-                aiTimer.start();
-            }
         }
         if (gameMode == GameMode.PVP && opponent != null && opponent.isPaused() != isPaused) {
             opponent.togglePause();
@@ -427,10 +492,8 @@ public class GameEngine {
             return;
         totalActions++;
         update();
-        // Restart gravity timer to prevent "gravity stutter" during soft drop
-        if (gameLoop != null) {
-            gameLoop.restart();
-        }
+        // Reset gravity accumulator to prevent gravity stutter
+        gravityAccumulator = 0;
     }
 
     // Update the piece (down)
@@ -686,12 +749,6 @@ public class GameEngine {
             if (!usedAiThisSession) {
                 com.tetris.util.AchievementManager.unlockAchievement("sprint_finisher");
             }
-            if (gameLoop != null) {
-                gameLoop.stop();
-            }
-            if (secondTimer != null) {
-                secondTimer.stop();
-            }
             SoundManager.stopBGM();
             SoundManager.playSFX("/resources/clear.wav");
             recordFinalScore();
@@ -891,23 +948,17 @@ public class GameEngine {
             panel.setCurrentPiece(currentPiece);
         }
 
-        // Restart gravity timer to give player a full tick window
-        if (gameLoop != null) {
-            gameLoop.restart();
-        }
-
+        // Restart gravity timer by resetting the accumulator
+        gravityAccumulator = 0;
+ 
         // If new piece collision, game over
         if (!board.isValidMove(currentPiece)) {
             isGameOver = true;
             setAiPlay(false); // Stop AI Autoplay
             SaveManager.deleteSave();
-            if (gameLoop != null) {
-                gameLoop.stop();
-            }
-            if (secondTimer != null) {
-                secondTimer.stop();
-            }
+        }
 
+        if (isGameOver) {
             if (gameMode == GameMode.PVP && opponent != null) {
                 if (opponent.isGameOver()) {
                     // Both players are now game over, determine the winner
@@ -950,7 +1001,6 @@ public class GameEngine {
             } else {
                 recordFinalScore();
             }
-            System.out.println("Game Over!");
         }
     }
 
@@ -1025,14 +1075,10 @@ public class GameEngine {
 
         this.gameState = GameState.PLAYING;
 
-        // Restart loops
-        gameLoop.stop();
-        gameLoop.setDelay(difficulty.getFallDelayMs());
-        gameLoop.setInitialDelay(difficulty.getFallDelayMs());
-        gameLoop.start();
-
-        secondTimer.stop();
-        secondTimer.start();
+        // Reset logic accumulators
+        gravityAccumulator = 0;
+        secondAccumulator = 0;
+        aiAccumulator = 0;
 
         // Play BGM but immediately pause it
         SoundManager.playBGM("/resources/bgm.wav");
@@ -1148,8 +1194,7 @@ public class GameEngine {
             return;
         }
         this.difficulty = difficulty;
-        gameLoop.setDelay(difficulty.getFallDelayMs());
-        gameLoop.setInitialDelay(difficulty.getFallDelayMs());
+        gravityAccumulator = 0; // Reset gravity delay window
         panel.repaint();
     }
 
@@ -1447,10 +1492,8 @@ public class GameEngine {
                 panel.setCurrentPiece(currentPiece);
             }
             
-            // Restart the gravity timer
-            if (gameLoop != null) {
-                gameLoop.restart();
-            }
+            // Restart the gravity timer by resetting the accumulator
+            gravityAccumulator = 0;
         }
         
         canHoldThisTurn = false;
@@ -1518,14 +1561,8 @@ public class GameEngine {
         if (active) {
             this.usedAiThisSession = true;
             needsAiCalculation = true;
-            if (aiTimer != null && !aiTimer.isRunning()) {
-                aiTimer.start();
-            }
-        } else {
-            if (aiTimer != null) {
-                aiTimer.stop();
-            }
         }
+        aiAccumulator = 0;
         panel.repaint();
     }
 
@@ -1629,13 +1666,10 @@ public class GameEngine {
         
         SoundManager.playBGM("/resources/bgm.wav");
         
-        gameLoop.stop();
-        gameLoop.setDelay(1000);
-        gameLoop.setInitialDelay(1000);
-        gameLoop.start();
-        
-        secondTimer.stop();
-        secondTimer.start();
+        // Reset logic accumulators
+        gravityAccumulator = 0;
+        secondAccumulator = 0;
+        aiAccumulator = 0;
         
         panel.repaint();
     }
@@ -1647,7 +1681,6 @@ public class GameEngine {
     private void tutorialSuccess() {
         lastTutorialSuccess = true;
         isTransitioning = true;
-        gameLoop.stop();
         panel.repaint();
         
         javax.swing.Timer delayTimer = new javax.swing.Timer(1200, e -> {
@@ -1667,7 +1700,6 @@ public class GameEngine {
     private void tutorialFail() {
         lastTutorialSuccess = false;
         isTransitioning = true;
-        gameLoop.stop();
         panel.repaint();
         
         javax.swing.Timer delayTimer = new javax.swing.Timer(1200, e -> {
