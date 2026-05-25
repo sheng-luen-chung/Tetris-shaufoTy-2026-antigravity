@@ -933,11 +933,11 @@ public class GamePanel extends JPanel {
 
     @Override
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
         synchronized (bufferLock) {
             if (visibleBuffer != null) {
                 g.drawImage(visibleBuffer, 0, 0, getWidth(), getHeight(), null);
             } else {
+                super.paintComponent(g);
                 drawGameScene(g);
             }
         }
@@ -945,7 +945,18 @@ public class GamePanel extends JPanel {
 
     private void drawGameScene(Graphics g) {
         if (gameEngine == null) return;
+        synchronized (gameEngine) {
+            if (gameEngine.getGameMode() == GameMode.PVP && gameEngine2 != null) {
+                synchronized (gameEngine2) {
+                    drawGameSceneInternal(g);
+                }
+            } else {
+                drawGameSceneInternal(g);
+            }
+        }
+    }
 
+    private void drawGameSceneInternal(Graphics g) {
         switch (gameEngine.getGameState()) {
             case MENU:
                 drawMenuScreen(g);
@@ -2107,7 +2118,7 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(fieldX, fieldY, fieldW, fieldH, 8, 8);
 
         // Render current name in buffer
-        String name = gameEngine.getNameInputBuffer().toString();
+        String name = gameEngine.getNameInputString();
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 24));
         g2d.setColor(Color.WHITE);
         int nameW = g2d.getFontMetrics().stringWidth(name);

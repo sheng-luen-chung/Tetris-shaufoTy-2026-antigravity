@@ -78,8 +78,8 @@ public class GameEngine {
     private int secondAccumulator = 0;
     private int aiAccumulator = 0;
     private int menuAccumulator = 0;
-    private boolean isGameOver = false;
-    private boolean isPaused = false;
+    private volatile boolean isGameOver = false;
+    private volatile boolean isPaused = false;
     private boolean leaderboardRecorded = false;
     private int score = 0;
     private int secondsElapsed = 0;
@@ -115,17 +115,75 @@ public class GameEngine {
     private static final int LOCK_HARD_CAP_MULTIPLIER = 3;
 
     // AI Autoplay Mechanism
-    private boolean aiPlay = false;
-    private boolean usedAiThisSession = false;
+    private volatile boolean aiPlay = false;
+    private volatile boolean usedAiThisSession = false;
     private int targetRotation = 0;
     private int targetCol = 0;
-    private boolean needsAiCalculation = true;
+    private volatile boolean needsAiCalculation = true;
 
-    private Difficulty difficulty = Difficulty.NORMAL;
+    private volatile Difficulty difficulty = Difficulty.NORMAL;
     private final LeaderboardManager leaderboardManager;
-    private GameState gameState = GameState.MENU;
-    private boolean isEnteringName = false;
+    private volatile GameState gameState = GameState.MENU;
+    private volatile boolean isEnteringName = false;
     private final StringBuilder nameInputBuffer = new StringBuilder();
+
+    // Thread-safe Action Queues to prevent Race Conditions & Deadlocks
+    public enum GameAction {
+        MOVE_LEFT,
+        MOVE_RIGHT,
+        ROTATE_CW,
+        ROTATE_CCW,
+        SOFT_DROP,
+        HARD_DROP,
+        HOLD
+    }
+
+    private final java.util.concurrent.ConcurrentLinkedQueue<GameAction> actionQueue = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private final java.util.concurrent.ConcurrentLinkedQueue<Integer> garbageQueue = new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+    public void queueAction(GameAction action) {
+        actionQueue.add(action);
+    }
+
+    public void queueGarbage(int garbageLinesCount) {
+        garbageQueue.add(garbageLinesCount);
+    }
+
+    private void processInputActions() {
+        GameAction action;
+        while ((action = actionQueue.poll()) != null) {
+            switch (action) {
+                case MOVE_LEFT:
+                    movePieceLeftInternal();
+                    break;
+                case MOVE_RIGHT:
+                    movePieceRightInternal();
+                    break;
+                case ROTATE_CW:
+                    rotatePieceInternal();
+                    break;
+                case ROTATE_CCW:
+                    rotatePieceCounterClockwiseInternal();
+                    break;
+                case SOFT_DROP:
+                    softDropInternal();
+                    break;
+                case HARD_DROP:
+                    dropPieceInternal();
+                    break;
+                case HOLD:
+                    holdPieceInternal();
+                    break;
+            }
+        }
+    }
+
+    private void processGarbageQueue() {
+        Integer lines;
+        while ((lines = garbageQueue.poll()) != null) {
+            receiveGarbageInternal(lines);
+        }
+    }
 
     public GameEngine(Board board, GamePanel panel) {
         this.board = board;
@@ -178,7 +236,9 @@ public class GameEngine {
 
             boolean ticked = false;
             while (unprocessed >= 1) {
-                tickLogic(10);
+                synchronized (this) {
+                    tickLogic(10);
+                }
                 unprocessed--;
                 ticked = true;
             }
@@ -186,7 +246,9 @@ public class GameEngine {
             if (ticked) {
                 long frameNow = System.nanoTime();
                 if (frameNow - lastFrameTime >= frameTimeNs) {
-                    panel.renderOffscreen();
+                    if (playerNum == 1) {
+                        panel.renderOffscreen();
+                    }
                     lastFrameTime = frameNow;
                 }
             }
@@ -200,10 +262,17 @@ public class GameEngine {
     }
 
     private void tickLogic(int dt) {
+        // 0. Process queued garbage and inputs from EDT first
+        processGarbageQueue();
+        processInputActions();
+
         // 1. Tick inputs
         if (inputHandler != null) {
             inputHandler.tickInputs(dt);
         }
+
+        // Process any movements queued by tickInputs (continuous DAS/Soft Drop) immediately
+        processInputActions();
 
         // 2. Tick game state
         if (gameState == GameState.PLAYING || gameState == GameState.TUTORIAL) {
@@ -488,6 +557,10 @@ public class GameEngine {
 
     // Soft drop piece (down)
     public void softDrop() {
+        queueAction(GameAction.SOFT_DROP);
+    }
+
+    private void softDropInternal() {
         if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
@@ -761,6 +834,10 @@ public class GameEngine {
     }
 
     public void receiveGarbage(int garbageLinesCount) {
+        queueGarbage(garbageLinesCount);
+    }
+
+    private void receiveGarbageInternal(int garbageLinesCount) {
         if (isGameOver || isPaused) return;
 
         // Generate garbage lines on this board
@@ -1285,8 +1362,12 @@ public class GameEngine {
 
 
 
-    // Move piece left
+    // Move piece left (queued)
     public void movePieceLeft() {
+        queueAction(GameAction.MOVE_LEFT);
+    }
+
+    private void movePieceLeftInternal() {
         if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
@@ -1297,8 +1378,12 @@ public class GameEngine {
         }
     }
 
-    // Move piece right
+    // Move piece right (queued)
     public void movePieceRight() {
+        queueAction(GameAction.MOVE_RIGHT);
+    }
+
+    private void movePieceRightInternal() {
         if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
@@ -1309,8 +1394,12 @@ public class GameEngine {
         }
     }
 
-    // Rotate piece
+    // Rotate piece (queued)
     public void rotatePiece() {
+        queueAction(GameAction.ROTATE_CW);
+    }
+
+    private void rotatePieceInternal() {
         if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
@@ -1360,8 +1449,12 @@ public class GameEngine {
         panel.repaint();
     }
 
-    // Rotate piece counter-clockwise
+    // Rotate piece counter-clockwise (queued)
     public void rotatePieceCounterClockwise() {
+        queueAction(GameAction.ROTATE_CCW);
+    }
+
+    private void rotatePieceCounterClockwiseInternal() {
         if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
@@ -1440,8 +1533,12 @@ public class GameEngine {
         return new int[0][2];
     }
 
-    // Drop piece (Hard Drop)
+    // Drop piece (Hard Drop - queued)
     public void dropPiece() {
+        queueAction(GameAction.HARD_DROP);
+    }
+
+    private void dropPieceInternal() {
         if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         totalActions++;
@@ -1465,8 +1562,12 @@ public class GameEngine {
         panel.repaint();
     }
 
-    // Hold the current piece
+    // Hold the current piece (queued)
     public void holdPiece() {
+        queueAction(GameAction.HOLD);
+    }
+
+    private void holdPieceInternal() {
         if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused || isTransitioning)
             return;
         if (!canHoldThisTurn)
@@ -1717,21 +1818,25 @@ public class GameEngine {
         return nameInputBuffer;
     }
 
-    public void appendNameInput(char c) {
+    public synchronized String getNameInputString() {
+        return nameInputBuffer.toString();
+    }
+
+    public synchronized void appendNameInput(char c) {
         if (nameInputBuffer.length() < 10) {
             nameInputBuffer.append(c);
             panel.repaint();
         }
     }
 
-    public void backspaceNameInput() {
+    public synchronized void backspaceNameInput() {
         if (nameInputBuffer.length() > 0) {
             nameInputBuffer.setLength(nameInputBuffer.length() - 1);
             panel.repaint();
         }
     }
 
-    public void submitLeaderboardName() {
+    public synchronized void submitLeaderboardName() {
         String name = nameInputBuffer.toString().trim();
         if (name.isEmpty()) {
             name = "Guest";
@@ -1743,7 +1848,7 @@ public class GameEngine {
         panel.repaint();
     }
 
-    public void submitDefaultName() {
+    public synchronized void submitDefaultName() {
         leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
         leaderboardManager.submitGlobalScoreAsync(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
         isEnteringName = false;

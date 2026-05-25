@@ -38,10 +38,25 @@ public class InputHandler extends KeyAdapter {
     private int leftRepeatCounter = 0;
     private int rightRepeatCounter = 0;
 
+    // Tracking flags for Player 1 (only accessed on Game Loop thread)
+    private boolean p1LeftWasPressed = false;
+    private boolean p1RightWasPressed = false;
+    private boolean p1DownWasPressed = false;
+
+    // Tracking flags for Player 2 (only accessed on Game Loop thread)
+    private boolean p2LeftWasPressed = false;
+    private boolean p2RightWasPressed = false;
+    private boolean p2DownWasPressed = false;
+
+    // Tracking flags for Single Player (only accessed on Game Loop thread)
+    private boolean leftWasPressed = false;
+    private boolean rightWasPressed = false;
+    private boolean downWasPressed = false;
+
     // Professional Tetris Tuning Constants (Configurable)
-    private static int dasDelayMs = 170;
-    private static int arrRateMs = 45;
-    private static int softDropIntervalMs = 30;
+    private static volatile int dasDelayMs = 170;
+    private static volatile int arrRateMs = 45;
+    private static volatile int softDropIntervalMs = 30;
 
     // Single Player Keys
     private static boolean singleCustomized = false;
@@ -303,50 +318,73 @@ public class InputHandler extends KeyAdapter {
     private void updateP1Inputs(int deltaTime) {
         // Continuous left movement (DAS)
         if (p1LeftPressed && !p1RightPressed) {
-            int oldHoldTime = p1LeftHoldTime;
-            p1LeftHoldTime += deltaTime;
-            if (p1LeftHoldTime >= dasDelayMs) {
-                if (oldHoldTime < dasDelayMs) {
-                    engine.movePieceLeft();
-                }
-                p1LeftRepeatCounter += deltaTime;
-                while (p1LeftRepeatCounter >= arrRateMs) {
-                    engine.movePieceLeft();
-                    p1LeftRepeatCounter -= arrRateMs;
+            if (!p1LeftWasPressed) {
+                p1LeftWasPressed = true;
+                p1LeftHoldTime = 0;
+                p1LeftRepeatCounter = 0;
+                engine.movePieceLeft();
+            } else {
+                int oldHoldTime = p1LeftHoldTime;
+                p1LeftHoldTime += deltaTime;
+                if (p1LeftHoldTime >= dasDelayMs) {
+                    if (oldHoldTime < dasDelayMs) {
+                        engine.movePieceLeft();
+                    }
+                    p1LeftRepeatCounter += deltaTime;
+                    while (p1LeftRepeatCounter >= arrRateMs) {
+                        engine.movePieceLeft();
+                        p1LeftRepeatCounter -= arrRateMs;
+                    }
                 }
             }
         } else {
+            p1LeftWasPressed = false;
             p1LeftHoldTime = 0;
             p1LeftRepeatCounter = 0;
         }
 
         // Continuous right movement (DAS)
         if (p1RightPressed && !p1LeftPressed) {
-            int oldHoldTime = p1RightHoldTime;
-            p1RightHoldTime += deltaTime;
-            if (p1RightHoldTime >= dasDelayMs) {
-                if (oldHoldTime < dasDelayMs) {
-                    engine.movePieceRight();
-                }
-                p1RightRepeatCounter += deltaTime;
-                while (p1RightRepeatCounter >= arrRateMs) {
-                    engine.movePieceRight();
-                    p1RightRepeatCounter -= arrRateMs;
+            if (!p1RightWasPressed) {
+                p1RightWasPressed = true;
+                p1RightHoldTime = 0;
+                p1RightRepeatCounter = 0;
+                engine.movePieceRight();
+            } else {
+                int oldHoldTime = p1RightHoldTime;
+                p1RightHoldTime += deltaTime;
+                if (p1RightHoldTime >= dasDelayMs) {
+                    if (oldHoldTime < dasDelayMs) {
+                        engine.movePieceRight();
+                    }
+                    p1RightRepeatCounter += deltaTime;
+                    while (p1RightRepeatCounter >= arrRateMs) {
+                        engine.movePieceRight();
+                        p1RightRepeatCounter -= arrRateMs;
+                    }
                 }
             }
         } else {
+            p1RightWasPressed = false;
             p1RightHoldTime = 0;
             p1RightRepeatCounter = 0;
         }
 
         // Continuous down movement (Soft Drop)
         if (p1DownPressed) {
-            p1DownHoldTime += deltaTime;
-            while (p1DownHoldTime >= softDropIntervalMs) {
+            if (!p1DownWasPressed) {
+                p1DownWasPressed = true;
+                p1DownHoldTime = 0;
                 engine.softDrop();
-                p1DownHoldTime -= softDropIntervalMs;
+            } else {
+                p1DownHoldTime += deltaTime;
+                while (p1DownHoldTime >= softDropIntervalMs) {
+                    engine.softDrop();
+                    p1DownHoldTime -= softDropIntervalMs;
+                }
             }
         } else {
+            p1DownWasPressed = false;
             p1DownHoldTime = 0;
         }
     }
@@ -356,50 +394,73 @@ public class InputHandler extends KeyAdapter {
         
         // Continuous left movement (DAS)
         if (p2LeftPressed && !p2RightPressed) {
-            int oldHoldTime = p2LeftHoldTime;
-            p2LeftHoldTime += deltaTime;
-            if (p2LeftHoldTime >= dasDelayMs) {
-                if (oldHoldTime < dasDelayMs) {
-                    engine2.movePieceLeft();
-                }
-                p2LeftRepeatCounter += deltaTime;
-                while (p2LeftRepeatCounter >= arrRateMs) {
-                    engine2.movePieceLeft();
-                    p2LeftRepeatCounter -= arrRateMs;
+            if (!p2LeftWasPressed) {
+                p2LeftWasPressed = true;
+                p2LeftHoldTime = 0;
+                p2LeftRepeatCounter = 0;
+                engine2.movePieceLeft();
+            } else {
+                int oldHoldTime = p2LeftHoldTime;
+                p2LeftHoldTime += deltaTime;
+                if (p2LeftHoldTime >= dasDelayMs) {
+                    if (oldHoldTime < dasDelayMs) {
+                        engine2.movePieceLeft();
+                    }
+                    p2LeftRepeatCounter += deltaTime;
+                    while (p2LeftRepeatCounter >= arrRateMs) {
+                        engine2.movePieceLeft();
+                        p2LeftRepeatCounter -= arrRateMs;
+                    }
                 }
             }
         } else {
+            p2LeftWasPressed = false;
             p2LeftHoldTime = 0;
             p2LeftRepeatCounter = 0;
         }
 
         // Continuous right movement (DAS)
         if (p2RightPressed && !p2LeftPressed) {
-            int oldHoldTime = p2RightHoldTime;
-            p2RightHoldTime += deltaTime;
-            if (p2RightHoldTime >= dasDelayMs) {
-                if (oldHoldTime < dasDelayMs) {
-                    engine2.movePieceRight();
-                }
-                p2RightRepeatCounter += deltaTime;
-                while (p2RightRepeatCounter >= arrRateMs) {
-                    engine2.movePieceRight();
-                    p2RightRepeatCounter -= arrRateMs;
+            if (!p2RightWasPressed) {
+                p2RightWasPressed = true;
+                p2RightHoldTime = 0;
+                p2RightRepeatCounter = 0;
+                engine2.movePieceRight();
+            } else {
+                int oldHoldTime = p2RightHoldTime;
+                p2RightHoldTime += deltaTime;
+                if (p2RightHoldTime >= dasDelayMs) {
+                    if (oldHoldTime < dasDelayMs) {
+                        engine2.movePieceRight();
+                    }
+                    p2RightRepeatCounter += deltaTime;
+                    while (p2RightRepeatCounter >= arrRateMs) {
+                        engine2.movePieceRight();
+                        p2RightRepeatCounter -= arrRateMs;
+                    }
                 }
             }
         } else {
+            p2RightWasPressed = false;
             p2RightHoldTime = 0;
             p2RightRepeatCounter = 0;
         }
 
         // Continuous down movement (Soft Drop)
         if (p2DownPressed) {
-            p2DownHoldTime += deltaTime;
-            while (p2DownHoldTime >= softDropIntervalMs) {
+            if (!p2DownWasPressed) {
+                p2DownWasPressed = true;
+                p2DownHoldTime = 0;
                 engine2.softDrop();
-                p2DownHoldTime -= softDropIntervalMs;
+            } else {
+                p2DownHoldTime += deltaTime;
+                while (p2DownHoldTime >= softDropIntervalMs) {
+                    engine2.softDrop();
+                    p2DownHoldTime -= softDropIntervalMs;
+                }
             }
         } else {
+            p2DownWasPressed = false;
             p2DownHoldTime = 0;
         }
     }
@@ -407,54 +468,73 @@ public class InputHandler extends KeyAdapter {
     private void updateInputs(int deltaTime) {
         // Continuous left movement (DAS)
         if (leftPressed && !rightPressed) {
-            int oldHoldTime = leftHoldTime;
-            leftHoldTime += deltaTime;
-            if (leftHoldTime >= dasDelayMs) {
-                // If we just passed DAS threshold, trigger a move immediately
-                if (oldHoldTime < dasDelayMs) {
-                    engine.movePieceLeft();
-                }
-                
-                leftRepeatCounter += deltaTime;
-                while (leftRepeatCounter >= arrRateMs) {
-                    engine.movePieceLeft();
-                    leftRepeatCounter -= arrRateMs;
+            if (!leftWasPressed) {
+                leftWasPressed = true;
+                leftHoldTime = 0;
+                leftRepeatCounter = 0;
+                engine.movePieceLeft();
+            } else {
+                int oldHoldTime = leftHoldTime;
+                leftHoldTime += deltaTime;
+                if (leftHoldTime >= dasDelayMs) {
+                    if (oldHoldTime < dasDelayMs) {
+                        engine.movePieceLeft();
+                    }
+                    leftRepeatCounter += deltaTime;
+                    while (leftRepeatCounter >= arrRateMs) {
+                        engine.movePieceLeft();
+                        leftRepeatCounter -= arrRateMs;
+                    }
                 }
             }
         } else {
+            leftWasPressed = false;
             leftHoldTime = 0;
             leftRepeatCounter = 0;
         }
 
         // Continuous right movement (DAS)
         if (rightPressed && !leftPressed) {
-            int oldHoldTime = rightHoldTime;
-            rightHoldTime += deltaTime;
-            if (rightHoldTime >= dasDelayMs) {
-                // If we just passed DAS threshold, trigger a move immediately
-                if (oldHoldTime < dasDelayMs) {
-                    engine.movePieceRight();
-                }
-
-                rightRepeatCounter += deltaTime;
-                while (rightRepeatCounter >= arrRateMs) {
-                    engine.movePieceRight();
-                    rightRepeatCounter -= arrRateMs;
+            if (!rightWasPressed) {
+                rightWasPressed = true;
+                rightHoldTime = 0;
+                rightRepeatCounter = 0;
+                engine.movePieceRight();
+            } else {
+                int oldHoldTime = rightHoldTime;
+                rightHoldTime += deltaTime;
+                if (rightHoldTime >= dasDelayMs) {
+                    if (oldHoldTime < dasDelayMs) {
+                        engine.movePieceRight();
+                    }
+                    rightRepeatCounter += deltaTime;
+                    while (rightRepeatCounter >= arrRateMs) {
+                        engine.movePieceRight();
+                        rightRepeatCounter -= arrRateMs;
+                    }
                 }
             }
         } else {
+            rightWasPressed = false;
             rightHoldTime = 0;
             rightRepeatCounter = 0;
         }
 
         // Continuous down movement (Soft Drop)
         if (downPressed) {
-            downHoldTime += deltaTime;
-            while (downHoldTime >= softDropIntervalMs) {
+            if (!downWasPressed) {
+                downWasPressed = true;
+                downHoldTime = 0;
                 engine.softDrop();
-                downHoldTime -= softDropIntervalMs;
+            } else {
+                downHoldTime += deltaTime;
+                while (downHoldTime >= softDropIntervalMs) {
+                    engine.softDrop();
+                    downHoldTime -= softDropIntervalMs;
+                }
             }
         } else {
+            downWasPressed = false;
             downHoldTime = 0;
         }
     }
@@ -463,33 +543,18 @@ public class InputHandler extends KeyAdapter {
         p1LeftPressed = false;
         p1RightPressed = false;
         p1DownPressed = false;
-        p1LeftHoldTime = 0;
-        p1RightHoldTime = 0;
-        p1DownHoldTime = 0;
-        p1LeftRepeatCounter = 0;
-        p1RightRepeatCounter = 0;
     }
 
     private void resetP2KeyStates() {
         p2LeftPressed = false;
         p2RightPressed = false;
         p2DownPressed = false;
-        p2LeftHoldTime = 0;
-        p2RightHoldTime = 0;
-        p2DownHoldTime = 0;
-        p2LeftRepeatCounter = 0;
-        p2RightRepeatCounter = 0;
     }
 
     private void resetKeyStates() {
         leftPressed = false;
         rightPressed = false;
         downPressed = false;
-        leftHoldTime = 0;
-        rightHoldTime = 0;
-        downHoldTime = 0;
-        leftRepeatCounter = 0;
-        rightRepeatCounter = 0;
         resetP1KeyStates();
         resetP2KeyStates();
     }
@@ -601,7 +666,7 @@ public class InputHandler extends KeyAdapter {
             if (engine.isEnteringName()) {
                 char keyChar = e.getKeyChar();
                 if (keyCode == KeyEvent.VK_ENTER) {
-                    if (engine.getNameInputBuffer().length() > 0) {
+                    if (engine.getNameInputString().length() > 0) {
                         engine.submitLeaderboardName();
                     }
                 } else if (keyCode == KeyEvent.VK_BACK_SPACE) {
@@ -672,25 +737,11 @@ public class InputHandler extends KeyAdapter {
 
                 // Player 1
                 if (keyCode == p1Left) {
-                    if (!p1LeftPressed) {
-                        p1LeftPressed = true;
-                        p1LeftHoldTime = 0;
-                        p1LeftRepeatCounter = 0;
-                        engine.movePieceLeft();
-                    }
+                    p1LeftPressed = true;
                 } else if (keyCode == p1Right) {
-                    if (!p1RightPressed) {
-                        p1RightPressed = true;
-                        p1RightHoldTime = 0;
-                        p1RightRepeatCounter = 0;
-                        engine.movePieceRight();
-                    }
+                    p1RightPressed = true;
                 } else if (keyCode == p1Down) {
-                    if (!p1DownPressed) {
-                        p1DownPressed = true;
-                        p1DownHoldTime = 0;
-                        engine.softDrop();
-                    }
+                    p1DownPressed = true;
                 } else if (keyCode == p1Rotate) {
                     engine.rotatePiece();
                 } else if (keyCode == p1Drop) {
@@ -703,25 +754,11 @@ public class InputHandler extends KeyAdapter {
                 // Player 2 (Arrows)
                 if (engine2 != null) {
                     if (keyCode == p2Left) {
-                        if (!p2LeftPressed) {
-                            p2LeftPressed = true;
-                            p2LeftHoldTime = 0;
-                            p2LeftRepeatCounter = 0;
-                            engine2.movePieceLeft();
-                        }
+                        p2LeftPressed = true;
                     } else if (keyCode == p2Right) {
-                        if (!p2RightPressed) {
-                            p2RightPressed = true;
-                            p2RightHoldTime = 0;
-                            p2RightRepeatCounter = 0;
-                            engine2.movePieceRight();
-                        }
+                        p2RightPressed = true;
                     } else if (keyCode == p2Down) {
-                        if (!p2DownPressed) {
-                            p2DownPressed = true;
-                            p2DownHoldTime = 0;
-                            engine2.softDrop();
-                        }
+                        p2DownPressed = true;
                     } else if (keyCode == p2Rotate) {
                         engine2.rotatePiece();
                     } else if (keyCode == p2Drop) {
@@ -762,25 +799,11 @@ public class InputHandler extends KeyAdapter {
             int hold = singleKeyHold;
 
             if (keyCode == left) {
-                if (!leftPressed) {
-                    leftPressed = true;
-                    leftHoldTime = 0;
-                    leftRepeatCounter = 0;
-                    engine.movePieceLeft();
-                }
+                leftPressed = true;
             } else if (keyCode == right) {
-                if (!rightPressed) {
-                    rightPressed = true;
-                    rightHoldTime = 0;
-                    rightRepeatCounter = 0;
-                    engine.movePieceRight();
-                }
+                rightPressed = true;
             } else if (keyCode == down) {
-                if (!downPressed) {
-                    downPressed = true;
-                    downHoldTime = 0;
-                    engine.softDrop();
-                }
+                downPressed = true;
             } else if (keyCode == rotate) {
                 engine.rotatePiece();
             } else if (keyCode == KeyEvent.VK_Z) {
