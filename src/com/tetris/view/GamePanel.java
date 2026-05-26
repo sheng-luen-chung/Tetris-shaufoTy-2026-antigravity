@@ -2608,12 +2608,13 @@ public class GamePanel extends JPanel {
         } else {
             scoreVal = String.format("%,d", gameEngine.getScore()) + com.tetris.util.LanguageManager.get(" 分", " pts");
         }
-        g2d.drawString("最終成績 (SCORE): " + scoreVal, 80, statsY + 60);
+        String finalScoreLabel = com.tetris.util.LanguageManager.get("最終成績 (SCORE): ", "Final Score (SCORE): ");
+        g2d.drawString(finalScoreLabel + scoreVal, 80, statsY + 60);
 
         // Name input prompt
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
         g2d.setColor(new Color(255, 100, 255));
-        String prompt = "請輸入您的名字 (ENTER INITIALS):";
+        String prompt = com.tetris.util.LanguageManager.get("請輸入您的名字 (ENTER INITIALS):", "Please enter your name (ENTER INITIALS):");
         int promptX = (width - g2d.getFontMetrics().stringWidth(prompt)) / 2;
         g2d.drawString(prompt, promptX, 330);
 
@@ -2825,7 +2826,9 @@ public class GamePanel extends JPanel {
             if (earnedBadges.size() > 3) {
                 g2d.setFont(getCachedFont("SansSerif", Font.ITALIC, 11));
                 g2d.setColor(new Color(150, 150, 160));
-                String moreMsg = "+ 還有 " + (earnedBadges.size() - 3) + " 個獲得的徽章";
+                String moreMsg = String.format(com.tetris.util.LanguageManager.get(
+                    "+ 還有 %d 個獲得的徽章",
+                    "+ %d more badges"), earnedBadges.size() - 3);
                 g2d.drawString(moreMsg, badgeContainerX + badgeContainerW - 130, badgeContainerY + badgeContainerH - 12);
             }
         }
@@ -3420,13 +3423,8 @@ public class GamePanel extends JPanel {
 
                 g2d.setFont(new java.awt.Font("Microsoft JhengHei", java.awt.Font.PLAIN, 10));
                 g2d.setColor(new Color(230, 200, 185));
-                if (com.tetris.util.LanguageManager.getCurrentLanguage() == com.tetris.util.LanguageManager.Language.ZH) {
-                    g2d.drawString("本局曾使用自動遊玩", warnX + 10, aiY + 40);
-                    g2d.drawString("分數將不寫入排行榜", warnX + 10, aiY + 53);
-                } else {
-                    g2d.drawString("Auto play was used", warnX + 10, aiY + 40);
-                    g2d.drawString("This score will not be submitted", warnX + 10, aiY + 53);
-                }
+                    g2d.drawString(com.tetris.util.LanguageManager.get("本局曾使用自動遊玩", "Auto play was used"), warnX + 10, aiY + 40);
+                    g2d.drawString(com.tetris.util.LanguageManager.get("分數將不寫入排行榜", "This score will not be submitted"), warnX + 10, aiY + 53);
             }
             if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING && targetEngine.getGameMode() != GameMode.PVP && !targetEngine.isAiPlay() && !targetEngine.hasUsedAiThisSession()) {
                 drawSidebarTipBox(g2d, startX + 15, 470, 170, 110);
@@ -5149,7 +5147,7 @@ public class GamePanel extends JPanel {
         }
 
         String titleFontName = (com.tetris.util.LanguageManager.getCurrentLanguage() == com.tetris.util.LanguageManager.Language.ZH) ? "Microsoft JhengHei" : "Impact";
-        g2d.setFont(getCachedFont(titleFontName, Font.BOLD, 42));
+        g2d.setFont(getCachedFont(titleFontName, Font.BOLD, 36));
         g2d.setColor(new Color(0, 255, 255));
         String title = com.tetris.util.LanguageManager.get("互動教學與新手引導", "Interactive Tutorial & Guide");
         FontMetrics fm = g2d.getFontMetrics();
@@ -5254,7 +5252,7 @@ public class GamePanel extends JPanel {
         }
 
         String achFontName = (com.tetris.util.LanguageManager.getCurrentLanguage() == com.tetris.util.LanguageManager.Language.ZH) ? "Microsoft JhengHei" : "Impact";
-        g2d.setFont(getCachedFont(achFontName, Font.BOLD, 42));
+        g2d.setFont(getCachedFont(achFontName, Font.BOLD, 36));
         g2d.setColor(new Color(255, 215, 0));
         String title = com.tetris.util.LanguageManager.get("成就與說明", "Achievements & Help");
         FontMetrics fm = g2d.getFontMetrics();
