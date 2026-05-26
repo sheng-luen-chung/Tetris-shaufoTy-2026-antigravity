@@ -1931,7 +1931,7 @@ public class GamePanel extends JPanel {
             
             g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 10));
             g2d.setColor(isSelected ? new Color(0, 255, 100) : new Color(200, 200, 200));
-            String scopeLabel = (tabScope == LeaderboardScope.LOCAL) ? "本地榜單 (LOCAL)" : "全球榜單 (GLOBAL)";
+            String scopeLabel = (tabScope == LeaderboardScope.LOCAL) ? "LOCAL" : "GLOBAL";
             int labelW = g2d.getFontMetrics().stringWidth(scopeLabel);
             int labelH = g2d.getFontMetrics().getAscent();
             g2d.drawString(scopeLabel, x + (scopeTabW - labelW) / 2, scopeTabY + (scopeTabH + labelH) / 2 - 2);
@@ -2028,25 +2028,26 @@ public class GamePanel extends JPanel {
             g2d.drawString(tabLabel, x + (tabW - labelW) / 2, tabY + (tabH + labelH) / 2 - 2);
         }
 
-        // Columns headers
+        // Columns headers (moved down slightly to avoid overlap with tabs)
+        int headerY = 210;
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 13));
         g2d.setColor(new Color(0, 255, 255));
-        g2d.drawString(com.tetris.util.LanguageManager.get("排名", "RANK"), 45, 190);
-        g2d.drawString(com.tetris.util.LanguageManager.get("玩家名稱", "NAME"), 95, 190);
+        g2d.drawString(com.tetris.util.LanguageManager.get("排名", "RANK"), 45, headerY);
+        g2d.drawString(com.tetris.util.LanguageManager.get("玩家名稱", "NAME"), 95, headerY);
         if (selectedLeaderboardMode == GameMode.SPRINT) {
-            g2d.drawString(com.tetris.util.LanguageManager.get("時間", "TIME"), 205, 190);
-            g2d.drawString(com.tetris.util.LanguageManager.get("消除行數", "LINES"), 295, 190);
+            g2d.drawString(com.tetris.util.LanguageManager.get("時間", "TIME"), 205, headerY);
+            g2d.drawString(com.tetris.util.LanguageManager.get("消除行數", "LINES"), 295, headerY);
         } else if (selectedLeaderboardMode == GameMode.SURVIVAL) {
-            g2d.drawString(com.tetris.util.LanguageManager.get("時間", "TIME"), 205, 190);
-            g2d.drawString(com.tetris.util.LanguageManager.get("分數", "SCORE"), 295, 190);
+            g2d.drawString(com.tetris.util.LanguageManager.get("時間", "TIME"), 205, headerY);
+            g2d.drawString(com.tetris.util.LanguageManager.get("分數", "SCORE"), 295, headerY);
         } else {
-            g2d.drawString(com.tetris.util.LanguageManager.get("分數", "SCORE"), 205, 190);
-            g2d.drawString(com.tetris.util.LanguageManager.get("難度", "DIFF"), 295, 190);
+            g2d.drawString(com.tetris.util.LanguageManager.get("分數", "SCORE"), 205, headerY);
+            g2d.drawString(com.tetris.util.LanguageManager.get("難度", "DIFF"), 295, headerY);
         }
-        g2d.drawString(com.tetris.util.LanguageManager.get("日期", "DATE"), 385, 190);
+        g2d.drawString(com.tetris.util.LanguageManager.get("日期", "DATE"), 385, headerY);
 
         g2d.setColor(new Color(255, 255, 255, 50));
-        g2d.drawLine(40, 200, getWidth() - 40, 200);
+        g2d.drawLine(40, headerY + 10, getWidth() - 40, headerY + 10);
 
         // List
         if (isLeaderboardLoading) {
@@ -2081,7 +2082,7 @@ public class GamePanel extends JPanel {
             }
             
             g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 13));
-            int y = 222;
+            int y = headerY + 32; // start listing rows below the headers
             int rowGap = 28;
 
             if (entries == null || entries.isEmpty()) {
@@ -2165,7 +2166,10 @@ public class GamePanel extends JPanel {
             g2d.setColor(new Color(200, 200, 200));
         }
 
-        g2d.drawString(backBtnText, btnX + 20, btnY - 11);
+        int btnTop = btnY - 30;
+        int backTextX = btnX + (btnW - fmBack.stringWidth(backBtnText)) / 2;
+        int backTextY = btnTop + (btnH - fmBack.getHeight()) / 2 + fmBack.getAscent();
+        g2d.drawString(backBtnText, backTextX, backTextY);
 
         // Help hints at the bottom
         g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 11));
@@ -4992,6 +4996,7 @@ public class GamePanel extends JPanel {
             if (tutorialOptionBounds[i] == null) tutorialOptionBounds[i] = new Rectangle(x - 20, y - textHeight + 5, maxWidth + 40, textHeight + 10); else tutorialOptionBounds[i].setBounds(x - 20, y - textHeight + 5, maxWidth + 40, textHeight + 10);
 
             boolean isSelected = (i == selectedTutorialIndex);
+            boolean isReturn = (i == levels.length - 1);
             if (isSelected) {
                 g2d.setColor(new Color(0, 255, 255, 35));
                 g2d.fillRoundRect(tutorialOptionBounds[i].x, tutorialOptionBounds[i].y, tutorialOptionBounds[i].width, tutorialOptionBounds[i].height, 10, 10);
@@ -4999,14 +5004,23 @@ public class GamePanel extends JPanel {
                 g2d.drawRoundRect(tutorialOptionBounds[i].x, tutorialOptionBounds[i].y, tutorialOptionBounds[i].width, tutorialOptionBounds[i].height, 10, 10);
 
                 g2d.setColor(Color.WHITE);
-                g2d.drawString(levels[i], x, y);
-
-                int sqSize = 8;
-                g2d.fillRect(tutorialOptionBounds[i].x + 6, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
-                g2d.fillRect(tutorialOptionBounds[i].x + tutorialOptionBounds[i].width - 14, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
+                if (isReturn) {
+                    int centeredX = baseX + (maxWidth - textWidth) / 2;
+                    g2d.drawString(levels[i], centeredX, y);
+                } else {
+                    g2d.drawString(levels[i], x, y);
+                    int sqSize = 8;
+                    g2d.fillRect(tutorialOptionBounds[i].x + 6, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
+                    g2d.fillRect(tutorialOptionBounds[i].x + tutorialOptionBounds[i].width - 14, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
+                }
             } else {
                 g2d.setColor(new Color(150, 150, 180));
-                g2d.drawString(levels[i], x, y);
+                if (isReturn) {
+                    int centeredX = baseX + (maxWidth - textWidth) / 2;
+                    g2d.drawString(levels[i], centeredX, y);
+                } else {
+                    g2d.drawString(levels[i], x, y);
+                }
             }
         }
     }
@@ -5110,8 +5124,12 @@ public class GamePanel extends JPanel {
             }
         }
 
-        // Back Button
-        int btnW = 120;
+        // Back Button (width auto-fit to label)
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 14));
+        String backMain = com.tetris.util.LanguageManager.get("返回主選單", "Return to Main Menu");
+        FontMetrics fmBackAch = g2d.getFontMetrics();
+        int textW = fmBackAch.stringWidth(backMain);
+        int btnW = Math.max(120, textW + 40);
         int btnH = 34;
         int btnX = (getWidth() - btnW) / 2;
         int btnY = cardY + cardH + 15;
@@ -5131,10 +5149,11 @@ public class GamePanel extends JPanel {
         }
         g2d.drawRoundRect(btnX, btnY, btnW, btnH, 8, 8);
 
-        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 14));
-        String backMain = com.tetris.util.LanguageManager.get("返回主選單", "Return to Main Menu");
-        int textW = g2d.getFontMetrics().stringWidth(backMain);
-        g2d.drawString(backMain, btnX + (btnW - textW) / 2, btnY + 22);
+        // Center text horizontally and vertically
+        FontMetrics fmBack = g2d.getFontMetrics();
+        int textX = btnX + (btnW - fmBack.stringWidth(backMain)) / 2;
+        int textY = btnY + (btnH - fmBack.getHeight()) / 2 + fmBack.getAscent();
+        g2d.drawString(backMain, textX, textY);
     }
 
     // Draw Toast notification for achievements
