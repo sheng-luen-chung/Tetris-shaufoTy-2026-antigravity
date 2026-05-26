@@ -151,7 +151,8 @@ public class InputHandler extends KeyAdapter {
                                                 com.tetris.util.SoundManager.isSFXMuted(),
                                                 com.tetris.util.ThemeManager.getCurrentTheme().name(),
                                                 com.tetris.util.ThemeManager.getCurrentColorBlindMode().name(),
-                                                com.tetris.util.SoundManager.getCurrentSoundPack().name());
+                                                com.tetris.util.SoundManager.getCurrentSoundPack().name(),
+                                                com.tetris.util.LanguageManager.getCurrentLanguage().name());
     }
 
     public static void resetToDefault() {
@@ -275,6 +276,7 @@ public class InputHandler extends KeyAdapter {
                 if (config.containsKey("theme")) com.tetris.util.ThemeManager.setCurrentTheme(com.tetris.util.ThemeManager.Theme.valueOf(config.get("theme")));
                 if (config.containsKey("colorBlind")) com.tetris.util.ThemeManager.setCurrentColorBlindMode(com.tetris.util.ThemeManager.ColorBlindMode.valueOf(config.get("colorBlind")));
                 if (config.containsKey("soundPack")) com.tetris.util.SoundManager.setCurrentSoundPack(com.tetris.util.SoundManager.SoundPack.valueOf(config.get("soundPack")));
+                if (config.containsKey("language")) com.tetris.util.LanguageManager.setCurrentLanguage(com.tetris.util.LanguageManager.Language.valueOf(config.get("language")));
             } catch (Exception ex) {
                 System.err.println("Error parsing controls config: " + ex.getMessage());
             }
@@ -285,15 +287,15 @@ public class InputHandler extends KeyAdapter {
         GameEngine.GameState state = engine.getGameState();
         boolean isActiveState = (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL);
         if (isActiveState) {
-            if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
+            if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
                 if (engine2 != null && !engine.isPaused()) {
-                    if (!engine.isGameOver()) {
+                    if (engine.getGameMode() == com.tetris.model.GameMode.PVP && !engine.isGameOver()) {
                         updateP1Inputs(deltaTime);
                     } else {
                         resetP1KeyStates();
                     }
 
-                    if (!engine2.isGameOver()) {
+                    if ((engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) && !engine2.isGameOver()) {
                         updateP2Inputs(deltaTime);
                     } else {
                         resetP2KeyStates();
@@ -682,7 +684,7 @@ public class InputHandler extends KeyAdapter {
             }
 
             boolean bothGameOver = false;
-            if (engine.getGameMode() == com.tetris.model.GameMode.PVP && engine2 != null) {
+            if ((engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) && engine2 != null) {
                 bothGameOver = engine.isGameOver() && engine2.isGameOver();
             } else {
                 bothGameOver = engine.isGameOver();
@@ -696,6 +698,13 @@ public class InputHandler extends KeyAdapter {
             }
 
             if (engine.isPaused()) {
+                if (engine.getGameMode() == com.tetris.model.GameMode.VS_AI && engine.getPanel() != null && engine.getPanel().isShowVsAiControlsPrompt()) {
+                    if (keyCode == KeyEvent.VK_ENTER || keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_ESCAPE) {
+                        engine.getPanel().setShowVsAiControlsPrompt(false);
+                        engine.togglePause();
+                    }
+                    return;
+                }
                 switch (keyCode) {
                     case KeyEvent.VK_UP:
                     case KeyEvent.VK_W:
@@ -718,8 +727,8 @@ public class InputHandler extends KeyAdapter {
                 return;
             }
 
-            if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
-                // PVP Controls
+            if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
+                // PVP / VS_AI Controls
                 // Resolve dynamic keys
                 int p1Left = pvpP1KeyLeft;
                 int p1Right = pvpP1KeyRight;
@@ -728,31 +737,33 @@ public class InputHandler extends KeyAdapter {
                 int p1Drop = pvpP1KeyDrop;
                 int p1Hold = pvpP1KeyHold;
 
-                int p2Left = pvpP2KeyLeft;
-                int p2Right = pvpP2KeyRight;
-                int p2Down = pvpP2KeyDown;
-                int p2Rotate = pvpP2KeyRotate;
-                int p2Drop = pvpP2KeyDrop;
-                int p2Hold = pvpP2KeyHold;
-
-                // Player 1
-                if (keyCode == p1Left) {
-                    p1LeftPressed = true;
-                } else if (keyCode == p1Right) {
-                    p1RightPressed = true;
-                } else if (keyCode == p1Down) {
-                    p1DownPressed = true;
-                } else if (keyCode == p1Rotate) {
-                    engine.rotatePiece();
-                } else if (keyCode == p1Drop) {
-                    engine.dropPiece();
-                    resetP1KeyStates();
-                } else if (keyCode == p1Hold) {
-                    engine.holdPiece();
+                // Player 1 - Only in PvP mode (AI in VS_AI mode)
+                if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
+                    if (keyCode == p1Left) {
+                        p1LeftPressed = true;
+                    } else if (keyCode == p1Right) {
+                        p1RightPressed = true;
+                    } else if (keyCode == p1Down) {
+                        p1DownPressed = true;
+                    } else if (keyCode == p1Rotate) {
+                        engine.rotatePiece();
+                    } else if (keyCode == p1Drop) {
+                        engine.dropPiece();
+                        resetP1KeyStates();
+                    } else if (keyCode == p1Hold) {
+                        engine.holdPiece();
+                    }
                 }
                 
-                // Player 2 (Arrows)
+                // Player 2 (Arrows) - Human player in both PvP and VS_AI modes
                 if (engine2 != null) {
+                    int p2Left = pvpP2KeyLeft;
+                    int p2Right = pvpP2KeyRight;
+                    int p2Down = pvpP2KeyDown;
+                    int p2Rotate = pvpP2KeyRotate;
+                    int p2Drop = pvpP2KeyDrop;
+                    int p2Hold = pvpP2KeyHold;
+
                     if (keyCode == p2Left) {
                         p2LeftPressed = true;
                     } else if (keyCode == p2Right) {
@@ -825,21 +836,26 @@ public class InputHandler extends KeyAdapter {
         int keyCode = e.getKeyCode();
         GameEngine.GameState state = engine.getGameState();
         if (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL) {
-            if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
+            if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
                 int p1Left = pvpP1KeyLeft;
                 int p1Right = pvpP1KeyRight;
                 int p1Down = pvpP1KeyDown;
+
+                if (engine.getGameMode() == com.tetris.model.GameMode.PVP) {
+                    if (keyCode == p1Left) {
+                        p1LeftPressed = false;
+                    } else if (keyCode == p1Right) {
+                        p1RightPressed = false;
+                    } else if (keyCode == p1Down) {
+                        p1DownPressed = false;
+                    }
+                }
+
                 int p2Left = pvpP2KeyLeft;
                 int p2Right = pvpP2KeyRight;
                 int p2Down = pvpP2KeyDown;
 
-                if (keyCode == p1Left) {
-                    p1LeftPressed = false;
-                } else if (keyCode == p1Right) {
-                    p1RightPressed = false;
-                } else if (keyCode == p1Down) {
-                    p1DownPressed = false;
-                } else if (keyCode == p2Left) {
+                if (keyCode == p2Left) {
                     p2LeftPressed = false;
                 } else if (keyCode == p2Right) {
                     p2RightPressed = false;

@@ -121,6 +121,9 @@ public class GameEngine {
     private int targetCol = 0;
     private volatile boolean needsAiCalculation = true;
 
+    // Reuse Random to avoid frequent allocations
+    private final Random rng = new Random();
+
     private volatile Difficulty difficulty = Difficulty.NORMAL;
     private final LeaderboardManager leaderboardManager;
     private volatile GameState gameState = GameState.MENU;
@@ -207,6 +210,11 @@ public class GameEngine {
         gameLoopThread = new Thread(this::runGameLoop, "Tetris-GameLoop-" + playerNum);
         gameLoopThread.setDaemon(true);
         gameLoopThread.start();
+
+        // Play Main Menu BGM when starting up!
+        if (playerNum == 1 && gameState == GameState.MENU) {
+            SoundManager.playBGM("/resources/menu_bgm.wav");
+        }
     }
 
     public synchronized void stop() {
@@ -298,8 +306,9 @@ public class GameEngine {
                 // AI step timer
                 if (aiPlay) {
                     aiAccumulator += dt;
-                    if (aiAccumulator >= 80) {
-                        aiAccumulator -= 80;
+                    int aiDelay = getAiStepDelayMs();
+                    if (aiAccumulator >= aiDelay) {
+                        aiAccumulator -= aiDelay;
                         runAIStep();
                     }
                 }
@@ -332,8 +341,8 @@ public class GameEngine {
             } else if (difficulty == Difficulty.HARD) {
                 interval = 10;
             }
-            if (secondsElapsed > 0 && secondsElapsed % interval == 0) {
-                int holeCol = new Random().nextInt(com.tetris.model.Board.COLS);
+                if (secondsElapsed > 0 && secondsElapsed % interval == 0) {
+                    int holeCol = rng.nextInt(Board.COLS);
                 board.addGarbageLine(holeCol);
                 if (currentPiece != null && !board.isValidMove(currentPiece)) {
                     currentPiece.move(-1, 0); // push up
@@ -380,7 +389,7 @@ public class GameEngine {
         secondAccumulator = 0;
         aiAccumulator = 0;
 
-        if (gameMode == GameMode.PVP) {
+        if (gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) {
             playerNum = 1;
             if (opponent == null) {
                 Board board2 = new Board();
@@ -394,7 +403,7 @@ public class GameEngine {
             }
 
             // Sync state and mode for opponent
-            opponent.setGameMode(GameMode.PVP);
+            opponent.setGameMode(gameMode);
             opponent.gameState = GameState.PLAYING;
             opponent.pvpWinner = 0;
             opponent.board.clear();
@@ -419,16 +428,35 @@ public class GameEngine {
             opponent.nextPiece = opponent.nextPieces.get(0);
             opponent.spawnNewPiece();
 
+            // Set difficulty for opponent (AI speed will depend on it)
+            opponent.setDifficulty(this.difficulty);
+
+            // In VS_AI mode: Player 1 (left) is AI, Player 2 (right) is human
+            this.setDifficulty(this.difficulty);
+            this.setAiPlay(gameMode == GameMode.VS_AI);
+            opponent.setAiPlay(false);
+
             opponent.start(); // Ensure opponent thread is running
             opponent.gravityAccumulator = 0;
             opponent.secondAccumulator = 0;
             opponent.aiAccumulator = 0;
+
+            if (gameMode == GameMode.VS_AI) {
+                this.isPaused = true;
+                opponent.isPaused = true;
+                if (panel != null) {
+                    panel.setShowVsAiControlsPrompt(true);
+                }
+            }
         }
 
         panel.updateWindowSize();
 
         // Play BGM
         SoundManager.playBGM("/resources/bgm.wav");
+        if (isPaused) {
+            SoundManager.pauseBGM();
+        }
 
         panel.repaint();
     }
@@ -437,9 +465,13 @@ public class GameEngine {
     public void returnToMenu() {
         setAiPlay(false); // Stop AI Autoplay
         gameState = GameState.MENU;
-        SoundManager.stopBGM();
+        if (playerNum == 1) {
+            SoundManager.playBGM("/resources/menu_bgm.wav");
+        } else {
+            SoundManager.stopBGM();
+        }
 
-        if (gameMode == GameMode.PVP && opponent != null && opponent.getGameState() != GameState.MENU) {
+        if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null && opponent.getGameState() != GameState.MENU) {
             opponent.returnToMenu();
         }
 
@@ -468,7 +500,7 @@ public class GameEngine {
             SoundManager.resumeBGM();
             panel.resetUIState();
         }
-        if (gameMode == GameMode.PVP && opponent != null && opponent.isPaused() != isPaused) {
+        if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null && opponent.isPaused() != isPaused) {
             opponent.togglePause();
         }
         panel.repaint();
@@ -701,7 +733,7 @@ public class GameEngine {
         }
 
         // PVP Garbage Generation
-        if (gameMode == GameMode.PVP && opponent != null && (lines > 0 || isTSpin)) {
+        if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null && (lines > 0 || isTSpin)) {
             int garbageToSend = 0;
             if (isTSpin) {
                 if (tSpinType == TSpinType.REGULAR) {
@@ -841,9 +873,8 @@ public class GameEngine {
         if (isGameOver || isPaused) return;
 
         // Generate garbage lines on this board
-        java.util.Random rand = new java.util.Random();
         for (int i = 0; i < garbageLinesCount; i++) {
-            int holeCol = rand.nextInt(Board.COLS);
+            int holeCol = rng.nextInt(Board.COLS);
             board.addGarbageLine(holeCol);
         }
 
@@ -998,7 +1029,7 @@ public class GameEngine {
             }
         }
         Tetromino[] types = Tetromino.values();
-        Tetromino randomType = types[new Random().nextInt(types.length)];
+        Tetromino randomType = types[rng.nextInt(types.length)];
         return new Piece(randomType);
     }
 
@@ -1036,42 +1067,23 @@ public class GameEngine {
         }
 
         if (isGameOver) {
-            if (gameMode == GameMode.PVP && opponent != null) {
-                if (opponent.isGameOver()) {
-                    // Both players are now game over, determine the winner
-                    int winner = 0; // 0: none, 1: P1, 2: P2, 3: Tie
-                    int p1Score = (playerNum == 1) ? this.score : opponent.getScore();
-                    int p2Score = (playerNum == 1) ? opponent.getScore() : this.score;
-                    int p1Time = (playerNum == 1) ? this.secondsElapsed : opponent.getSecondsElapsed();
-                    int p2Time = (playerNum == 1) ? opponent.getSecondsElapsed() : this.secondsElapsed;
-
-                    if (p1Score > p2Score) {
-                        winner = 1;
-                    } else if (p2Score > p1Score) {
-                        winner = 2;
-                    } else {
-                        // Tie breaker: longer survival time wins
-                        if (p1Time > p2Time) {
-                            winner = 1;
-                        } else if (p2Time > p1Time) {
-                            winner = 2;
-                        } else {
-                            winner = 3; // True tie
-                        }
+            if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null) {
+                synchronized (panel) {
+                    if (this.pvpWinner == 0 && opponent.getPvpWinner() == 0) {
+                        int winner = (this.playerNum == 1) ? 2 : 1;
+                        this.pvpWinner = winner;
+                        opponent.setPvpWinner(winner);
+                        opponent.isGameOver = true;
+                        opponent.setAiPlay(false);
+                        SoundManager.stopBGM();
                     }
-
-                    this.pvpWinner = winner;
-                    opponent.setPvpWinner(winner);
-                    SoundManager.stopBGM();
-                } else {
-                    // Opponent is still playing, do not stop BGM or determine winner yet
                 }
             } else {
                 SoundManager.stopBGM();
             }
 
             // Check if score qualifies for leaderboard
-            if (gameMode != GameMode.PVP && !usedAiThisSession && leaderboardManager.qualifiesForLeaderboard(score, secondsElapsed, totalLinesCleared, difficulty, gameMode)) {
+            if (gameMode != GameMode.PVP && gameMode != GameMode.VS_AI && !usedAiThisSession && leaderboardManager.qualifiesForLeaderboard(score, secondsElapsed, totalLinesCleared, difficulty, gameMode)) {
                 isEnteringName = true;
                 nameInputBuffer.setLength(0);
                 panel.startAnimationTimer();
@@ -1087,14 +1099,14 @@ public class GameEngine {
         }
 
         leaderboardRecorded = true;
-        if (!usedAiThisSession && gameMode != GameMode.PVP) {
+        if (!usedAiThisSession && gameMode != GameMode.PVP && gameMode != GameMode.VS_AI) {
             leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
         }
     }
 
     // Save current game state
     public void saveGame() {
-        if (gameState != GameState.PLAYING || isGameOver || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL) {
+        if (gameState != GameState.PLAYING || isGameOver || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL || gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) {
             return;
         }
         SaveManager.save(score, secondsElapsed, difficulty, canHoldThisTurn, currentPiece, nextPiece, heldPiece, board,
@@ -1665,6 +1677,16 @@ public class GameEngine {
         }
         aiAccumulator = 0;
         panel.repaint();
+    }
+
+    public int getAiStepDelayMs() {
+        if (difficulty == Difficulty.EASY) {
+            return 500;
+        } else if (difficulty == Difficulty.HARD) {
+            return 300;
+        } else {
+            return 400;
+        }
     }
 
     // AI step execution

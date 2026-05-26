@@ -32,6 +32,7 @@ public class SoundManager {
     }
 
     private static Clip bgmClip;
+    private static String currentBGMPath = null;
     private static float bgmVolume = 0.25f;
     private static float sfxVolume = 0.8f;
     private static boolean bgmMuted = false;
@@ -117,6 +118,16 @@ public class SoundManager {
      * 循環播放背景音樂 (BGM)。
      */
     public static synchronized void playBGM(String filePath) {
+        if (filePath != null && filePath.equals(currentBGMPath) && bgmClip != null && bgmClip.isOpen()) {
+            if (!bgmMuted && bgmVolume > 0.0f) {
+                if (!bgmClip.isRunning()) {
+                    bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
+                    bgmClip.start();
+                }
+            }
+            return;
+        }
+
         stopBGM();
 
         try {
@@ -128,6 +139,7 @@ public class SoundManager {
 
             bgmClip = AudioSystem.getClip();
             bgmClip.open(audioStream);
+            currentBGMPath = filePath;
             
             setClipVolume(bgmClip, bgmVolume, bgmMuted);
             bgmClip.loop(Clip.LOOP_CONTINUOUSLY);
@@ -145,6 +157,7 @@ public class SoundManager {
      */
     public static synchronized void stopBGM() {
         bgmPaused = false;
+        currentBGMPath = null;
         if (bgmClip != null) {
             try {
                 if (bgmClip.isRunning()) bgmClip.stop();
@@ -371,8 +384,8 @@ public class SoundManager {
                 }
                 value *= 0.4;
                 
-            } else {
-                // MINIMAL_POP (或 CLASSIC 的辅助 SFX) 使用極清脆的正弦波 (Sine Wave) 指數衰減
+            } else if (pack == SoundPack.MINIMAL_POP) {
+                // MINIMAL_POP 使用極清脆的正弦波 (Sine Wave) 指數衰減
                 double freq = 500.0;
                 if (type == SoundType.MOVE) {
                     freq = 700.0;
@@ -403,6 +416,44 @@ public class SoundManager {
                 }
                 
                 value = Math.sin(2.0 * Math.PI * freq * t);
+            } else {
+                // CLASSIC 的輔助 SFX：使用具備街機質感的正弦/三角混合音效，做出懷舊遊戲機的阻尼感
+                double freq = 440.0;
+                if (type == SoundType.MOVE) {
+                    freq = 350.0;
+                    envelope = Math.exp(-t * 90.0); // 街機移動聲：稍沉的啵啵聲
+                    value = Math.sin(2.0 * Math.PI * freq * t);
+                } else if (type == SoundType.ROTATE) {
+                    // 旋轉聲：向上的小啾聲
+                    freq = 400.0 + (t / duration) * 300.0;
+                    envelope = Math.exp(-t * 60.0);
+                    // 混合三角波與正弦波，讓音色更有機械感
+                    double period = 1.0 / freq;
+                    double phase = (t % period) / period;
+                    double tri = (phase < 0.5) ? (4.0 * phase - 1.0) : (3.0 - 4.0 * phase);
+                    value = 0.5 * tri + 0.5 * Math.sin(2.0 * Math.PI * freq * t);
+                } else if (type == SoundType.HOLD) {
+                    // 暫存聲：街機特色的雙音快速遞增
+                    freq = (t < duration * 0.5) ? 480.0 : 640.0;
+                    double subT = t % (duration * 0.5);
+                    envelope = Math.exp(-subT * 40.0);
+                    value = Math.sin(2.0 * Math.PI * freq * t);
+                } else if (type == SoundType.LOCK) {
+                    // 鎖定聲：沉悶的落地撞擊
+                    freq = 150.0;
+                    envelope = Math.exp(-t * 40.0);
+                    value = Math.sin(2.0 * Math.PI * freq * t);
+                } else if (type == SoundType.CLEAR) {
+                    // 消行：經典包通常播放原有的 clear.wav，此處僅作為防呆備份
+                    double[] notes = {523.25, 659.25, 783.99, 1046.50};
+                    int idx = (int) (t / (duration / 4.0));
+                    freq = notes[Math.min(idx, 3)];
+                    value = Math.sin(2.0 * Math.PI * freq * t);
+                } else if (type == SoundType.GAME_OVER) {
+                    // 遊戲結束：緩慢降調的街機蜂鳴聲
+                    freq = 300.0 - (t / duration) * 200.0;
+                    value = Math.sin(2.0 * Math.PI * freq * t);
+                }
             }
             
             double sample = value * envelope * 127.0;

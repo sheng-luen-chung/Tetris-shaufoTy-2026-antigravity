@@ -19,17 +19,35 @@ public class AchievementManager {
 
     public static class AchievementInfo {
         public String id;
-        public String title;
-        public String desc;
-        public String requirement;
+        public String titleZh;
+        public String titleEn;
+        public String descZh;
+        public String descEn;
+        public String reqZh;
+        public String reqEn;
         public boolean unlocked;
 
-        public AchievementInfo(String id, String title, String desc, String requirement) {
+        public AchievementInfo(String id, String titleZh, String titleEn, String descZh, String descEn, String reqZh, String reqEn) {
             this.id = id;
-            this.title = title;
-            this.desc = desc;
-            this.requirement = requirement;
+            this.titleZh = titleZh;
+            this.titleEn = titleEn;
+            this.descZh = descZh;
+            this.descEn = descEn;
+            this.reqZh = reqZh;
+            this.reqEn = reqEn;
             this.unlocked = false;
+        }
+
+        public String getTitle() {
+            return LanguageManager.get(titleZh, titleEn);
+        }
+
+        public String getDesc() {
+            return LanguageManager.get(descZh, descEn);
+        }
+
+        public String getRequirement() {
+            return LanguageManager.get(reqZh, reqEn);
         }
     }
 
@@ -37,20 +55,20 @@ public class AchievementManager {
 
     static {
         // Define all 10 achievements
-        add("first_steps", "初試身手", "完成基礎移動與軟降教學關卡", "通過教學關卡 1");
-        add("tspin_master", "T-Spin 大師", "通過所有教學與 T-Spin 練習關卡", "通過教學關卡 7");
-        add("first_clear", "初次消行", "在一般遊戲中成功消除任一行", "消除 ≥ 1 行");
-        add("tetris_clear", "完美消四行", "在一般遊戲中單次消除 4 行", "單次消除 4 行");
-        add("combo_master", "連擊狂人", "在一般遊戲中達成 5 次以上 Combo 連擊", "Combo 連擊數 ≥ 5");
-        add("tspin_regular", "旋轉乾坤", "在一般遊戲中觸發一次 Regular T-Spin", "觸發 Regular T-Spin");
-        add("perfect_clear", "全身退場", "在一般遊戲中達成 Perfect Clear 版面全消", "版面完全清空");
-        add("sprint_finisher", "長跑選手", "成功完成 40 行 SPRINT 競速模式", "完成 40 行競速");
-        add("score_master", "分數達人", "在 ENDLESS 無盡模式單局獲得 50,000 以上高分", "單局分數 ≥ 50,000");
-        add("survival_master", "生存大師", "在 SURVIVAL 生存模式中存活 3 分鐘 (180秒) 以上", "生存時間 ≥ 180 秒");
+        add("first_steps", "初試身手", "First Steps", "完成基礎移動與軟降教學關卡", "Complete basic movement and soft drop tutorial", "通過教學關卡 1", "Clear Tutorial Level 1");
+        add("tspin_master", "T-Spin 大師", "T-Spin Master", "通過所有教學與 T-Spin 練習關卡", "Clear all tutorial levels", "通過教學關卡 7", "Clear Tutorial Level 7");
+        add("first_clear", "初次消行", "First Clear", "在一般遊戲中成功消除任一行", "Clear any line in a normal game", "消除 ≥ 1 行", "Clear >= 1 Line");
+        add("tetris_clear", "完美消四行", "Tetris!", "在一般遊戲中單次消除 4 行", "Clear 4 lines at once in a normal game", "單次消除 4 行", "Clear 4 lines in a single action");
+        add("combo_master", "連擊狂人", "Combo Master", "在一般遊戲中達成 5 次以上 Combo 連擊", "Achieve 5 or more Combos in a normal game", "Combo 連擊數 ≥ 5", "Combo count >= 5");
+        add("tspin_regular", "旋轉乾坤", "T-Spin Masterclass", "在一般遊戲中觸發一次 Regular T-Spin", "Trigger a Regular T-Spin in a normal game", "觸發 Regular T-Spin", "Trigger a Regular T-Spin");
+        add("perfect_clear", "全身退場", "Perfect Clear", "在一般遊戲中達成 Perfect Clear 版面全消", "Achieve a Perfect Clear in a normal game", "版面完全清空", "Completely clear the board");
+        add("sprint_finisher", "長跑選手", "Sprint Finisher", "成功完成 40 行 SPRINT 競速模式", "Complete the 40-line Sprint mode", "完成 40 行競速", "Finish 40-line Sprint");
+        add("score_master", "分數達人", "Score Master", "在 ENDLESS 無盡模式單局獲得 50,000 以上高分", "Get over 50,000 points in a single Endless game", "單局分數 ≥ 50,000", "Score >= 50,000");
+        add("survival_master", "生存大師", "Survival Expert", "在 SURVIVAL 生存模式中存活 3 分鐘 (180秒) 以上", "Survive for 3 minutes (180 seconds) or more in Survival mode", "生存時間 ≥ 180 秒", "Survive time >= 180s");
     }
 
-    private static void add(String id, String title, String desc, String requirement) {
-        achievements.put(id, new AchievementInfo(id, title, desc, requirement));
+    private static void add(String id, String titleZh, String titleEn, String descZh, String descEn, String reqZh, String reqEn) {
+        achievements.put(id, new AchievementInfo(id, titleZh, titleEn, descZh, descEn, reqZh, reqEn));
     }
 
     private static Path getFilePath() {
@@ -79,7 +97,7 @@ public class AchievementManager {
             
             // Trigger toast notification in UI
             if (gameEngine != null && gameEngine.getPanel() != null) {
-                gameEngine.getPanel().showAchievementToast(info.title, info.desc);
+                gameEngine.getPanel().showAchievementToast(info.getTitle(), info.getDesc());
             }
         }
     }

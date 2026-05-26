@@ -195,7 +195,7 @@ public class SaveManager {
                                     float bgmVol, float sfxVol,
                                     boolean bgmMute, boolean sfxMute,
                                     String theme, String colorBlind,
-                                    String soundPack) {
+                                    String soundPack, String language) {
         Path path = getSettingsFilePath();
         try {
             Files.createDirectories(path.getParent());
@@ -222,6 +222,7 @@ public class SaveManager {
                 writer.write("theme=" + theme + "\n");
                 writer.write("colorBlind=" + colorBlind + "\n");
                 writer.write("soundPack=" + soundPack + "\n");
+                writer.write("language=" + language + "\n");
             }
         } catch (IOException e) {
             System.err.println("Failed to save settings: " + e.getMessage());

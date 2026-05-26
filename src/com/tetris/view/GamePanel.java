@@ -108,7 +108,7 @@ public class GamePanel extends JPanel {
 
     // Pause menu properties
     private int selectedPauseIndex = 0;
-    private final Rectangle[] pauseOptionBounds = new Rectangle[7];
+    private final Rectangle[] pauseOptionBounds = new Rectangle[8];
     private boolean showSettingsInPause = false;
     private boolean showGhostPiece = true;
     private boolean showGridLines = true;
@@ -131,6 +131,8 @@ public class GamePanel extends JPanel {
     private Rectangle sfxMuteBounds = new Rectangle();
     private Rectangle menuSettingsBackButtonBounds = new Rectangle();
     private Rectangle menuSettingsThemeBounds = new Rectangle();
+
+    private Rectangle menuSettingsLanguageBounds = new Rectangle();
     private Rectangle menuSettingsColorBlindBounds = new Rectangle();
     private Rectangle menuSettingsSoundPackBounds = new Rectangle();
     private Rectangle menuSettingsPreviewCountBounds = new Rectangle();
@@ -153,8 +155,10 @@ public class GamePanel extends JPanel {
 
     // Game mode selection properties
     private boolean showModeSelectInMenu = false;
-    private int selectedModeIndex = 0; // 0: ENDLESS, 1: SPRINT, 2: ULTRA, 3: SURVIVAL, 4: PVP, 5: BACK
-    private final Rectangle[] modeOptionBounds = new Rectangle[6];
+    private int selectedModeIndex = 0; // Normal: 0-6, AI demo: 0-4
+    private final Rectangle[] modeOptionBounds = new Rectangle[7];
+    private boolean isSelectingModeForAiDemo = false;
+    private boolean showVsAiControlsPrompt = false;
 
     // Difficulty selection properties
     private boolean showDifficultySelectInMenu = false;
@@ -594,6 +598,17 @@ public class GamePanel extends JPanel {
                             return;
                         }
 
+                        // LANGUAGE button click
+                        if (menuSettingsLanguageBounds != null && menuSettingsLanguageBounds.contains(e.getPoint())) {
+                            com.tetris.util.LanguageManager.setCurrentLanguage(
+                                com.tetris.util.LanguageManager.getCurrentLanguage() == com.tetris.util.LanguageManager.Language.ZH ? 
+                                com.tetris.util.LanguageManager.Language.EN : com.tetris.util.LanguageManager.Language.ZH
+                            );
+                            com.tetris.controller.InputHandler.saveConfig();
+                            repaint();
+                            return;
+                        }
+
                         // Volume and mute controls
                         if (bgmTrackBounds.contains(e.getPoint())) {
                             isDraggingBGM = true;
@@ -611,7 +626,8 @@ public class GamePanel extends JPanel {
                             repaint();
                         }
                     } else if (showModeSelectInMenu) {
-                        for (int i = 0; i < 6; i++) {
+                        int numModes = isSelectingModeForAiDemo ? 5 : 7;
+                        for (int i = 0; i < numModes; i++) {
                             if (modeOptionBounds[i] != null && modeOptionBounds[i].contains(e.getPoint())) {
                                 selectedModeIndex = i;
                                 triggerModeSelection();
@@ -695,6 +711,11 @@ public class GamePanel extends JPanel {
                     if (gameEngine.isGameOver()) {
                         gameEngine.returnToMenu();
                     } else if (gameEngine.isPaused()) {
+                        if (showVsAiControlsPrompt && gameEngine.getGameMode() == GameMode.VS_AI) {
+                            showVsAiControlsPrompt = false;
+                            gameEngine.togglePause();
+                            return;
+                        }
                         if (showSettingsInPause) {
                             // Volume and Mute clicks inside pause settings
                             if (bgmTrackBounds.contains(e.getPoint())) {
@@ -719,7 +740,7 @@ public class GamePanel extends JPanel {
                                 return;
                             }
                         }
-                        int numPauseOptions = showSettingsInPause ? 5 : 4;
+                        int numPauseOptions = showSettingsInPause ? 8 : 4;
                         for (int i = 0; i < numPauseOptions; i++) {
                             if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
                                 selectedPauseIndex = i;
@@ -748,7 +769,8 @@ public class GamePanel extends JPanel {
                     if (showSettingsInMenu) {
                         repaint();
                     } else if (showModeSelectInMenu) {
-                        for (int i = 0; i < 6; i++) {
+                        int numModes = isSelectingModeForAiDemo ? 5 : 7;
+                        for (int i = 0; i < numModes; i++) {
                             if (modeOptionBounds[i] != null && modeOptionBounds[i].contains(e.getPoint())) {
                                 if (selectedModeIndex != i) {
                                     selectedModeIndex = i;
@@ -792,7 +814,7 @@ public class GamePanel extends JPanel {
                 } else if (state == com.tetris.controller.GameEngine.GameState.ACHIEVEMENTS) {
                     repaint(); // Repaint to update achievements back button hover state
                 } else if ((state == com.tetris.controller.GameEngine.GameState.PLAYING || state == com.tetris.controller.GameEngine.GameState.TUTORIAL) && gameEngine.isPaused()) {
-                    int numPauseOptions = showSettingsInPause ? 5 : 4;
+                    int numPauseOptions = showSettingsInPause ? 8 : 4;
                     for (int i = 0; i < numPauseOptions; i++) {
                         if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
                             if (selectedPauseIndex != i) {
@@ -846,7 +868,8 @@ public class GamePanel extends JPanel {
         java.awt.Window window = javax.swing.SwingUtilities.getWindowAncestor(this);
         if (window instanceof javax.swing.JFrame) {
             javax.swing.JFrame frame = (javax.swing.JFrame) window;
-            if (gameEngine != null && gameEngine.getGameMode() == GameMode.PVP && gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
+            if (gameEngine != null && (gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI)
+                    && gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
                 setPreferredSize(new Dimension(1000, ROWS * TILE_SIZE));
             } else {
                 setPreferredSize(new Dimension(500, ROWS * TILE_SIZE));
@@ -906,6 +929,7 @@ public class GamePanel extends JPanel {
         showControlSettings = false;
         rebindingAction = null;
         selectedPauseIndex = 0;
+        showVsAiControlsPrompt = false;
         repaint();
     }
 
@@ -915,6 +939,9 @@ public class GamePanel extends JPanel {
     public void setRebindingAction(String val) { this.rebindingAction = val; }
     public int getRebindingPlayer() { return rebindingPlayer; }
     public void setRebindingPlayer(int val) { this.rebindingPlayer = val; }
+
+    public boolean isShowVsAiControlsPrompt() { return showVsAiControlsPrompt; }
+    public void setShowVsAiControlsPrompt(boolean val) { this.showVsAiControlsPrompt = val; repaint(); }
 
     // Set the current piece
     public void setCurrentPiece(Piece piece) {
@@ -946,7 +973,7 @@ public class GamePanel extends JPanel {
     private void drawGameScene(Graphics g) {
         if (gameEngine == null) return;
         synchronized (gameEngine) {
-            if (gameEngine.getGameMode() == GameMode.PVP && gameEngine2 != null) {
+            if ((gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI) && gameEngine2 != null) {
                 synchronized (gameEngine2) {
                     drawGameSceneInternal(g);
                 }
@@ -976,7 +1003,8 @@ public class GamePanel extends JPanel {
                 Graphics2D g2d = (Graphics2D) g;
                 java.awt.geom.AffineTransform oldTransform = g2d.getTransform();
 
-                if (gameEngine.getGameMode() == GameMode.PVP && gameEngine2 != null) {
+                com.tetris.controller.GameEngine localEngine2 = gameEngine2;
+                if ((gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI) && localEngine2 != null) {
                     // --- PLAYER 1 (Left: x=0) ---
                     java.awt.geom.AffineTransform p1Transform = g2d.getTransform();
                     int currentShakeX = 0;
@@ -1002,7 +1030,7 @@ public class GamePanel extends JPanel {
                     drawScorePopups(g2d, scorePopups);
                     drawSidebar(g2d, gameEngine);
                     drawPerfectClearOverlay(g2d, perfectClearStartTime);
-                    if (gameEngine.isGameOver() && !gameEngine2.isGameOver()) {
+                    if (gameEngine.isGameOver() && !localEngine2.isGameOver()) {
                         drawLocalPvpGameOver(g2d);
                     }
                     g2d.setTransform(p1Transform);
@@ -1027,13 +1055,13 @@ public class GamePanel extends JPanel {
                     }
 
                     drawGrid(g2d);
-                    drawFixedBlocks(g2d, gameEngine2.getBoard());
-                    drawCurrentPiece(g2d, gameEngine2.getCurrentPiece(), gameEngine2.getBoard(), gameEngine2);
+                    drawFixedBlocks(g2d, localEngine2.getBoard());
+                    drawCurrentPiece(g2d, localEngine2.getCurrentPiece(), localEngine2.getBoard(), localEngine2);
                     drawParticles(g2d, particles2);
                     drawScorePopups(g2d, scorePopups2);
-                    drawSidebar(g2d, gameEngine2);
+                    drawSidebar(g2d, localEngine2);
                     drawPerfectClearOverlay(g2d, perfectClearStartTime2);
-                    if (gameEngine2.isGameOver() && !gameEngine.isGameOver()) {
+                    if (localEngine2.isGameOver() && !gameEngine.isGameOver()) {
                         drawLocalPvpGameOver(g2d);
                     }
                     g2d.setTransform(p2Transform);
@@ -1041,11 +1069,15 @@ public class GamePanel extends JPanel {
                     // --- OVERLAYS (Centered over both windows) ---
                     // Draw Pause Overlay
                     if (gameEngine.isPaused()) {
-                        drawPauseOverlay(g2d);
+                        if (showVsAiControlsPrompt && gameEngine.getGameMode() == GameMode.VS_AI) {
+                            drawVsAiControlsPromptOverlay(g2d);
+                        } else {
+                            drawPauseOverlay(g2d);
+                        }
                     }
 
                     // Draw Game Over Overlay
-                    if (gameEngine.isGameOver() && gameEngine2.isGameOver()) {
+                    if (gameEngine.isGameOver() && localEngine2.isGameOver()) {
                         drawPvpGameOverOverlay(g2d);
                     }
 
@@ -1124,7 +1156,8 @@ public class GamePanel extends JPanel {
         int h = getHeight();
         if (w <= 0 || h <= 0) {
             w = COLS * TILE_SIZE + SIDEBAR_WIDTH;
-            if (gameEngine != null && gameEngine.getGameMode() == GameMode.PVP && gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
+            if (gameEngine != null && (gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI)
+                    && gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
                 w = 1000;
             } else {
                 w = 500;
@@ -1189,7 +1222,8 @@ public class GamePanel extends JPanel {
         if (showDifficultySelectInMenu) {
             selectedDifficultyIndex = (selectedDifficultyIndex + dir + 4) % 4;
         } else if (showModeSelectInMenu) {
-            selectedModeIndex = (selectedModeIndex + dir + 5) % 5;
+            int numModes = isSelectingModeForAiDemo ? 5 : 7;
+            selectedModeIndex = (selectedModeIndex + dir + numModes) % numModes;
         } else {
             int numOptions = com.tetris.util.SaveManager.hasSave() ? 8 : 7;
             selectedMenuIndex = (selectedMenuIndex + dir + numOptions) % numOptions;
@@ -1219,10 +1253,11 @@ public class GamePanel extends JPanel {
                         break;
                     case 3:
                         // AI DEMO Option
-                        gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
+                        showSettingsInMenu = false;
                         showDifficultySelectInMenu = false;
-                        gameEngine.startGame();
-                        gameEngine.setAiPlay(true);
+                        showModeSelectInMenu = true;
+                        isSelectingModeForAiDemo = true;
+                        selectedModeIndex = 0;
                         break;
                     case 4:
                         showSettingsInMenu = true;
@@ -1248,10 +1283,11 @@ public class GamePanel extends JPanel {
                         break;
                     case 2:
                         // AI DEMO Option
-                        gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
+                        showSettingsInMenu = false;
                         showDifficultySelectInMenu = false;
-                        gameEngine.startGame();
-                        gameEngine.setAiPlay(true);
+                        showModeSelectInMenu = true;
+                        isSelectingModeForAiDemo = true;
+                        selectedModeIndex = 0;
                         break;
                     case 3:
                         showSettingsInMenu = true;
@@ -1272,40 +1308,73 @@ public class GamePanel extends JPanel {
     }
 
     private void triggerModeSelection() {
-        switch (selectedModeIndex) {
-            case 0: // ENDLESS
-                gameEngine.setGameMode(GameMode.ENDLESS);
-                showModeSelectInMenu = false;
-                showDifficultySelectInMenu = true;
-                selectedDifficultyIndex = 0; // Default to EASY
-                break;
-            case 1: // SPRINT
-                gameEngine.setGameMode(GameMode.SPRINT);
-                showModeSelectInMenu = false;
-                showDifficultySelectInMenu = true;
-                selectedDifficultyIndex = 0; // Default to EASY
-                break;
-            case 2: // ULTRA
-                gameEngine.setGameMode(GameMode.ULTRA);
-                showModeSelectInMenu = false;
-                showDifficultySelectInMenu = true;
-                selectedDifficultyIndex = 0; // Default to EASY
-                break;
-            case 3: // SURVIVAL
-                gameEngine.setGameMode(GameMode.SURVIVAL);
-                showModeSelectInMenu = false;
-                showDifficultySelectInMenu = true;
-                selectedDifficultyIndex = 0; // Default to EASY
-                break;
-            case 4: // PVP BATTLE
-                gameEngine.setGameMode(GameMode.PVP);
-                showModeSelectInMenu = false;
-                gameEngine.startGame();
-                break;
-            case 5: // BACK
-                showModeSelectInMenu = false;
-                selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 1 : 0; // Return to Play Game
-                break;
+        if (this.isSelectingModeForAiDemo) {
+            switch (selectedModeIndex) {
+                case 0:
+                    this.gameEngine.setGameMode(GameMode.ENDLESS);
+                    this.startAiDemo();
+                    break;
+                case 1:
+                    this.gameEngine.setGameMode(GameMode.SPRINT);
+                    this.startAiDemo();
+                    break;
+                case 2:
+                    this.gameEngine.setGameMode(GameMode.ULTRA);
+                    this.startAiDemo();
+                    break;
+                case 3:
+                    this.gameEngine.setGameMode(GameMode.SURVIVAL);
+                    this.startAiDemo();
+                    break;
+                case 4:
+                    this.showModeSelectInMenu = false;
+                    this.isSelectingModeForAiDemo = false;
+                    this.selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 3 : 2;
+                    break;
+            }
+        } else {
+            switch (selectedModeIndex) {
+                case 0:
+                    this.gameEngine.setGameMode(GameMode.ENDLESS);
+                    this.showModeSelectInMenu = false;
+                    this.showDifficultySelectInMenu = true;
+                    this.selectedDifficultyIndex = 1; // Default to NORMAL
+                    break;
+                case 1:
+                    this.gameEngine.setGameMode(GameMode.SPRINT);
+                    this.showModeSelectInMenu = false;
+                    this.showDifficultySelectInMenu = true;
+                    this.selectedDifficultyIndex = 1;
+                    break;
+                case 2:
+                    this.gameEngine.setGameMode(GameMode.ULTRA);
+                    this.showModeSelectInMenu = false;
+                    this.showDifficultySelectInMenu = true;
+                    this.selectedDifficultyIndex = 1;
+                    break;
+                case 3:
+                    this.gameEngine.setGameMode(GameMode.SURVIVAL);
+                    this.showModeSelectInMenu = false;
+                    this.showDifficultySelectInMenu = true;
+                    this.selectedDifficultyIndex = 1;
+                    break;
+                case 4:
+                    this.gameEngine.setGameMode(GameMode.VS_AI);
+                    this.showModeSelectInMenu = false;
+                    this.showDifficultySelectInMenu = true;
+                    this.selectedDifficultyIndex = 1;
+                    break;
+                case 5:
+                    this.gameEngine.setGameMode(GameMode.PVP);
+                    this.showModeSelectInMenu = false;
+                    this.gameEngine.startGame();
+                    break;
+                case 6:
+                default:
+                    this.showModeSelectInMenu = false;
+                    this.selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 1 : 0;
+                    break;
+            }
         }
         repaint();
     }
@@ -1937,9 +2006,16 @@ public class GamePanel extends JPanel {
         // 2. Header Title
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD | Font.ITALIC, 48));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = (winner == 1) ? "玩家 1 獲得勝利！" : 
-                           ((winner == 2) ? "玩家 2 獲得勝利！" : 
-                           ((winner == 3) ? "雙方平手！" : "遊戲結束"));
+        String titleText;
+        if (gameEngine.getGameMode() == GameMode.VS_AI) {
+            titleText = (winner == 1) ? com.tetris.util.LanguageManager.get("AI 對手 獲得勝利！", "AI Opponent Wins!") : 
+                        ((winner == 2) ? com.tetris.util.LanguageManager.get("玩家 2 獲得勝利！", "Player 2 Wins!") : 
+                        ((winner == 3) ? com.tetris.util.LanguageManager.get("雙方平手！", "Draw!") : com.tetris.util.LanguageManager.get("遊戲結束", "Game Over")));
+        } else {
+            titleText = (winner == 1) ? com.tetris.util.LanguageManager.get("玩家 1 獲得勝利！", "Player 1 Wins!") : 
+                        ((winner == 2) ? com.tetris.util.LanguageManager.get("玩家 2 獲得勝利！", "Player 2 Wins!") : 
+                        ((winner == 3) ? com.tetris.util.LanguageManager.get("雙方平手！", "Draw!") : com.tetris.util.LanguageManager.get("遊戲結束", "Game Over")));
+        }
         int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 80;
 
@@ -1952,7 +2028,9 @@ public class GamePanel extends JPanel {
 
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 14));
         g2d.setColor(new Color(180, 100, 255));
-        String subTitleText = "雙人對戰戰績結算 (LOCAL PVP BATTLE SUMMARY)";
+        String subTitleText = (gameEngine.getGameMode() == GameMode.VS_AI) ? 
+                              com.tetris.util.LanguageManager.get("人機對戰戰績結算 (VS AI BATTLE SUMMARY)", "VS AI BATTLE SUMMARY") : 
+                              com.tetris.util.LanguageManager.get("雙人對戰戰績結算 (LOCAL PVP BATTLE SUMMARY)", "LOCAL PVP BATTLE SUMMARY");
         int subTitleX = (width - g2d.getFontMetrics().stringWidth(subTitleText)) / 2;
         g2d.drawString(subTitleText, subTitleX, 110);
 
@@ -1976,16 +2054,20 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(p2StartX, statsY, cardW, cardH, 15, 15);
 
         // Render Stats for P1
-        drawPlayerStatsCard(g2d, p1StartX, statsY, cardW, "玩家 1 (PLAYER 1)", gameEngine, new Color(0, 255, 255));
-
+        String p1Title = (gameEngine.getGameMode() == GameMode.VS_AI) ? 
+                         com.tetris.util.LanguageManager.get("AI 對手 (AI OPPONENT)", "AI Opponent") : 
+                         com.tetris.util.LanguageManager.get("玩家 1 (PLAYER 1)", "Player 1 (PLAYER 1)");
+        drawPlayerStatsCard(g2d, p1StartX, statsY, cardW, p1Title, gameEngine, new Color(0, 255, 255));
 
         // Render Stats for P2
-        drawPlayerStatsCard(g2d, p2StartX, statsY, cardW, "玩家 2 (PLAYER 2)", gameEngine2, new Color(255, 100, 255));
+        com.tetris.controller.GameEngine localEngine2 = gameEngine2;
+        String p2Title = com.tetris.util.LanguageManager.get("玩家 2 (PLAYER 2)", "Player 2 (PLAYER 2)");
+        drawPlayerStatsCard(g2d, p2StartX, statsY, cardW, p2Title, localEngine2, new Color(255, 100, 255));
 
         // 4. Return Hint at bottom
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
         g2d.setColor(new Color(120, 120, 150));
-        String hintText = "按下 ENTER 或 空白鍵 返回主選單";
+        String hintText = com.tetris.util.LanguageManager.get("按下 ENTER 或 空白鍵 返回主選單", "Press ENTER or SPACE to Return to Menu");
         int hintX = (width - g2d.getFontMetrics().stringWidth(hintText)) / 2;
         g2d.drawString(hintText, hintX, 520);
     }
@@ -2004,24 +2086,114 @@ public class GamePanel extends JPanel {
         int itemY = startY + 80;
         int gap = 40;
 
-        g2d.drawString("最終分數:", startX + 40, itemY);
+        g2d.drawString(com.tetris.util.LanguageManager.get("最終分數:", "Final Score:"), startX + 40, itemY);
         g2d.drawString(String.format("%,d", engine.getScore()), startX + 260, itemY);
         itemY += gap;
 
-        g2d.drawString("消除行數:", startX + 40, itemY);
+        g2d.drawString(com.tetris.util.LanguageManager.get("消除行數:", "Lines Cleared:"), startX + 40, itemY);
         g2d.drawString(String.valueOf(engine.getTotalLinesCleared()), startX + 260, itemY);
         itemY += gap;
 
-        g2d.drawString("達成 T-Spin:", startX + 40, itemY);
+        g2d.drawString(com.tetris.util.LanguageManager.get("達成 T-Spin:", "T-Spins:"), startX + 40, itemY);
         g2d.drawString(String.valueOf(engine.getTSpins()), startX + 260, itemY);
         itemY += gap;
 
-        g2d.drawString("最高連消:", startX + 40, itemY);
+        g2d.drawString(com.tetris.util.LanguageManager.get("最高連消:", "Max Combo:"), startX + 40, itemY);
         g2d.drawString(String.valueOf(Math.max(0, engine.getMaxCombo())), startX + 260, itemY);
         itemY += gap;
 
-        g2d.drawString("放置方塊:", startX + 40, itemY);
+        g2d.drawString(com.tetris.util.LanguageManager.get("放置方塊:", "Pieces Spawned:"), startX + 40, itemY);
         g2d.drawString(String.valueOf(engine.getPiecesSpawned()), startX + 260, itemY);
+    }
+
+    private void drawVsAiControlsPromptOverlay(Graphics2D g2d) {
+        int w = getWidth();
+        int h = getHeight();
+        if (w <= 0) w = 1000;
+        if (h <= 0) h = 600;
+
+        g2d.setColor(new Color(15, 10, 25, 230));
+        g2d.fillRect(0, 0, w, h);
+
+        int cardW = 600;
+        int cardH = 420;
+        int cardX = (w - cardW) / 2;
+        int cardY = (h - cardH) / 2;
+
+        g2d.setColor(new Color(30, 20, 50, 180));
+        g2d.fillRoundRect(cardX, cardY, cardW, cardH, 16, 16);
+        g2d.setColor(new Color(180, 80, 255, 100));
+        g2d.setStroke(new java.awt.BasicStroke(2.0f));
+        g2d.drawRoundRect(cardX, cardY, cardW, cardH, 16, 16);
+        g2d.setStroke(new java.awt.BasicStroke(1.0f));
+
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 26));
+        FontMetrics fm = g2d.getFontMetrics();
+        String title = com.tetris.util.LanguageManager.get("與 AI 對戰模式 (VS AI) 操作提示", "VS AI Mode Controls Guide");
+        int titleX = cardX + (cardW - fm.stringWidth(title)) / 2;
+        int titleY = cardY + 50;
+
+        g2d.setColor(new Color(180, 80, 255, 150));
+        g2d.drawString(title, titleX + 2, titleY + 2);
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(title, titleX, titleY);
+
+        g2d.setColor(new Color(255, 255, 255, 30));
+        g2d.drawLine(cardX + 40, cardY + 75, cardX + cardW - 40, cardY + 75);
+
+        int colW = 240;
+        int p1X = cardX + 40;
+        int p2X = cardX + cardW - 40 - colW;
+        int colY = cardY + 110;
+
+        // Player 1 Card (Left - AI CPU)
+        g2d.setColor(new Color(0, 255, 255, 10));
+        g2d.fillRoundRect(p1X, colY, colW, 200, 10, 10);
+        g2d.setColor(new Color(0, 255, 255, 40));
+        g2d.drawRoundRect(p1X, colY, colW, 200, 10, 10);
+        g2d.setColor(new Color(0, 255, 255));
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
+        g2d.drawString(com.tetris.util.LanguageManager.get("玩家 1 (左側)：電腦 AI", "Player 1 (Left): Computer AI"), p1X + 15, colY + 30);
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 13));
+        g2d.drawString(com.tetris.util.LanguageManager.get("• 由電腦 AI 自動進行遊戲", "• Automatically played by computer AI"), p1X + 15, colY + 70);
+        g2d.drawString(com.tetris.util.LanguageManager.get("• 放置速度依選定難度而變", "• Speed varies by chosen difficulty"), p1X + 15, colY + 100);
+        g2d.drawString(com.tetris.util.LanguageManager.get("• 不需要玩家進行鍵盤操作", "• No keyboard input required from you"), p1X + 15, colY + 130);
+        g2d.drawString(com.tetris.util.LanguageManager.get("• 消除行數會給您發送垃圾行", "• Cleared lines send garbage to you"), p1X + 15, colY + 160);
+
+        // Player 2 Card (Right - Human)
+        g2d.setColor(new Color(255, 100, 255, 10));
+        g2d.fillRoundRect(p2X, colY, colW, 200, 10, 10);
+        g2d.setColor(new Color(255, 100, 255, 40));
+        g2d.drawRoundRect(p2X, colY, colW, 200, 10, 10);
+        g2d.setColor(new Color(255, 100, 255));
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
+        g2d.drawString(com.tetris.util.LanguageManager.get("玩家 2 (右側)：人類玩家", "Player 2 (Right): Human Player"), p2X + 15, colY + 30);
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 13));
+        g2d.drawString(com.tetris.util.LanguageManager.get("• 使用【方向鍵】操控方塊：", "• Use [Arrow Keys] to control:"), p2X + 15, colY + 65);
+        g2d.drawString(com.tetris.util.LanguageManager.get("  -  ← / → ： 左右移動", "  -  ← / → : Move Left / Right"), p2X + 15, colY + 90);
+        g2d.drawString(com.tetris.util.LanguageManager.get("  -  ↓ ： 軟降加速", "  -  ↓ : Soft Drop"), p2X + 15, colY + 112);
+        g2d.drawString(com.tetris.util.LanguageManager.get("  -  ↑ ： 順時針旋轉", "  -  ↑ : Rotate Clockwise"), p2X + 15, colY + 134);
+        g2d.drawString(com.tetris.util.LanguageManager.get("  -  Enter ： 硬降直接落地", "  -  Enter : Hard Drop"), p2X + 15, colY + 156);
+        g2d.drawString(com.tetris.util.LanguageManager.get("  -  Shift ： 暫存保留方塊", "  -  Shift : Hold Piece"), p2X + 15, colY + 178);
+
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
+        long t = System.currentTimeMillis();
+        int alpha = 130 + (int) (125.0 * Math.sin(t / 200.0));
+        g2d.setColor(new Color(255, 215, 0, alpha));
+        String startPrompt = com.tetris.util.LanguageManager.get("按下 [ENTER] 或 [空白鍵] 開始對戰...", "Press [ENTER] or [SPACEBAR] to Battle...");
+        FontMetrics fmPrompt = g2d.getFontMetrics();
+        g2d.drawString(startPrompt, cardX + (cardW - fmPrompt.stringWidth(startPrompt)) / 2, cardY + cardH - 30);
+    }
+
+    private void startAiDemo() {
+        this.showModeSelectInMenu = false;
+        this.isSelectingModeForAiDemo = false;
+        this.gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
+        this.showDifficultySelectInMenu = false;
+        this.gameEngine.startGame();
+        this.gameEngine.setAiPlay(true);
     }
 
     public void startAnimationTimer() {
@@ -2346,7 +2518,7 @@ public class GamePanel extends JPanel {
 
     // Pause menu navigation helper
     public void navigatePauseMenu(int dir) {
-        int numOptions = showSettingsInPause ? 7 : 4;
+        int numOptions = showSettingsInPause ? 8 : 4;
         selectedPauseIndex = (selectedPauseIndex + dir + numOptions) % numOptions;
         repaint();
     }
@@ -2391,7 +2563,14 @@ public class GamePanel extends JPanel {
                 case 5: // SOUND PACK
                     com.tetris.util.SoundManager.nextSoundPack();
                     break;
-                case 6: // BACK
+                case 6: // LANGUAGE
+                    com.tetris.util.LanguageManager.setCurrentLanguage(
+                        com.tetris.util.LanguageManager.getCurrentLanguage() == com.tetris.util.LanguageManager.Language.ZH ? 
+                        com.tetris.util.LanguageManager.Language.EN : com.tetris.util.LanguageManager.Language.ZH
+                    );
+                    com.tetris.controller.InputHandler.saveConfig();
+                    break;
+                case 7: // BACK
                     showSettingsInPause = false;
                     selectedPauseIndex = 2; // return cursor to settings option (index 2 now, because SETTINGS is index 2!)
                     break;
@@ -2409,7 +2588,7 @@ public class GamePanel extends JPanel {
         if (height <= 0) height = ROWS * TILE_SIZE;
 
         // Semi-transparent dark background
-        g2d.setColor(new Color(10, 10, 20, 210));
+        g2d.setColor(new Color(10, 10, 20, 160));
         g2d.fillRect(0, 0, width, height);
 
         // Title: GAME PAUSED
@@ -2427,19 +2606,20 @@ public class GamePanel extends JPanel {
 
         // Selection container card
         int cardW = 340;
-        int cardH = showSettingsInPause ? 430 : 310;
+        int cardH = showSettingsInPause ? 470 : 310;
         int cardX = (width - cardW) / 2;
         int cardY = 160;
 
-        g2d.setColor(new Color(255, 255, 255, 15));
+        // Translucent pause menu panel
+        g2d.setColor(new Color(255, 255, 255, 16));
         g2d.fillRoundRect(cardX, cardY, cardW, cardH, 15, 15);
-        g2d.setColor(new Color(255, 255, 255, 40));
+        g2d.setColor(new Color(255, 255, 255, 45));
         g2d.drawRoundRect(cardX, cardY, cardW, cardH, 15, 15);
 
         // Draw Options
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 18));
         FontMetrics fmOption = g2d.getFontMetrics();
-        int numPauseOptions = showSettingsInPause ? 7 : 4;
+        int numPauseOptions = showSettingsInPause ? 8 : 4;
 
         for (int i = 0; i < numPauseOptions; i++) {
             String label = "";
@@ -2449,10 +2629,10 @@ public class GamePanel extends JPanel {
 
             if (!showSettingsInPause) {
                 switch (i) {
-                    case 0: label = "繼續遊戲"; break;
-                    case 1: label = "儲存進度"; break;
-                    case 2: label = "遊戲設定"; break;
-                    case 3: label = "返回主選單"; break;
+                    case 0: label = com.tetris.util.LanguageManager.get("繼續遊戲", "Resume Game"); break;
+                    case 1: label = com.tetris.util.LanguageManager.get("儲存進度", "Save Progress"); break;
+                    case 2: label = com.tetris.util.LanguageManager.get("遊戲設定", "Settings"); break;
+                    case 3: label = com.tetris.util.LanguageManager.get("返回主選單", "Back to Menu"); break;
                 }
                 textWidth = fmOption.stringWidth(label);
                 x = cardX + (cardW - textWidth) / 2;
@@ -2460,16 +2640,18 @@ public class GamePanel extends JPanel {
                 if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, y - textHeight + 5, cardW - 30, textHeight + 15); else pauseOptionBounds[i].setBounds(cardX + 15, y - textHeight + 5, cardW - 30, textHeight + 15);
             } else {
                 switch (i) {
-                    case 0: label = "幻影方塊: " + (showGhostPiece ? "開啟" : "關閉"); break;
-                    case 1: label = "網格線: " + (showGridLines ? "顯示" : "隱藏"); break;
-                    case 2: label = "預覽數量: " + nextPiecesCount + " 個"; break;
-                    case 3: label = "視覺主題: " + getThemeChineseLabel(com.tetris.util.ThemeManager.getCurrentTheme()); break;
-                    case 4: label = "色盲模式: " + getColorBlindModeChineseLabel(com.tetris.util.ThemeManager.getCurrentColorBlindMode()); break;
-                    case 5: label = "音效套件: " + getSoundPackChineseLabel(com.tetris.util.SoundManager.getCurrentSoundPack()); break;
-                    case 6: label = "返回"; break;
+                    case 0: label = com.tetris.util.LanguageManager.get("幻影方塊: " + (showGhostPiece ? "開啟" : "關閉"), "Ghost Piece: " + (showGhostPiece ? "ON" : "OFF")); break;
+                    case 1: label = com.tetris.util.LanguageManager.get("網格線: " + (showGridLines ? "顯示" : "隱藏"), "Grid Lines: " + (showGridLines ? "SHOW" : "HIDE")); break;
+                    case 2: label = com.tetris.util.LanguageManager.get("預覽數量: " + nextPiecesCount + " 個", "Preview: " + nextPiecesCount + " Pieces"); break;
+                    case 3: label = com.tetris.util.LanguageManager.get("視覺主題: " + getThemeChineseLabel(com.tetris.util.ThemeManager.getCurrentTheme()), "Theme: " + com.tetris.util.ThemeManager.getCurrentTheme().name()); break;
+                    case 4: label = com.tetris.util.LanguageManager.get("色盲模式: " + getColorBlindModeChineseLabel(com.tetris.util.ThemeManager.getCurrentColorBlindMode()), "Color Blind: " + com.tetris.util.ThemeManager.getCurrentColorBlindMode().name()); break;
+                    case 5: label = com.tetris.util.LanguageManager.get("音效套件: " + getSoundPackChineseLabel(com.tetris.util.SoundManager.getCurrentSoundPack()), "Sound Pack: " + com.tetris.util.SoundManager.getCurrentSoundPack().name()); break;
+                    case 6: label = com.tetris.util.LanguageManager.get("語言: 繁體中文", "Language: English"); break;
+                    case 7: label = com.tetris.util.LanguageManager.get("返回", "Back"); break;
                 }
                 textWidth = fmOption.stringWidth(label);
                 x = cardX + (cardW - textWidth) / 2;
+
                 if (i == 0) {
                     y = cardY + 35;
                     if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 12, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 12, cardW - 30, 32);
@@ -2488,10 +2670,14 @@ public class GamePanel extends JPanel {
                 } else if (i == 5) {
                     y = cardY + 355;
                     if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 332, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 332, cardW - 30, 32);
-                } else {
+                } else if (i == 6) {
                     y = cardY + 395;
                     if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 372, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 372, cardW - 30, 32);
+                } else {
+                    y = cardY + 435;
+                    if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 412, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 412, cardW - 30, 32);
                 }
+            
             }
 
             boolean isSelected = (i == selectedPauseIndex);
@@ -2795,8 +2981,8 @@ public class GamePanel extends JPanel {
         int dynamicYStart = currentY + 15;
         if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
             drawTutorialHints(g, startX + 15, dynamicYStart);
-        } else if (targetEngine.getGameMode() == GameMode.PVP) {
-            // Draw PvP stats!
+        } else if (targetEngine.getGameMode() == GameMode.PVP || targetEngine.getGameMode() == GameMode.VS_AI) {
+            // Draw PvP/VS_AI stats!
             int statsX = startX + 15;
             int statsY = dynamicYStart;
             int statsW = 170;
@@ -2810,15 +2996,24 @@ public class GamePanel extends JPanel {
 
             g2d.setColor(new Color(0, 255, 255));
             g2d.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 12));
-            String playerTitle = (targetEngine.getPlayerNum() == 1) ? "玩家 1 (WASD)" : "玩家 2 (方向鍵)";
+            String playerTitle;
+            if (targetEngine.getGameMode() == GameMode.VS_AI) {
+                playerTitle = (targetEngine.getPlayerNum() == 1) ? 
+                              com.tetris.util.LanguageManager.get("AI 對手 (電腦)", "AI Opponent (CPU)") : 
+                              com.tetris.util.LanguageManager.get("玩家 2 (方向鍵)", "Player 2 (Arrows)");
+            } else {
+                playerTitle = (targetEngine.getPlayerNum() == 1) ? 
+                              com.tetris.util.LanguageManager.get("玩家 1 (WASD)", "Player 1 (WASD)") : 
+                              com.tetris.util.LanguageManager.get("玩家 2 (方向鍵)", "Player 2 (Arrows)");
+            }
             g2d.drawString(playerTitle, statsX + 10, statsY + 20);
 
             g2d.setColor(Color.WHITE);
             g2d.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 12));
-            g2d.drawString("消除行數: " + targetEngine.getTotalLinesCleared(), statsX + 10, statsY + 45);
-            g2d.drawString("T-Spins 次數: " + targetEngine.getTSpins(), statsX + 10, statsY + 68);
-            g2d.drawString("最高連消: " + targetEngine.getMaxCombo(), statsX + 10, statsY + 91);
-            g2d.drawString("已放方塊: " + targetEngine.getPiecesSpawned(), statsX + 10, statsY + 114);
+            g2d.drawString(com.tetris.util.LanguageManager.get("消除行數: ", "Lines Cleared: ") + targetEngine.getTotalLinesCleared(), statsX + 10, statsY + 45);
+            g2d.drawString(com.tetris.util.LanguageManager.get("T-Spins 次數: ", "T-Spins: ") + targetEngine.getTSpins(), statsX + 10, statsY + 68);
+            g2d.drawString(com.tetris.util.LanguageManager.get("最高連消: ", "Max Combo: ") + targetEngine.getMaxCombo(), statsX + 10, statsY + 91);
+            g2d.drawString(com.tetris.util.LanguageManager.get("已放方塊: ", "Pieces Spawned: ") + targetEngine.getPiecesSpawned(), statsX + 10, statsY + 114);
         } else {
             drawLeaderboard(g, startX + 15, dynamicYStart);
 
@@ -3533,7 +3728,7 @@ public class GamePanel extends JPanel {
         java.awt.Point mousePos = getMousePosition();
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 42));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = "遊戲設定";
+        String titleText = com.tetris.util.LanguageManager.get("遊戲設定", "Settings");
         int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 120;
 
@@ -3555,7 +3750,7 @@ public class GamePanel extends JPanel {
         drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 25, 45);
 
         // THEME button
-        String themeText = "視覺主題: " + getThemeChineseLabel(com.tetris.util.ThemeManager.getCurrentTheme());
+        String themeText = com.tetris.util.LanguageManager.get("視覺主題: " + getThemeChineseLabel(com.tetris.util.ThemeManager.getCurrentTheme()), "Theme: " + com.tetris.util.ThemeManager.getCurrentTheme().name());
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 15));
         FontMetrics fmTheme = g2d.getFontMetrics();
         int btnW = 240;
@@ -3579,7 +3774,7 @@ public class GamePanel extends JPanel {
         g2d.drawString(themeText, btnX + (btnW - fmTheme.stringWidth(themeText)) / 2, themeBtnY + 22);
 
         // COLORBLIND button
-        String cbText = "色盲模式: " + getColorBlindModeChineseLabel(com.tetris.util.ThemeManager.getCurrentColorBlindMode());
+        String cbText = com.tetris.util.LanguageManager.get("色盲模式: " + getColorBlindModeChineseLabel(com.tetris.util.ThemeManager.getCurrentColorBlindMode()), "Color Blind: " + com.tetris.util.ThemeManager.getCurrentColorBlindMode().name());
         int cbBtnY = cardY + 172;
         if (menuSettingsColorBlindBounds == null) menuSettingsColorBlindBounds = new Rectangle(btnX, cbBtnY, btnW, btnH); else menuSettingsColorBlindBounds.setBounds(btnX, cbBtnY, btnW, btnH);
         boolean hoverCb = (mousePos != null && menuSettingsColorBlindBounds.contains(mousePos));
@@ -3597,7 +3792,7 @@ public class GamePanel extends JPanel {
         g2d.drawString(cbText, btnX + (btnW - fmTheme.stringWidth(cbText)) / 2, cbBtnY + 22);
 
         // SOUND PACK button
-        String spText = "音效套件: " + getSoundPackChineseLabel(com.tetris.util.SoundManager.getCurrentSoundPack());
+        String spText = com.tetris.util.LanguageManager.get("音效套件: " + getSoundPackChineseLabel(com.tetris.util.SoundManager.getCurrentSoundPack()), "Sound Pack: " + com.tetris.util.SoundManager.getCurrentSoundPack().name());
         int spBtnY = cardY + 214;
         if (menuSettingsSoundPackBounds == null) menuSettingsSoundPackBounds = new Rectangle(btnX, spBtnY, btnW, btnH); else menuSettingsSoundPackBounds.setBounds(btnX, spBtnY, btnW, btnH);
         boolean hoverSp = (mousePos != null && menuSettingsSoundPackBounds.contains(mousePos));
@@ -3615,7 +3810,7 @@ public class GamePanel extends JPanel {
         g2d.drawString(spText, btnX + (btnW - fmTheme.stringWidth(spText)) / 2, spBtnY + 22);
 
         // PREVIEW COUNT button
-        String previewText = "預覽數量: " + nextPiecesCount + " 個";
+        String previewText = com.tetris.util.LanguageManager.get("預覽數量: " + nextPiecesCount + " 個", "Preview: " + nextPiecesCount + " Pieces");
         int previewBtnY = cardY + 256;
 
         if (menuSettingsPreviewCountBounds == null) menuSettingsPreviewCountBounds = new Rectangle(btnX, previewBtnY, btnW, btnH); else menuSettingsPreviewCountBounds.setBounds(btnX, previewBtnY, btnW, btnH);
@@ -3634,7 +3829,7 @@ public class GamePanel extends JPanel {
         g2d.drawString(previewText, btnX + (btnW - fmTheme.stringWidth(previewText)) / 2, previewBtnY + 22);
 
         // CONTROL SETTINGS button
-        String controlBtnText = "控制設定";
+        String controlBtnText = com.tetris.util.LanguageManager.get("控制設定", "Control Bindings");
         int ctrlBtnY = cardY + 298;
 
         if (menuSettingsControlBounds == null) menuSettingsControlBounds = new Rectangle(btnX, ctrlBtnY, btnW, btnH); else menuSettingsControlBounds.setBounds(btnX, ctrlBtnY, btnW, btnH);
@@ -3652,14 +3847,33 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(btnX, ctrlBtnY, btnW, btnH, 8, 8);
         g2d.drawString(controlBtnText, btnX + (btnW - fmTheme.stringWidth(controlBtnText)) / 2, ctrlBtnY + 22);
 
+        // LANGUAGE button
+        String langLabel = com.tetris.util.LanguageManager.get("語言: 繁體中文", "Language: English");
+        int langBtnY = cardY + 340;
+
+        if (menuSettingsLanguageBounds == null) menuSettingsLanguageBounds = new Rectangle(btnX, langBtnY, btnW, btnH); else menuSettingsLanguageBounds.setBounds(btnX, langBtnY, btnW, btnH);
+        boolean hoverLang = (mousePos != null && menuSettingsLanguageBounds.contains(mousePos));
+
+        if (hoverLang) {
+            g2d.setColor(new Color(255, 255, 255, 40));
+            g2d.fillRoundRect(btnX, langBtnY, btnW, btnH, 8, 8);
+            g2d.setColor(Color.WHITE);
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 15));
+            g2d.fillRoundRect(btnX, langBtnY, btnW, btnH, 8, 8);
+            g2d.setColor(new Color(200, 200, 200));
+        }
+        g2d.drawRoundRect(btnX, langBtnY, btnW, btnH, 8, 8);
+        g2d.drawString(langLabel, btnX + (btnW - fmTheme.stringWidth(langLabel)) / 2, langBtnY + 22);
+
         // BACK button
-        String backText = "返回";
+        String backText = com.tetris.util.LanguageManager.get("返回", "Back");
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
         FontMetrics fmBack = g2d.getFontMetrics();
         int backBtnW = 120;
         int backBtnH = 34;
         int backBtnX = (getWidth() - backBtnW) / 2;
-        int backBtnY = cardY + 390;
+        int backBtnY = cardY + 405;
 
         if (menuSettingsBackButtonBounds == null) menuSettingsBackButtonBounds = new Rectangle(backBtnX, backBtnY, backBtnW, backBtnH); else menuSettingsBackButtonBounds.setBounds(backBtnX, backBtnY, backBtnW, backBtnH);
         boolean hoverBack = (mousePos != null && menuSettingsBackButtonBounds.contains(mousePos));
@@ -3699,7 +3913,7 @@ public class GamePanel extends JPanel {
     private void drawModeSelectScreen(Graphics2D g2d) {
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 42));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = "選擇模式";
+        String titleText = com.tetris.util.LanguageManager.get("選擇模式", "Select Mode");
         int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
         int titleY = 120;
 
@@ -3722,21 +3936,22 @@ public class GamePanel extends JPanel {
         // Subtitle inside card
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 15));
         g2d.setColor(new Color(200, 200, 220));
-        String subText = "請選擇遊戲模式";
+        String subText = com.tetris.util.LanguageManager.get("請選擇遊戲模式", "Please Select a Game Mode");
         int subW = g2d.getFontMetrics().stringWidth(subText);
         g2d.drawString(subText, cardX + (cardW - subW) / 2, cardY + 25);
 
         int btnW = 240;
-        int btnH = 34;
+        int btnH = 32;
         int btnX = cardX + (cardW - btnW) / 2;
-        int startY = cardY + 50;
-        int gap = 42;
+        int startY = cardY + 45;
+        int gap = 40;
 
         java.awt.Point mousePos = getMousePosition();
+        int numModes = isSelectingModeForAiDemo ? 5 : 7;
 
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < numModes; i++) {
             int y = startY + i * gap;
-            if (i == 5) {
+            if (i == numModes - 1) {
                 // BACK button offset
                 y = cardY + 345;
             }
@@ -3749,40 +3964,51 @@ public class GamePanel extends JPanel {
             Color selectColor;
             Color fillCol;
 
-            switch (i) {
+            int effectiveIndex = i;
+            if (isSelectingModeForAiDemo && i == 4) {
+                effectiveIndex = 6; // BACK
+            }
+
+            switch (effectiveIndex) {
                 case 0:
-                    label = "無盡模式 (ENDLESS)";
+                    label = com.tetris.util.LanguageManager.get("無盡模式 (ENDLESS)", "Endless Mode (ENDLESS)");
                     baseColor = new Color(0, 255, 255);
                     selectColor = Color.WHITE;
                     fillCol = new Color(0, 255, 255, isSelected ? 45 : 20);
                     break;
                 case 1:
-                    label = "40行衝刺賽 (SPRINT)";
+                    label = com.tetris.util.LanguageManager.get("40行衝刺賽 (SPRINT)", "40-Line Sprint (SPRINT)");
                     baseColor = new Color(255, 100, 255);
                     selectColor = Color.WHITE;
                     fillCol = new Color(255, 100, 255, isSelected ? 45 : 20);
                     break;
                 case 2:
-                    label = "2分鐘限時賽 (ULTRA)";
+                    label = com.tetris.util.LanguageManager.get("2分鐘限時賽 (ULTRA)", "2-Min Ultra (ULTRA)");
                     baseColor = new Color(255, 215, 0);
                     selectColor = Color.WHITE;
                     fillCol = new Color(255, 215, 0, isSelected ? 45 : 20);
                     break;
                 case 3:
-                    label = "生存挑戰賽 (SURVIVAL)";
+                    label = com.tetris.util.LanguageManager.get("生存挑戰賽 (SURVIVAL)", "Survival Challenge (SURVIVAL)");
                     baseColor = new Color(255, 140, 0);
                     selectColor = Color.WHITE;
                     fillCol = new Color(255, 140, 0, isSelected ? 45 : 20);
                     break;
                 case 4:
-                    label = "雙人對戰模式 (PVP)";
+                    label = com.tetris.util.LanguageManager.get("與 AI 對戰模式 (VS AI)", "VS AI Battle (VS AI)");
+                    baseColor = new Color(180, 100, 255);
+                    selectColor = Color.WHITE;
+                    fillCol = new Color(180, 100, 255, isSelected ? 45 : 20);
+                    break;
+                case 5:
+                    label = com.tetris.util.LanguageManager.get("雙人對戰模式 (PVP)", "Local PVP Battle (PVP)");
                     baseColor = new Color(255, 60, 60);
                     selectColor = Color.WHITE;
                     fillCol = new Color(255, 60, 60, isSelected ? 45 : 20);
                     break;
-                case 5:
+                case 6:
                 default:
-                    label = "返回";
+                    label = com.tetris.util.LanguageManager.get("返回", "Back");
                     baseColor = new Color(160, 160, 180);
                     selectColor = new Color(0, 255, 255);
                     fillCol = new Color(255, 255, 255, isSelected ? 30 : 10);
@@ -4650,19 +4876,19 @@ public class GamePanel extends JPanel {
 
             // Draw title
             g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 13));
-            g2d.drawString(info.title, x + 40, y + 20);
+            g2d.drawString(info.getTitle(), x + 40, y + 20);
 
             // Draw desc and requirement
             g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 10));
             if (info.unlocked) {
                 g2d.setColor(new Color(200, 200, 200));
-                g2d.drawString(info.desc, x + 40, y + 36);
+                g2d.drawString(info.getDesc(), x + 40, y + 36);
                 g2d.setColor(new Color(0, 255, 100));
-                g2d.drawString("解鎖條件: " + info.requirement, x + 40, y + 50);
+                g2d.drawString(com.tetris.util.LanguageManager.get("解鎖條件: ", "Requirement: ") + info.getRequirement(), x + 40, y + 50);
             } else {
                 g2d.setColor(new Color(110, 110, 120));
                 g2d.drawString("???", x + 40, y + 36);
-                g2d.drawString("解鎖條件: " + info.requirement, x + 40, y + 50);
+                g2d.drawString(com.tetris.util.LanguageManager.get("解鎖條件: ", "Requirement: ") + info.getRequirement(), x + 40, y + 50);
             }
         }
 
