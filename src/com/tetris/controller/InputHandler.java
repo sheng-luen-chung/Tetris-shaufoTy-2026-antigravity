@@ -602,20 +602,46 @@ public class InputHandler extends KeyAdapter {
         }
 
         if (state == GameEngine.GameState.MENU) {
-            switch (keyCode) {
-                case KeyEvent.VK_UP:
-                    engine.navigateMenuUp();
-                    break;
-                case KeyEvent.VK_DOWN:
-                    engine.navigateMenuDown();
-                    break;
-                case KeyEvent.VK_ENTER:
-                case KeyEvent.VK_SPACE:
-                    engine.selectMenuItem();
-                    break;
-                case KeyEvent.VK_ESCAPE:
-                    engine.handleBackAction();
-                    break;
+            if (engine.getPanel() != null && engine.getPanel().isShowSettingsInMenu()) {
+                if (engine.getPanel().isShowControlSettings()) {
+                    if (keyCode == KeyEvent.VK_ESCAPE || keyCode == KeyEvent.VK_ENTER || keyCode == KeyEvent.VK_SPACE) {
+                        engine.handleBackAction();
+                    }
+                } else {
+                    switch (keyCode) {
+                        case KeyEvent.VK_UP:
+                        case KeyEvent.VK_W:
+                            engine.getPanel().navigateMenuSettings(-1);
+                            break;
+                        case KeyEvent.VK_DOWN:
+                        case KeyEvent.VK_S:
+                            engine.getPanel().navigateMenuSettings(1);
+                            break;
+                        case KeyEvent.VK_ENTER:
+                        case KeyEvent.VK_SPACE:
+                            engine.getPanel().selectMenuSettingsItem();
+                            break;
+                        case KeyEvent.VK_ESCAPE:
+                            engine.handleBackAction();
+                            break;
+                    }
+                }
+            } else {
+                switch (keyCode) {
+                    case KeyEvent.VK_UP:
+                        engine.navigateMenuUp();
+                        break;
+                    case KeyEvent.VK_DOWN:
+                        engine.navigateMenuDown();
+                        break;
+                    case KeyEvent.VK_ENTER:
+                    case KeyEvent.VK_SPACE:
+                        engine.selectMenuItem();
+                        break;
+                    case KeyEvent.VK_ESCAPE:
+                        engine.handleBackAction();
+                        break;
+                }
             }
         } else if (state == GameEngine.GameState.TUTORIAL_SELECT) {
             switch (keyCode) {

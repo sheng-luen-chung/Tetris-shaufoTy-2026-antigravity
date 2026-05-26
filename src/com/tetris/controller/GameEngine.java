@@ -117,6 +117,9 @@ public class GameEngine {
     // AI Autoplay Mechanism
     private volatile boolean aiPlay = false;
     private volatile boolean usedAiThisSession = false;
+    private static final double DEFAULT_AI_DEMO_DELAY_MULTIPLIER = 0.5;
+    private volatile boolean aiDemoMode = false;
+    private volatile double aiDemoDelayMultiplier = DEFAULT_AI_DEMO_DELAY_MULTIPLIER;
     private int targetRotation = 0;
     private int targetCol = 0;
     private volatile boolean needsAiCalculation = true;
@@ -383,6 +386,8 @@ public class GameEngine {
         spawnNewPiece();
         usedAiThisSession = false;
         gameState = GameState.PLAYING;
+        aiDemoMode = false;
+        aiDemoDelayMultiplier = DEFAULT_AI_DEMO_DELAY_MULTIPLIER;
 
         // Reset logic accumulators
         gravityAccumulator = 0;
@@ -1334,13 +1339,17 @@ public class GameEngine {
 
     public void handleBackAction() {
         if ((gameState == GameState.PLAYING || gameState == GameState.TUTORIAL) && isPaused) {
-            if (panel.isShowSettingsInPause()) {
+            if (panel.isShowDisplaySettingsInPause()) {
+                panel.setShowDisplaySettingsInPause(false);
+            } else if (panel.isShowSettingsInPause()) {
                 panel.setShowSettingsInPause(false);
             } else {
                 togglePause();
             }
         } else if (gameState == GameState.MENU) {
-            if (panel.isShowSettingsInMenu()) {
+            if (panel.isShowDisplaySettingsInMenu()) {
+                panel.setShowDisplaySettingsInMenu(false);
+            } else if (panel.isShowSettingsInMenu()) {
                 if (panel.isShowControlSettings()) {
                     panel.setShowControlSettings(false);
                 } else {
@@ -1674,19 +1683,43 @@ public class GameEngine {
         if (active) {
             this.usedAiThisSession = true;
             needsAiCalculation = true;
+        } else {
+            aiDemoMode = false;
+            aiDemoDelayMultiplier = DEFAULT_AI_DEMO_DELAY_MULTIPLIER;
         }
         aiAccumulator = 0;
         panel.repaint();
     }
 
-    public int getAiStepDelayMs() {
-        if (difficulty == Difficulty.EASY) {
-            return 500;
-        } else if (difficulty == Difficulty.HARD) {
-            return 300;
-        } else {
-            return 400;
+    public void setAiDemoMode(boolean active) {
+        this.aiDemoMode = active;
+        if (!active) {
+            this.aiDemoDelayMultiplier = DEFAULT_AI_DEMO_DELAY_MULTIPLIER;
         }
+    }
+
+    public void setAiDemoDelayMultiplier(double multiplier) {
+        if (Double.isNaN(multiplier) || Double.isInfinite(multiplier) || multiplier <= 0.0) {
+            return;
+        }
+        this.aiDemoDelayMultiplier = multiplier;
+    }
+
+    public int getAiStepDelayMs() {
+        int baseDelay;
+        if (difficulty == Difficulty.EASY) {
+            baseDelay = 500;
+        } else if (difficulty == Difficulty.HARD) {
+            baseDelay = 300;
+        } else {
+            baseDelay = 400;
+        }
+
+        if (aiDemoMode) {
+            return Math.max(120, (int) Math.round(baseDelay * aiDemoDelayMultiplier));
+        }
+
+        return baseDelay;
     }
 
     // AI step execution

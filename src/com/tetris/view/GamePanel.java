@@ -88,6 +88,7 @@ public class GamePanel extends JPanel {
 
     // Menu properties
     private int selectedMenuIndex = 0;
+    private int selectedMenuSettingsIndex = 0;
     private final Rectangle[] menuOptionBounds = new Rectangle[8];
     private Rectangle backButtonBounds = new Rectangle();
     private final List<FloatingPiece> floatingPieces = new ArrayList<>();
@@ -108,11 +109,20 @@ public class GamePanel extends JPanel {
 
     // Pause menu properties
     private int selectedPauseIndex = 0;
+    private int selectedPauseSettingsIndex = 0;
+    private int selectedPauseDisplayIndex = 0;
     private final Rectangle[] pauseOptionBounds = new Rectangle[8];
     private boolean showSettingsInPause = false;
+    private boolean showDisplaySettingsInPause = false;
     private boolean showGhostPiece = true;
     private boolean showGridLines = true;
     private long lastSaveTime = 0;
+    private Rectangle pauseDisplayGhostBounds = new Rectangle();
+    private Rectangle pauseDisplayGridBounds = new Rectangle();
+    private Rectangle pauseDisplayThemeBounds = new Rectangle();
+    private Rectangle pauseDisplayColorBlindBounds = new Rectangle();
+    private Rectangle pauseDisplayBackButtonBounds = new Rectangle();
+    private Rectangle pauseSoundPackBounds = new Rectangle();
 
     // Screenshake properties
     private int shakeIntensity = 0;
@@ -125,6 +135,7 @@ public class GamePanel extends JPanel {
 
     // Volume Settings controls properties
     private boolean showSettingsInMenu = false;
+    private boolean showDisplaySettingsInMenu = false;
     private Rectangle bgmTrackBounds = new Rectangle();
     private Rectangle sfxTrackBounds = new Rectangle();
     private Rectangle bgmMuteBounds = new Rectangle();
@@ -133,6 +144,12 @@ public class GamePanel extends JPanel {
     private Rectangle menuSettingsThemeBounds = new Rectangle();
 
     private Rectangle menuSettingsLanguageBounds = new Rectangle();
+    private Rectangle menuSettingsDisplayBounds = new Rectangle();
+    private Rectangle menuDisplayBackButtonBounds = new Rectangle();
+    private Rectangle menuDisplayGhostBounds = new Rectangle();
+    private Rectangle menuDisplayGridBounds = new Rectangle();
+    private Rectangle menuDisplayThemeBounds = new Rectangle();
+    private Rectangle menuDisplayColorBlindBounds = new Rectangle();
     private Rectangle menuSettingsColorBlindBounds = new Rectangle();
     private Rectangle menuSettingsSoundPackBounds = new Rectangle();
     private Rectangle menuSettingsPreviewCountBounds = new Rectangle();
@@ -544,6 +561,35 @@ public class GamePanel extends JPanel {
                                 }
                             }
                             return; // swallow other clicks while in control settings
+                        } else if (showDisplaySettingsInMenu) {
+                            if (menuDisplayBackButtonBounds != null && menuDisplayBackButtonBounds.contains(e.getPoint())) {
+                                showDisplaySettingsInMenu = false;
+                                repaint();
+                                return;
+                            }
+                            if (menuDisplayGhostBounds != null && menuDisplayGhostBounds.contains(e.getPoint())) {
+                                showGhostPiece = !showGhostPiece;
+                                repaint();
+                                return;
+                            }
+                            if (menuDisplayGridBounds != null && menuDisplayGridBounds.contains(e.getPoint())) {
+                                showGridLines = !showGridLines;
+                                repaint();
+                                return;
+                            }
+                            if (menuDisplayThemeBounds != null && menuDisplayThemeBounds.contains(e.getPoint())) {
+                                com.tetris.util.ThemeManager.nextTheme();
+                                com.tetris.controller.InputHandler.saveConfig();
+                                repaint();
+                                return;
+                            }
+                            if (menuDisplayColorBlindBounds != null && menuDisplayColorBlindBounds.contains(e.getPoint())) {
+                                com.tetris.util.ThemeManager.nextColorBlindMode();
+                                com.tetris.controller.InputHandler.saveConfig();
+                                repaint();
+                                return;
+                            }
+                            return;
                         }
 
                         // BACK button click
@@ -554,23 +600,13 @@ public class GamePanel extends JPanel {
                             return;
                         }
 
-                        // THEME button click
-                        if (menuSettingsThemeBounds != null && menuSettingsThemeBounds.contains(e.getPoint())) {
-                            com.tetris.util.ThemeManager.nextTheme();
-                            com.tetris.controller.InputHandler.saveConfig();
+                        if (menuSettingsDisplayBounds != null && menuSettingsDisplayBounds.contains(e.getPoint())) {
+                            showDisplaySettingsInMenu = true;
+                            selectedMenuSettingsIndex = 0;
                             repaint();
                             return;
                         }
 
-                        // COLORBLIND button click
-                        if (menuSettingsColorBlindBounds != null && menuSettingsColorBlindBounds.contains(e.getPoint())) {
-                            com.tetris.util.ThemeManager.nextColorBlindMode();
-                            com.tetris.controller.InputHandler.saveConfig();
-                            repaint();
-                            return;
-                        }
-
-                        // SOUND PACK button click
                         if (menuSettingsSoundPackBounds != null && menuSettingsSoundPackBounds.contains(e.getPoint())) {
                             com.tetris.util.SoundManager.nextSoundPack();
                             if (!com.tetris.util.SoundManager.isSFXMuted()) {
@@ -598,17 +634,6 @@ public class GamePanel extends JPanel {
                             return;
                         }
 
-                        // LANGUAGE button click
-                        if (menuSettingsLanguageBounds != null && menuSettingsLanguageBounds.contains(e.getPoint())) {
-                            com.tetris.util.LanguageManager.setCurrentLanguage(
-                                com.tetris.util.LanguageManager.getCurrentLanguage() == com.tetris.util.LanguageManager.Language.ZH ? 
-                                com.tetris.util.LanguageManager.Language.EN : com.tetris.util.LanguageManager.Language.ZH
-                            );
-                            com.tetris.controller.InputHandler.saveConfig();
-                            repaint();
-                            return;
-                        }
-
                         // Volume and mute controls
                         if (bgmTrackBounds.contains(e.getPoint())) {
                             isDraggingBGM = true;
@@ -622,6 +647,13 @@ public class GamePanel extends JPanel {
                             repaint();
                         } else if (sfxMuteBounds.contains(e.getPoint())) {
                             com.tetris.util.SoundManager.setSFXMuted(!com.tetris.util.SoundManager.isSFXMuted());
+                            com.tetris.controller.InputHandler.saveConfig();
+                            repaint();
+                        } else if (menuSettingsSoundPackBounds != null && menuSettingsSoundPackBounds.contains(e.getPoint())) {
+                            com.tetris.util.SoundManager.nextSoundPack();
+                            if (!com.tetris.util.SoundManager.isSFXMuted()) {
+                                com.tetris.util.SoundManager.playSynthSound(com.tetris.util.SoundManager.SoundType.MOVE);
+                            }
                             com.tetris.controller.InputHandler.saveConfig();
                             repaint();
                         }
@@ -717,6 +749,37 @@ public class GamePanel extends JPanel {
                             return;
                         }
                         if (showSettingsInPause) {
+                            if (showDisplaySettingsInPause) {
+                                if (pauseDisplayBackButtonBounds != null && pauseDisplayBackButtonBounds.contains(e.getPoint())) {
+                                    showDisplaySettingsInPause = false;
+                                    repaint();
+                                    return;
+                                }
+                                if (pauseDisplayGhostBounds != null && pauseDisplayGhostBounds.contains(e.getPoint())) {
+                                    showGhostPiece = !showGhostPiece;
+                                    repaint();
+                                    return;
+                                }
+                                if (pauseDisplayGridBounds != null && pauseDisplayGridBounds.contains(e.getPoint())) {
+                                    showGridLines = !showGridLines;
+                                    repaint();
+                                    return;
+                                }
+                                if (pauseDisplayThemeBounds != null && pauseDisplayThemeBounds.contains(e.getPoint())) {
+                                    com.tetris.util.ThemeManager.nextTheme();
+                                    com.tetris.controller.InputHandler.saveConfig();
+                                    repaint();
+                                    return;
+                                }
+                                if (pauseDisplayColorBlindBounds != null && pauseDisplayColorBlindBounds.contains(e.getPoint())) {
+                                    com.tetris.util.ThemeManager.nextColorBlindMode();
+                                    com.tetris.controller.InputHandler.saveConfig();
+                                    repaint();
+                                    return;
+                                }
+                                return;
+                            }
+
                             // Volume and Mute clicks inside pause settings
                             if (bgmTrackBounds.contains(e.getPoint())) {
                                 isDraggingBGM = true;
@@ -738,12 +801,20 @@ public class GamePanel extends JPanel {
                                 }
                                 repaint();
                                 return;
+                            } else if (pauseSoundPackBounds != null && pauseSoundPackBounds.contains(e.getPoint())) {
+                                com.tetris.util.SoundManager.nextSoundPack();
+                                if (!com.tetris.util.SoundManager.isSFXMuted()) {
+                                    com.tetris.util.SoundManager.playSynthSound(com.tetris.util.SoundManager.SoundType.MOVE);
+                                }
+                                com.tetris.controller.InputHandler.saveConfig();
+                                repaint();
+                                return;
                             }
                         }
-                        int numPauseOptions = showSettingsInPause ? 8 : 4;
+                        int numPauseOptions = 5;
                         for (int i = 0; i < numPauseOptions; i++) {
                             if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
-                                selectedPauseIndex = i;
+                                selectedPauseSettingsIndex = i;
                                 selectPauseMenuItem();
                                 break;
                             }
@@ -814,11 +885,15 @@ public class GamePanel extends JPanel {
                 } else if (state == com.tetris.controller.GameEngine.GameState.ACHIEVEMENTS) {
                     repaint(); // Repaint to update achievements back button hover state
                 } else if ((state == com.tetris.controller.GameEngine.GameState.PLAYING || state == com.tetris.controller.GameEngine.GameState.TUTORIAL) && gameEngine.isPaused()) {
-                    int numPauseOptions = showSettingsInPause ? 8 : 4;
+                    if (showDisplaySettingsInPause) {
+                        repaint();
+                        return;
+                    }
+                    int numPauseOptions = 5;
                     for (int i = 0; i < numPauseOptions; i++) {
                         if (pauseOptionBounds[i] != null && pauseOptionBounds[i].contains(e.getPoint())) {
-                            if (selectedPauseIndex != i) {
-                                selectedPauseIndex = i;
+                            if (selectedPauseSettingsIndex != i) {
+                                selectedPauseSettingsIndex = i;
                                 repaint();
                             }
                             break;
@@ -886,6 +961,25 @@ public class GamePanel extends JPanel {
 
     public void setShowSettingsInMenu(boolean show) {
         this.showSettingsInMenu = show;
+        if (!show) {
+            showDisplaySettingsInMenu = false;
+            showControlSettings = false;
+            selectedMenuSettingsIndex = 0;
+        } else {
+            selectedMenuSettingsIndex = 0;
+        }
+        repaint();
+    }
+
+    public boolean isShowDisplaySettingsInMenu() {
+        return showDisplaySettingsInMenu;
+    }
+
+    public void setShowDisplaySettingsInMenu(boolean show) {
+        this.showDisplaySettingsInMenu = show;
+        if (show) {
+            selectedMenuSettingsIndex = 0;
+        }
         repaint();
     }
 
@@ -918,17 +1012,38 @@ public class GamePanel extends JPanel {
 
     public void setShowSettingsInPause(boolean show) {
         this.showSettingsInPause = show;
+        if (!show) {
+            showDisplaySettingsInPause = false;
+            selectedPauseSettingsIndex = 0;
+            selectedPauseDisplayIndex = 0;
+        }
+        repaint();
+    }
+
+    public boolean isShowDisplaySettingsInPause() {
+        return showDisplaySettingsInPause;
+    }
+
+    public void setShowDisplaySettingsInPause(boolean show) {
+        this.showDisplaySettingsInPause = show;
+        if (show) {
+            selectedPauseDisplayIndex = 0;
+        }
         repaint();
     }
 
     public void resetUIState() {
         showSettingsInMenu = false;
+        showDisplaySettingsInMenu = false;
         showSettingsInPause = false;
+        showDisplaySettingsInPause = false;
         showDifficultySelectInMenu = false;
         showModeSelectInMenu = false;
         showControlSettings = false;
         rebindingAction = null;
         selectedPauseIndex = 0;
+        selectedPauseSettingsIndex = 0;
+        selectedPauseDisplayIndex = 0;
         showVsAiControlsPrompt = false;
         repaint();
     }
@@ -1231,6 +1346,12 @@ public class GamePanel extends JPanel {
         repaint();
     }
 
+    public void navigateMenuSettings(int dir) {
+        int numOptions = showDisplaySettingsInMenu ? 5 : 5;
+        selectedMenuSettingsIndex = (selectedMenuSettingsIndex + dir + numOptions) % numOptions;
+        repaint();
+    }
+
     // Menu select action helper
     public void selectCurrentOption() {
         if (showDifficultySelectInMenu) {
@@ -1261,6 +1382,7 @@ public class GamePanel extends JPanel {
                         break;
                     case 4:
                         showSettingsInMenu = true;
+                        selectedMenuSettingsIndex = 0;
                         break;
                     case 5:
                         gameEngine.setGameState(com.tetris.controller.GameEngine.GameState.ACHIEVEMENTS);
@@ -1291,6 +1413,7 @@ public class GamePanel extends JPanel {
                         break;
                     case 3:
                         showSettingsInMenu = true;
+                        selectedMenuSettingsIndex = 0;
                         break;
                     case 4:
                         gameEngine.setGameState(com.tetris.controller.GameEngine.GameState.ACHIEVEMENTS);
@@ -1302,6 +1425,59 @@ public class GamePanel extends JPanel {
                         System.exit(0);
                         break;
                 }
+            }
+        }
+        repaint();
+    }
+
+    public void selectMenuSettingsItem() {
+        if (showDisplaySettingsInMenu) {
+            switch (selectedMenuSettingsIndex) {
+                case 0:
+                    showGhostPiece = !showGhostPiece;
+                    break;
+                case 1:
+                    showGridLines = !showGridLines;
+                    break;
+                case 2:
+                    com.tetris.util.ThemeManager.nextTheme();
+                    com.tetris.controller.InputHandler.saveConfig();
+                    break;
+                case 3:
+                    com.tetris.util.ThemeManager.nextColorBlindMode();
+                    com.tetris.controller.InputHandler.saveConfig();
+                    break;
+                case 4:
+                    showDisplaySettingsInMenu = false;
+                    selectedMenuSettingsIndex = 1;
+                    break;
+            }
+        } else {
+            switch (selectedMenuSettingsIndex) {
+                case 0:
+                    com.tetris.util.SoundManager.nextSoundPack();
+                    if (!com.tetris.util.SoundManager.isSFXMuted()) {
+                        com.tetris.util.SoundManager.playSynthSound(com.tetris.util.SoundManager.SoundType.MOVE);
+                    }
+                    com.tetris.controller.InputHandler.saveConfig();
+                    break;
+                case 1:
+                    showDisplaySettingsInMenu = true;
+                    selectedMenuSettingsIndex = 0;
+                    break;
+                case 2:
+                    nextPiecesCount = nextPiecesCount % 5 + 1;
+                    com.tetris.controller.InputHandler.saveConfig();
+                    break;
+                case 3:
+                    showControlSettings = true;
+                    rebindingPlayer = 1;
+                    rebindingAction = null;
+                    break;
+                case 4:
+                    showSettingsInMenu = false;
+                    selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 4 : 3;
+                    break;
             }
         }
         repaint();
@@ -1489,6 +1665,8 @@ public class GamePanel extends JPanel {
         if (showSettingsInMenu) {
             if (showControlSettings) {
                 drawControlSettings(g2d);
+            } else if (showDisplaySettingsInMenu) {
+                drawDisplaySettings(g2d, 0, 0, 0, false);
             } else {
                 drawMenuSettings(g2d);
             }
@@ -2193,6 +2371,8 @@ public class GamePanel extends JPanel {
         this.gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
         this.showDifficultySelectInMenu = false;
         this.gameEngine.startGame();
+        this.gameEngine.setAiDemoMode(true);
+        this.gameEngine.setAiDemoDelayMultiplier(0.5);
         this.gameEngine.setAiPlay(true);
     }
 
@@ -2518,8 +2698,14 @@ public class GamePanel extends JPanel {
 
     // Pause menu navigation helper
     public void navigatePauseMenu(int dir) {
-        int numOptions = showSettingsInPause ? 8 : 4;
-        selectedPauseIndex = (selectedPauseIndex + dir + numOptions) % numOptions;
+        int numOptions = showDisplaySettingsInPause ? 5 : (showSettingsInPause ? 5 : 4);
+        if (!showSettingsInPause) {
+            selectedPauseIndex = (selectedPauseIndex + dir + numOptions) % numOptions;
+        } else if (showDisplaySettingsInPause) {
+            selectedPauseDisplayIndex = (selectedPauseDisplayIndex + dir + numOptions) % numOptions;
+        } else {
+            selectedPauseSettingsIndex = (selectedPauseSettingsIndex + dir + numOptions) % numOptions;
+        }
         repaint();
     }
 
@@ -2527,52 +2713,67 @@ public class GamePanel extends JPanel {
     public void selectPauseMenuItem() {
         if (!showSettingsInPause) {
             switch (selectedPauseIndex) {
-                case 0: // RESUME
+                case 0:
                     gameEngine.togglePause();
                     break;
-                case 1: // SAVE GAME
+                case 1:
                     gameEngine.saveGame();
                     lastSaveTime = System.currentTimeMillis();
                     break;
-                case 2: // SETTINGS
+                case 2:
                     showSettingsInPause = true;
-                    selectedPauseIndex = 0;
+                    selectedPauseSettingsIndex = 0;
                     break;
-                case 3: // BACK TO MAIN
+                case 3:
                     showSettingsInPause = false;
                     gameEngine.returnToMenu();
                     break;
             }
-        } else {
-            switch (selectedPauseIndex) {
-                case 0: // GHOST PIECE
+        } else if (showDisplaySettingsInPause) {
+            switch (selectedPauseDisplayIndex) {
+                case 0:
                     showGhostPiece = !showGhostPiece;
                     break;
-                case 1: // GRID LINES
+                case 1:
                     showGridLines = !showGridLines;
                     break;
-                case 2: // PREVIEW COUNT
-                    nextPiecesCount = nextPiecesCount % 5 + 1;
-                    break;
-                case 3: // THEME
+                case 2:
                     com.tetris.util.ThemeManager.nextTheme();
-                    break;
-                case 4: // COLOR BLIND
-                    com.tetris.util.ThemeManager.nextColorBlindMode();
-                    break;
-                case 5: // SOUND PACK
-                    com.tetris.util.SoundManager.nextSoundPack();
-                    break;
-                case 6: // LANGUAGE
-                    com.tetris.util.LanguageManager.setCurrentLanguage(
-                        com.tetris.util.LanguageManager.getCurrentLanguage() == com.tetris.util.LanguageManager.Language.ZH ? 
-                        com.tetris.util.LanguageManager.Language.EN : com.tetris.util.LanguageManager.Language.ZH
-                    );
                     com.tetris.controller.InputHandler.saveConfig();
                     break;
-                case 7: // BACK
+                case 3:
+                    com.tetris.util.ThemeManager.nextColorBlindMode();
+                    com.tetris.controller.InputHandler.saveConfig();
+                    break;
+                case 4:
+                    showDisplaySettingsInPause = false;
+                    selectedPauseSettingsIndex = 3;
+                    break;
+            }
+        } else {
+            switch (selectedPauseSettingsIndex) {
+                case 0:
+                    gameEngine.saveGame();
+                    lastSaveTime = System.currentTimeMillis();
+                    break;
+                case 1:
+                    com.tetris.util.SoundManager.nextSoundPack();
+                    if (!com.tetris.util.SoundManager.isSFXMuted()) {
+                        com.tetris.util.SoundManager.playSynthSound(com.tetris.util.SoundManager.SoundType.MOVE);
+                    }
+                    com.tetris.controller.InputHandler.saveConfig();
+                    break;
+                case 2:
+                    nextPiecesCount = nextPiecesCount % 5 + 1;
+                    break;
+                case 3:
+                    showDisplaySettingsInPause = true;
+                    selectedPauseDisplayIndex = 0;
+                    break;
+                case 4:
                     showSettingsInPause = false;
-                    selectedPauseIndex = 2; // return cursor to settings option (index 2 now, because SETTINGS is index 2!)
+                    showDisplaySettingsInPause = false;
+                    selectedPauseIndex = 2;
                     break;
             }
         }
@@ -2587,136 +2788,68 @@ public class GamePanel extends JPanel {
         if (width <= 0) width = COLS * TILE_SIZE + SIDEBAR_WIDTH;
         if (height <= 0) height = ROWS * TILE_SIZE;
 
-        // Semi-transparent dark background
         g2d.setColor(new Color(10, 10, 20, 160));
         g2d.fillRect(0, 0, width, height);
 
-        // Title: GAME PAUSED
-        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 42));
-        FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = "遊戲暫停";
-        int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
-        int titleY = 120;
+        if (!showDisplaySettingsInPause) {
+            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 42));
+            FontMetrics fmTitle = g2d.getFontMetrics();
+            String titleText = "遊戲暫停";
+            int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
+            int titleY = 120;
 
-        // Draw shadow/glow
-        g2d.setColor(new Color(255, 200, 0, 70));
-        g2d.drawString(titleText, titleX + 2, titleY + 2);
-        g2d.setColor(new Color(255, 215, 0)); // Gold
-        g2d.drawString(titleText, titleX, titleY);
+            g2d.setColor(new Color(255, 200, 0, 70));
+            g2d.drawString(titleText, titleX + 2, titleY + 2);
+            g2d.setColor(new Color(255, 215, 0));
+            g2d.drawString(titleText, titleX, titleY);
+        }
 
-        // Selection container card
         int cardW = 340;
-        int cardH = showSettingsInPause ? 470 : 310;
+        int cardH = showDisplaySettingsInPause ? 350 : 410;
         int cardX = (width - cardW) / 2;
         int cardY = 160;
 
-        // Translucent pause menu panel
         g2d.setColor(new Color(255, 255, 255, 16));
         g2d.fillRoundRect(cardX, cardY, cardW, cardH, 15, 15);
         g2d.setColor(new Color(255, 255, 255, 45));
         g2d.drawRoundRect(cardX, cardY, cardW, cardH, 15, 15);
 
-        // Draw Options
-        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 18));
-        FontMetrics fmOption = g2d.getFontMetrics();
-        int numPauseOptions = showSettingsInPause ? 8 : 4;
-
-        for (int i = 0; i < numPauseOptions; i++) {
-            String label = "";
-            int x = 0, y = 0;
-            int textHeight = fmOption.getHeight();
-            int textWidth = 0;
-
-            if (!showSettingsInPause) {
-                switch (i) {
-                    case 0: label = com.tetris.util.LanguageManager.get("繼續遊戲", "Resume Game"); break;
-                    case 1: label = com.tetris.util.LanguageManager.get("儲存進度", "Save Progress"); break;
-                    case 2: label = com.tetris.util.LanguageManager.get("遊戲設定", "Settings"); break;
-                    case 3: label = com.tetris.util.LanguageManager.get("返回主選單", "Back to Menu"); break;
-                }
-                textWidth = fmOption.stringWidth(label);
-                x = cardX + (cardW - textWidth) / 2;
-                y = cardY + 50 + i * 65;
-                if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, y - textHeight + 5, cardW - 30, textHeight + 15); else pauseOptionBounds[i].setBounds(cardX + 15, y - textHeight + 5, cardW - 30, textHeight + 15);
-            } else {
-                switch (i) {
-                    case 0: label = com.tetris.util.LanguageManager.get("幻影方塊: " + (showGhostPiece ? "開啟" : "關閉"), "Ghost Piece: " + (showGhostPiece ? "ON" : "OFF")); break;
-                    case 1: label = com.tetris.util.LanguageManager.get("網格線: " + (showGridLines ? "顯示" : "隱藏"), "Grid Lines: " + (showGridLines ? "SHOW" : "HIDE")); break;
-                    case 2: label = com.tetris.util.LanguageManager.get("預覽數量: " + nextPiecesCount + " 個", "Preview: " + nextPiecesCount + " Pieces"); break;
-                    case 3: label = com.tetris.util.LanguageManager.get("視覺主題: " + getThemeChineseLabel(com.tetris.util.ThemeManager.getCurrentTheme()), "Theme: " + com.tetris.util.ThemeManager.getCurrentTheme().name()); break;
-                    case 4: label = com.tetris.util.LanguageManager.get("色盲模式: " + getColorBlindModeChineseLabel(com.tetris.util.ThemeManager.getCurrentColorBlindMode()), "Color Blind: " + com.tetris.util.ThemeManager.getCurrentColorBlindMode().name()); break;
-                    case 5: label = com.tetris.util.LanguageManager.get("音效套件: " + getSoundPackChineseLabel(com.tetris.util.SoundManager.getCurrentSoundPack()), "Sound Pack: " + com.tetris.util.SoundManager.getCurrentSoundPack().name()); break;
-                    case 6: label = com.tetris.util.LanguageManager.get("語言: 繁體中文", "Language: English"); break;
-                    case 7: label = com.tetris.util.LanguageManager.get("返回", "Back"); break;
-                }
-                textWidth = fmOption.stringWidth(label);
-                x = cardX + (cardW - textWidth) / 2;
-
-                if (i == 0) {
-                    y = cardY + 35;
-                    if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 12, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 12, cardW - 30, 32);
-                } else if (i == 1) {
-                    y = cardY + 75;
-                    if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 52, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 52, cardW - 30, 32);
-                } else if (i == 2) {
-                    y = cardY + 115;
-                    if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 92, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 92, cardW - 30, 32);
-                } else if (i == 3) {
-                    y = cardY + 275;
-                    if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 252, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 252, cardW - 30, 32);
-                } else if (i == 4) {
-                    y = cardY + 315;
-                    if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 292, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 292, cardW - 30, 32);
-                } else if (i == 5) {
-                    y = cardY + 355;
-                    if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 332, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 332, cardW - 30, 32);
-                } else if (i == 6) {
-                    y = cardY + 395;
-                    if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 372, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 372, cardW - 30, 32);
-                } else {
-                    y = cardY + 435;
-                    if (pauseOptionBounds[i] == null) pauseOptionBounds[i] = new Rectangle(cardX + 15, cardY + 412, cardW - 30, 32); else pauseOptionBounds[i].setBounds(cardX + 15, cardY + 412, cardW - 30, 32);
-                }
-            
-            }
-
-            boolean isSelected = (i == selectedPauseIndex);
-            if (isSelected) {
-                // Background highlight box
-                g2d.setColor(new Color(0, 255, 255, 35));
-                g2d.fillRoundRect(pauseOptionBounds[i].x, pauseOptionBounds[i].y, pauseOptionBounds[i].width, pauseOptionBounds[i].height, 8, 8);
-                g2d.setColor(new Color(0, 255, 255));
-                g2d.drawRoundRect(pauseOptionBounds[i].x, pauseOptionBounds[i].y, pauseOptionBounds[i].width, pauseOptionBounds[i].height, 8, 8);
-
-                // Highlighted text
-                g2d.setColor(Color.WHITE);
-                g2d.drawString(label, x, y + 4);
-
-                // Indicators
-                int sqSize = 6;
-                g2d.fillRect(pauseOptionBounds[i].x + 8, y - textHeight/2 - sqSize/2 + 6, sqSize, sqSize);
-                g2d.fillRect(pauseOptionBounds[i].x + pauseOptionBounds[i].width - 14, y - textHeight/2 - sqSize/2 + 6, sqSize, sqSize);
-            } else {
-                g2d.setColor(new Color(180, 180, 200));
-                g2d.drawString(label, x, y + 4);
-            }
-        }
-
-        if (showSettingsInPause) {
-            drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 155, 45);
+        if (showDisplaySettingsInPause) {
+            drawDisplaySettings(g2d, cardX, cardY, cardW, true);
         } else {
-            // Draw temporary save status text if it was saved within 3 seconds
+            drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 25, 45);
+
+            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 15));
+            int btnW = 240;
+            int btnH = 34;
+            int btnX = (getWidth() - btnW) / 2;
+
+            String saveText = com.tetris.util.LanguageManager.get("儲存遊戲", "Save Game");
+            pauseOptionBounds[0] = drawSettingsButton(g2d, getMousePosition(), pauseOptionBounds[0], btnX, cardY + 190, btnW, btnH, saveText, getCachedFont("SansSerif", Font.BOLD, 15), selectedPauseSettingsIndex == 0);
+
+            String soundPackText = com.tetris.util.LanguageManager.get("音效套件: " + getSoundPackChineseLabel(com.tetris.util.SoundManager.getCurrentSoundPack()), "Sound Pack: " + com.tetris.util.SoundManager.getCurrentSoundPack().name());
+            pauseSoundPackBounds = drawSettingsButton(g2d, getMousePosition(), pauseSoundPackBounds, btnX, cardY + 232, btnW, btnH, soundPackText, getCachedFont("SansSerif", Font.BOLD, 15), selectedPauseSettingsIndex == 1);
+            pauseOptionBounds[1] = pauseSoundPackBounds;
+
+            String previewText = com.tetris.util.LanguageManager.get("預覽數量: " + nextPiecesCount + " 個", "Preview: " + nextPiecesCount + " Pieces");
+            pauseOptionBounds[2] = drawSettingsButton(g2d, getMousePosition(), pauseOptionBounds[2], btnX, cardY + 274, btnW, btnH, previewText, getCachedFont("SansSerif", Font.BOLD, 15), selectedPauseSettingsIndex == 2);
+
+            String displayText = com.tetris.util.LanguageManager.get("顯示設定", "Display Settings");
+            pauseOptionBounds[3] = drawSettingsButton(g2d, getMousePosition(), pauseOptionBounds[3], btnX, cardY + 316, btnW, btnH, displayText, getCachedFont("SansSerif", Font.BOLD, 15), selectedPauseSettingsIndex == 3);
+
+            String backText = com.tetris.util.LanguageManager.get("返回", "Back");
+            pauseOptionBounds[4] = drawSettingsButton(g2d, getMousePosition(), pauseOptionBounds[4], (getWidth() - 120) / 2, cardY + 364, 120, 34, backText, getCachedFont("SansSerif", Font.BOLD, 16), selectedPauseSettingsIndex == 4);
+
             if (System.currentTimeMillis() - lastSaveTime < 3000) {
                 g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 14));
                 boolean canSave = (gameEngine.getGameMode() == com.tetris.model.GameMode.ENDLESS);
                 String savedText = canSave ? "進度已儲存！" : "此模式不支援存檔！";
-                g2d.setColor(canSave ? new Color(0, 255, 100) : new Color(255, 60, 60)); // Green for success, Red for warning
+                g2d.setColor(canSave ? new Color(0, 255, 100) : new Color(255, 60, 60));
                 int savedW = g2d.getFontMetrics().stringWidth(savedText);
                 g2d.drawString(savedText, cardX + (cardW - savedW) / 2, cardY + cardH - 15);
             }
         }
 
-        // Control Hints
         g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 12));
         g2d.setColor(new Color(120, 120, 150));
         String hint = "使用 ⬆ / ⬇ 方向鍵或滑鼠選擇 | Enter 鍵確認";
@@ -3719,6 +3852,76 @@ public class GamePanel extends JPanel {
         String sfxMuteText = sfxMute ? "已靜音" : "靜音";
         int sfxMuteTextW = g2d.getFontMetrics().stringWidth(sfxMuteText);
         g2d.drawString(sfxMuteText, sfxMuteX + (muteW - sfxMuteTextW) / 2, sfxMuteY + 15);
+
+    }
+
+    private Rectangle drawSettingsButton(Graphics2D g2d, java.awt.Point mousePos, Rectangle bounds, int x, int y, int w, int h, String text, Font font, boolean selected) {
+        if (bounds == null) {
+            bounds = new Rectangle(x, y, w, h);
+        } else {
+            bounds.setBounds(x, y, w, h);
+        }
+
+        boolean hover = mousePos != null && bounds.contains(mousePos);
+        g2d.setFont(font);
+        if (selected || hover) {
+            g2d.setColor(new Color(255, 255, 255, 40));
+            g2d.fillRoundRect(x, y, w, h, 8, 8);
+            g2d.setColor(Color.WHITE);
+        } else {
+            g2d.setColor(new Color(255, 255, 255, 15));
+            g2d.fillRoundRect(x, y, w, h, 8, 8);
+            g2d.setColor(new Color(200, 200, 200));
+        }
+        g2d.drawRoundRect(x, y, w, h, 8, 8);
+        if (selected) {
+            g2d.setColor(new Color(0, 255, 255));
+            g2d.drawRoundRect(x + 1, y + 1, w - 2, h - 2, 8, 8);
+        }
+        int textWidth = g2d.getFontMetrics().stringWidth(text);
+        g2d.drawString(text, x + (w - textWidth) / 2, y + 22);
+        return bounds;
+    }
+
+    private void drawDisplaySettings(Graphics2D g2d, int cardX, int cardY, int cardW, boolean inPause) {
+        java.awt.Point mousePos = getMousePosition();
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 42));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        String titleText = com.tetris.util.LanguageManager.get("顯示設定", "Display Settings");
+        int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
+        int titleY = 120;
+
+        g2d.setColor(new Color(0, 255, 255, 70));
+        g2d.drawString(titleText, titleX + 2, titleY + 2);
+        g2d.setColor(new Color(0, 255, 255));
+        g2d.drawString(titleText, titleX, titleY);
+
+        int innerY = cardY + 25;
+        int btnW = 240;
+        int btnH = 34;
+        int btnX = (getWidth() - btnW) / 2;
+        Font buttonFont = getCachedFont("SansSerif", Font.BOLD, 15);
+
+        String ghostText = com.tetris.util.LanguageManager.get("幻影方塊: " + (showGhostPiece ? "開啟" : "關閉"), "Ghost Piece: " + (showGhostPiece ? "ON" : "OFF"));
+        String gridText = com.tetris.util.LanguageManager.get("網格線: " + (showGridLines ? "顯示" : "隱藏"), "Grid Lines: " + (showGridLines ? "SHOW" : "HIDE"));
+        String themeText = com.tetris.util.LanguageManager.get("視覺主題: " + getThemeChineseLabel(com.tetris.util.ThemeManager.getCurrentTheme()), "Theme: " + com.tetris.util.ThemeManager.getCurrentTheme().name());
+        String cbText = com.tetris.util.LanguageManager.get("色盲模式: " + getColorBlindModeChineseLabel(com.tetris.util.ThemeManager.getCurrentColorBlindMode()), "Color Blind: " + com.tetris.util.ThemeManager.getCurrentColorBlindMode().name());
+        String backText = com.tetris.util.LanguageManager.get("返回", "Back");
+        int selectedDisplayIndex = inPause ? selectedPauseDisplayIndex : selectedMenuSettingsIndex;
+
+        if (inPause) {
+            pauseDisplayGhostBounds = drawSettingsButton(g2d, mousePos, pauseDisplayGhostBounds, btnX, innerY, btnW, btnH, ghostText, buttonFont, selectedDisplayIndex == 0);
+            pauseDisplayGridBounds = drawSettingsButton(g2d, mousePos, pauseDisplayGridBounds, btnX, innerY + 42, btnW, btnH, gridText, buttonFont, selectedDisplayIndex == 1);
+            pauseDisplayThemeBounds = drawSettingsButton(g2d, mousePos, pauseDisplayThemeBounds, btnX, innerY + 84, btnW, btnH, themeText, buttonFont, selectedDisplayIndex == 2);
+            pauseDisplayColorBlindBounds = drawSettingsButton(g2d, mousePos, pauseDisplayColorBlindBounds, btnX, innerY + 126, btnW, btnH, cbText, buttonFont, selectedDisplayIndex == 3);
+            pauseDisplayBackButtonBounds = drawSettingsButton(g2d, mousePos, pauseDisplayBackButtonBounds, btnX, innerY + 184, btnW, btnH, backText, buttonFont, selectedDisplayIndex == 4);
+        } else {
+            menuDisplayGhostBounds = drawSettingsButton(g2d, mousePos, menuDisplayGhostBounds, btnX, innerY, btnW, btnH, ghostText, buttonFont, selectedDisplayIndex == 0);
+            menuDisplayGridBounds = drawSettingsButton(g2d, mousePos, menuDisplayGridBounds, btnX, innerY + 42, btnW, btnH, gridText, buttonFont, selectedDisplayIndex == 1);
+            menuDisplayThemeBounds = drawSettingsButton(g2d, mousePos, menuDisplayThemeBounds, btnX, innerY + 84, btnW, btnH, themeText, buttonFont, selectedDisplayIndex == 2);
+            menuDisplayColorBlindBounds = drawSettingsButton(g2d, mousePos, menuDisplayColorBlindBounds, btnX, innerY + 126, btnW, btnH, cbText, buttonFont, selectedDisplayIndex == 3);
+            menuDisplayBackButtonBounds = drawSettingsButton(g2d, mousePos, menuDisplayBackButtonBounds, btnX, innerY + 184, btnW, btnH, backText, buttonFont, selectedDisplayIndex == 4);
+        }
     }
 
     /**
@@ -3749,146 +3952,24 @@ public class GamePanel extends JPanel {
 
         drawVolumeSettings(g2d, cardX, cardY, cardW, cardY + 25, 45);
 
-        // THEME button
-        String themeText = com.tetris.util.LanguageManager.get("視覺主題: " + getThemeChineseLabel(com.tetris.util.ThemeManager.getCurrentTheme()), "Theme: " + com.tetris.util.ThemeManager.getCurrentTheme().name());
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 15));
-        FontMetrics fmTheme = g2d.getFontMetrics();
         int btnW = 240;
         int btnH = 34;
         int btnX = (getWidth() - btnW) / 2;
-        int themeBtnY = cardY + 130;
 
-        if (menuSettingsThemeBounds == null) menuSettingsThemeBounds = new Rectangle(btnX, themeBtnY, btnW, btnH); else menuSettingsThemeBounds.setBounds(btnX, themeBtnY, btnW, btnH);
-        boolean hoverTheme = (mousePos != null && menuSettingsThemeBounds.contains(mousePos));
+        String soundPackText = com.tetris.util.LanguageManager.get("音效套件: " + getSoundPackChineseLabel(com.tetris.util.SoundManager.getCurrentSoundPack()), "Sound Pack: " + com.tetris.util.SoundManager.getCurrentSoundPack().name());
+        menuSettingsSoundPackBounds = drawSettingsButton(g2d, mousePos, menuSettingsSoundPackBounds, btnX, cardY + 190, btnW, btnH, soundPackText, getCachedFont("SansSerif", Font.BOLD, 15), selectedMenuSettingsIndex == 0);
 
-        if (hoverTheme) {
-            g2d.setColor(new Color(255, 255, 255, 40));
-            g2d.fillRoundRect(btnX, themeBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(Color.WHITE);
-        } else {
-            g2d.setColor(new Color(255, 255, 255, 15));
-            g2d.fillRoundRect(btnX, themeBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(new Color(200, 200, 200));
-        }
-        g2d.drawRoundRect(btnX, themeBtnY, btnW, btnH, 8, 8);
-        g2d.drawString(themeText, btnX + (btnW - fmTheme.stringWidth(themeText)) / 2, themeBtnY + 22);
-
-        // COLORBLIND button
-        String cbText = com.tetris.util.LanguageManager.get("色盲模式: " + getColorBlindModeChineseLabel(com.tetris.util.ThemeManager.getCurrentColorBlindMode()), "Color Blind: " + com.tetris.util.ThemeManager.getCurrentColorBlindMode().name());
-        int cbBtnY = cardY + 172;
-        if (menuSettingsColorBlindBounds == null) menuSettingsColorBlindBounds = new Rectangle(btnX, cbBtnY, btnW, btnH); else menuSettingsColorBlindBounds.setBounds(btnX, cbBtnY, btnW, btnH);
-        boolean hoverCb = (mousePos != null && menuSettingsColorBlindBounds.contains(mousePos));
-
-        if (hoverCb) {
-            g2d.setColor(new Color(255, 255, 255, 40));
-            g2d.fillRoundRect(btnX, cbBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(Color.WHITE);
-        } else {
-            g2d.setColor(new Color(255, 255, 255, 15));
-            g2d.fillRoundRect(btnX, cbBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(new Color(200, 200, 200));
-        }
-        g2d.drawRoundRect(btnX, cbBtnY, btnW, btnH, 8, 8);
-        g2d.drawString(cbText, btnX + (btnW - fmTheme.stringWidth(cbText)) / 2, cbBtnY + 22);
-
-        // SOUND PACK button
-        String spText = com.tetris.util.LanguageManager.get("音效套件: " + getSoundPackChineseLabel(com.tetris.util.SoundManager.getCurrentSoundPack()), "Sound Pack: " + com.tetris.util.SoundManager.getCurrentSoundPack().name());
-        int spBtnY = cardY + 214;
-        if (menuSettingsSoundPackBounds == null) menuSettingsSoundPackBounds = new Rectangle(btnX, spBtnY, btnW, btnH); else menuSettingsSoundPackBounds.setBounds(btnX, spBtnY, btnW, btnH);
-        boolean hoverSp = (mousePos != null && menuSettingsSoundPackBounds.contains(mousePos));
-
-        if (hoverSp) {
-            g2d.setColor(new Color(255, 255, 255, 40));
-            g2d.fillRoundRect(btnX, spBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(Color.WHITE);
-        } else {
-            g2d.setColor(new Color(255, 255, 255, 15));
-            g2d.fillRoundRect(btnX, spBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(new Color(200, 200, 200));
-        }
-        g2d.drawRoundRect(btnX, spBtnY, btnW, btnH, 8, 8);
-        g2d.drawString(spText, btnX + (btnW - fmTheme.stringWidth(spText)) / 2, spBtnY + 22);
-
-        // PREVIEW COUNT button
         String previewText = com.tetris.util.LanguageManager.get("預覽數量: " + nextPiecesCount + " 個", "Preview: " + nextPiecesCount + " Pieces");
-        int previewBtnY = cardY + 256;
+        menuSettingsDisplayBounds = drawSettingsButton(g2d, mousePos, menuSettingsDisplayBounds, btnX, cardY + 232, btnW, btnH, com.tetris.util.LanguageManager.get("顯示設定", "Display Settings"), getCachedFont("SansSerif", Font.BOLD, 15), selectedMenuSettingsIndex == 1);
 
-        if (menuSettingsPreviewCountBounds == null) menuSettingsPreviewCountBounds = new Rectangle(btnX, previewBtnY, btnW, btnH); else menuSettingsPreviewCountBounds.setBounds(btnX, previewBtnY, btnW, btnH);
-        boolean hoverPreview = (mousePos != null && menuSettingsPreviewCountBounds.contains(mousePos));
+        menuSettingsPreviewCountBounds = drawSettingsButton(g2d, mousePos, menuSettingsPreviewCountBounds, btnX, cardY + 274, btnW, btnH, previewText, getCachedFont("SansSerif", Font.BOLD, 15), selectedMenuSettingsIndex == 2);
 
-        if (hoverPreview) {
-            g2d.setColor(new Color(255, 255, 255, 40));
-            g2d.fillRoundRect(btnX, previewBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(Color.WHITE);
-        } else {
-            g2d.setColor(new Color(255, 255, 255, 15));
-            g2d.fillRoundRect(btnX, previewBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(new Color(200, 200, 200));
-        }
-        g2d.drawRoundRect(btnX, previewBtnY, btnW, btnH, 8, 8);
-        g2d.drawString(previewText, btnX + (btnW - fmTheme.stringWidth(previewText)) / 2, previewBtnY + 22);
-
-        // CONTROL SETTINGS button
         String controlBtnText = com.tetris.util.LanguageManager.get("控制設定", "Control Bindings");
-        int ctrlBtnY = cardY + 298;
+        menuSettingsControlBounds = drawSettingsButton(g2d, mousePos, menuSettingsControlBounds, btnX, cardY + 316, btnW, btnH, controlBtnText, getCachedFont("SansSerif", Font.BOLD, 15), selectedMenuSettingsIndex == 3);
 
-        if (menuSettingsControlBounds == null) menuSettingsControlBounds = new Rectangle(btnX, ctrlBtnY, btnW, btnH); else menuSettingsControlBounds.setBounds(btnX, ctrlBtnY, btnW, btnH);
-        boolean hoverControl = (mousePos != null && menuSettingsControlBounds.contains(mousePos));
-
-        if (hoverControl) {
-            g2d.setColor(new Color(255, 255, 255, 40));
-            g2d.fillRoundRect(btnX, ctrlBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(Color.WHITE);
-        } else {
-            g2d.setColor(new Color(255, 255, 255, 15));
-            g2d.fillRoundRect(btnX, ctrlBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(new Color(200, 200, 200));
-        }
-        g2d.drawRoundRect(btnX, ctrlBtnY, btnW, btnH, 8, 8);
-        g2d.drawString(controlBtnText, btnX + (btnW - fmTheme.stringWidth(controlBtnText)) / 2, ctrlBtnY + 22);
-
-        // LANGUAGE button
-        String langLabel = com.tetris.util.LanguageManager.get("語言: 繁體中文", "Language: English");
-        int langBtnY = cardY + 340;
-
-        if (menuSettingsLanguageBounds == null) menuSettingsLanguageBounds = new Rectangle(btnX, langBtnY, btnW, btnH); else menuSettingsLanguageBounds.setBounds(btnX, langBtnY, btnW, btnH);
-        boolean hoverLang = (mousePos != null && menuSettingsLanguageBounds.contains(mousePos));
-
-        if (hoverLang) {
-            g2d.setColor(new Color(255, 255, 255, 40));
-            g2d.fillRoundRect(btnX, langBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(Color.WHITE);
-        } else {
-            g2d.setColor(new Color(255, 255, 255, 15));
-            g2d.fillRoundRect(btnX, langBtnY, btnW, btnH, 8, 8);
-            g2d.setColor(new Color(200, 200, 200));
-        }
-        g2d.drawRoundRect(btnX, langBtnY, btnW, btnH, 8, 8);
-        g2d.drawString(langLabel, btnX + (btnW - fmTheme.stringWidth(langLabel)) / 2, langBtnY + 22);
-
-        // BACK button
         String backText = com.tetris.util.LanguageManager.get("返回", "Back");
-        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
-        FontMetrics fmBack = g2d.getFontMetrics();
-        int backBtnW = 120;
-        int backBtnH = 34;
-        int backBtnX = (getWidth() - backBtnW) / 2;
-        int backBtnY = cardY + 405;
-
-        if (menuSettingsBackButtonBounds == null) menuSettingsBackButtonBounds = new Rectangle(backBtnX, backBtnY, backBtnW, backBtnH); else menuSettingsBackButtonBounds.setBounds(backBtnX, backBtnY, backBtnW, backBtnH);
-        boolean hoverBack = (mousePos != null && menuSettingsBackButtonBounds.contains(mousePos));
-
-        if (hoverBack) {
-            g2d.setColor(new Color(255, 255, 255, 40));
-            g2d.fillRoundRect(backBtnX, backBtnY, backBtnW, backBtnH, 8, 8);
-            g2d.setColor(Color.WHITE);
-        } else {
-            g2d.setColor(new Color(255, 255, 255, 15));
-            g2d.fillRoundRect(backBtnX, backBtnY, backBtnW, backBtnH, 8, 8);
-            g2d.setColor(new Color(200, 200, 200));
-        }
-        g2d.drawRoundRect(backBtnX, backBtnY, backBtnW, backBtnH, 8, 8);
-        g2d.drawString(backText, backBtnX + (backBtnW - fmBack.stringWidth(backText)) / 2, backBtnY + 22);
+        menuSettingsBackButtonBounds = drawSettingsButton(g2d, mousePos, menuSettingsBackButtonBounds, (getWidth() - 120) / 2, cardY + 364, 120, 34, backText, getCachedFont("SansSerif", Font.BOLD, 16), selectedMenuSettingsIndex == 4);
     }
 
     private void updateBGMVolumeFromMouse(int mouseX) {
