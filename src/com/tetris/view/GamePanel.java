@@ -552,8 +552,11 @@ public class GamePanel extends JPanel {
         menuAnimationTimer = new Timer(33, e -> {
             if (gameEngine != null) {
                 com.tetris.controller.GameEngine.GameState state = gameEngine.getGameState();
-                if (state == com.tetris.controller.GameEngine.GameState.MENU || 
-                    state == com.tetris.controller.GameEngine.GameState.LEADERBOARD) {
+                if (state == com.tetris.controller.GameEngine.GameState.MENU ||
+                    state == com.tetris.controller.GameEngine.GameState.LEADERBOARD ||
+                    state == com.tetris.controller.GameEngine.GameState.ACHIEVEMENTS ||
+                    state == com.tetris.controller.GameEngine.GameState.TUTORIAL ||
+                    state == com.tetris.controller.GameEngine.GameState.TUTORIAL_SELECT) {
                     updateFloatingPieces();
                     repaint();
                 }
@@ -1960,9 +1963,9 @@ public class GamePanel extends JPanel {
         }
 
         // Title
-        g2d.setFont(getCachedFont("Impact", Font.BOLD, 42));
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 36));
         g2d.setColor(new Color(255, 215, 0)); // Gold
-        String title = "TOP HIGH SCORES";
+        String title = com.tetris.util.LanguageManager.get("高分排行榜", "TOP HIGH SCORES");
         FontMetrics fm = g2d.getFontMetrics();
         g2d.drawString(title, (getWidth() - fm.stringWidth(title)) / 2, 75);
 
@@ -2965,7 +2968,7 @@ public class GamePanel extends JPanel {
         g2d.fillRect(0, 0, width, height);
 
         if (!showDisplaySettingsInPause) {
-            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 42));
+            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 36));
             FontMetrics fmTitle = g2d.getFontMetrics();
             String titleText = showSettingsInPause ? com.tetris.util.LanguageManager.get("遊戲設定", "Settings") : com.tetris.util.LanguageManager.get("遊戲暫停", "Game Paused");
             int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
@@ -4225,7 +4228,7 @@ public class GamePanel extends JPanel {
      * 繪製主畫面 GameMode 選擇卡片
      */
     private void drawModeSelectScreen(Graphics2D g2d) {
-        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 42));
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 36));
         FontMetrics fmTitle = g2d.getFontMetrics();
         String titleText = com.tetris.util.LanguageManager.get("選擇模式", "Select Mode");
         int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
@@ -5156,8 +5159,8 @@ public class GamePanel extends JPanel {
         g2d.setColor(new Color(0, 255, 255, 150));
         g2d.fillRect(40, 85, getWidth() - 80, 3);
 
-        int startY = 120;
-        int gap = 48;
+        int startY = 130;
+        int gap = 56;
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 18));
         FontMetrics fmOpt = g2d.getFontMetrics();
 
@@ -5186,7 +5189,7 @@ public class GamePanel extends JPanel {
             int x = baseX; // left-align within the centered block
             int y = startY + i * gap;
 
-            if (tutorialOptionBounds[i] == null) tutorialOptionBounds[i] = new Rectangle(x - 20, y - textHeight + 5, maxWidth + 40, textHeight + 10); else tutorialOptionBounds[i].setBounds(x - 20, y - textHeight + 5, maxWidth + 40, textHeight + 10);
+            if (tutorialOptionBounds[i] == null) tutorialOptionBounds[i] = new Rectangle(x - 20, y - textHeight + 5, maxWidth + 40, textHeight + 14); else tutorialOptionBounds[i].setBounds(x - 20, y - textHeight + 5, maxWidth + 40, textHeight + 14);
 
             boolean isSelected = (i == selectedTutorialIndex);
             boolean isReturn = (i == levels.length - 1);
