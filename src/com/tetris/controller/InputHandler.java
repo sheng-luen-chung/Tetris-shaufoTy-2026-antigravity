@@ -287,7 +287,13 @@ public class InputHandler extends KeyAdapter {
         GameEngine.GameState state = engine.getGameState();
         boolean isActiveState = (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL);
         if (isActiveState) {
-            if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
+            if (engine.getGameMode() == com.tetris.model.GameMode.NET_PVP) {
+                if (!engine.isPaused() && !engine.isGameOver()) {
+                    updateInputs(deltaTime);
+                } else {
+                    resetKeyStates();
+                }
+            } else if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
                 if (engine2 != null && !engine.isPaused()) {
                     if (engine.getGameMode() == com.tetris.model.GameMode.PVP && !engine.isGameOver()) {
                         updateP1Inputs(deltaTime);
@@ -601,6 +607,27 @@ public class InputHandler extends KeyAdapter {
             return;
         }
 
+        if (state == GameEngine.GameState.NET_LOBBY) {
+            switch (keyCode) {
+                case KeyEvent.VK_UP:
+                case KeyEvent.VK_W:
+                    if (engine.getPanel() != null) engine.getPanel().navigateLobby(-1);
+                    break;
+                case KeyEvent.VK_DOWN:
+                case KeyEvent.VK_S:
+                    if (engine.getPanel() != null) engine.getPanel().navigateLobby(1);
+                    break;
+                case KeyEvent.VK_ENTER:
+                case KeyEvent.VK_SPACE:
+                    if (engine.getPanel() != null) engine.getPanel().selectLobbyOption();
+                    break;
+                case KeyEvent.VK_ESCAPE:
+                    if (engine.getPanel() != null) engine.getPanel().cancelNetwork();
+                    break;
+            }
+            return;
+        }
+
         if (state == GameEngine.GameState.MENU) {
             if (engine.getPanel() != null && engine.getPanel().isShowSettingsInMenu()) {
                 if (engine.getPanel().isShowControlSettings()) {
@@ -710,7 +737,7 @@ public class InputHandler extends KeyAdapter {
             }
 
             boolean bothGameOver = false;
-            if ((engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) && engine2 != null) {
+            if ((engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI || engine.getGameMode() == com.tetris.model.GameMode.NET_PVP) && engine2 != null) {
                 bothGameOver = engine.isGameOver() && engine2.isGameOver();
             } else {
                 bothGameOver = engine.isGameOver();

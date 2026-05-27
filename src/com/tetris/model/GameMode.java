@@ -7,6 +7,7 @@ public enum GameMode {
     SURVIVAL,
     STAGE,
     PVP,
-    VS_AI
+    VS_AI,
+    NET_PVP
 }
 

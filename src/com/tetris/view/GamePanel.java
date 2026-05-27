@@ -249,10 +249,20 @@ public class GamePanel extends JPanel {
 
     // Game mode selection properties
     private boolean showModeSelectInMenu = false;
-    private int selectedModeIndex = 0; // Normal: 0-6, AI demo: 0-4
-    private final Rectangle[] modeOptionBounds = new Rectangle[8];
+    private int selectedModeIndex = 0; // Normal: 0-7, AI demo: 0-4
+    private final Rectangle[] modeOptionBounds = new Rectangle[9];
     private boolean isSelectingModeForAiDemo = false;
     private boolean showVsAiControlsPrompt = false;
+
+    // Net PVP Lobby properties
+    public enum NetLobbyState {
+        SELECT,
+        HOST_WAITING,
+        JOIN_CONNECTING
+    }
+    private NetLobbyState netLobbyState = NetLobbyState.SELECT;
+    private final Rectangle[] lobbyOptionBounds = new Rectangle[3];
+    private int selectedLobbyIndex = 0;
 
     // Difficulty selection properties
     private boolean showDifficultySelectInMenu = false;
@@ -747,7 +757,7 @@ public class GamePanel extends JPanel {
                             repaint();
                         }
                     } else if (showModeSelectInMenu) {
-                        int numModes = isSelectingModeForAiDemo ? 6 : 8;
+                        int numModes = isSelectingModeForAiDemo ? 6 : 9;
                         for (int i = 0; i < numModes; i++) {
                             if (modeOptionBounds[i] != null && modeOptionBounds[i].contains(e.getPoint())) {
                                 selectedModeIndex = i;
@@ -771,6 +781,20 @@ public class GamePanel extends JPanel {
                                 selectCurrentOption();
                                 break;
                             }
+                        }
+                    }
+                } else if (state == com.tetris.controller.GameEngine.GameState.NET_LOBBY) {
+                    if (netLobbyState == NetLobbyState.SELECT) {
+                        for (int i = 0; i < 3; i++) {
+                            if (lobbyOptionBounds[i] != null && lobbyOptionBounds[i].contains(e.getPoint())) {
+                                selectedLobbyIndex = i;
+                                selectLobbyOption();
+                                break;
+                            }
+                        }
+                    } else {
+                        if (lobbyOptionBounds[2] != null && lobbyOptionBounds[2].contains(e.getPoint())) {
+                            cancelNetwork();
                         }
                     }
                 } else if (state == com.tetris.controller.GameEngine.GameState.TUTORIAL_SELECT) {
@@ -973,7 +997,7 @@ public class GamePanel extends JPanel {
                         }
                         repaint();
                     } else if (showModeSelectInMenu) {
-                        int numModes = isSelectingModeForAiDemo ? 6 : 8;
+                        int numModes = isSelectingModeForAiDemo ? 6 : 9;
                         for (int i = 0; i < numModes; i++) {
                             if (modeOptionBounds[i] != null && modeOptionBounds[i].contains(e.getPoint())) {
                                 if (selectedModeIndex != i) {
@@ -991,6 +1015,18 @@ public class GamePanel extends JPanel {
                                     repaint();
                                 }
                                 break;
+                            }
+                        }
+                    } else if (state == com.tetris.controller.GameEngine.GameState.NET_LOBBY) {
+                        if (netLobbyState == NetLobbyState.SELECT) {
+                            for (int i = 0; i < 3; i++) {
+                                if (lobbyOptionBounds[i] != null && lobbyOptionBounds[i].contains(e.getPoint())) {
+                                    if (selectedLobbyIndex != i) {
+                                        selectedLobbyIndex = i;
+                                        repaint();
+                                    }
+                                    break;
+                                }
                             }
                         }
                     } else {
@@ -1091,7 +1127,7 @@ public class GamePanel extends JPanel {
         java.awt.Window window = javax.swing.SwingUtilities.getWindowAncestor(this);
         if (window instanceof javax.swing.JFrame) {
             javax.swing.JFrame frame = (javax.swing.JFrame) window;
-            if (gameEngine != null && (gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI)
+            if (gameEngine != null && (gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI || gameEngine.getGameMode() == GameMode.NET_PVP)
                     && gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
                 setPreferredSize(new Dimension(1000, ROWS * TILE_SIZE));
             } else {
@@ -1242,7 +1278,7 @@ public class GamePanel extends JPanel {
     private void drawGameScene(Graphics g) {
         if (gameEngine == null) return;
         synchronized (gameEngine) {
-            if ((gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI) && gameEngine2 != null) {
+            if ((gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI || gameEngine.getGameMode() == GameMode.NET_PVP) && gameEngine2 != null) {
                 synchronized (gameEngine2) {
                     drawGameSceneInternal(g);
                 }
@@ -1266,6 +1302,9 @@ public class GamePanel extends JPanel {
             case ACHIEVEMENTS:
                 drawAchievementsScreen(g);
                 break;
+            case NET_LOBBY:
+                drawNetLobbyScreen(g);
+                break;
             case PLAYING:
             case TUTORIAL:
             default:
@@ -1273,7 +1312,7 @@ public class GamePanel extends JPanel {
                 java.awt.geom.AffineTransform oldTransform = g2d.getTransform();
 
                 com.tetris.controller.GameEngine localEngine2 = gameEngine2;
-                if ((gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI) && localEngine2 != null) {
+                if ((gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI || gameEngine.getGameMode() == GameMode.NET_PVP) && localEngine2 != null) {
                     // --- PLAYER 1 (Left: x=0) ---
                     java.awt.geom.AffineTransform p1Transform = g2d.getTransform();
                     int currentShakeX = 0;
@@ -1713,6 +1752,13 @@ public class GamePanel extends JPanel {
                     this.gameEngine.startGame();
                     break;
                 case 7:
+                    this.gameEngine.setGameMode(GameMode.NET_PVP);
+                    this.showModeSelectInMenu = false;
+                    this.netLobbyState = NetLobbyState.SELECT;
+                    this.selectedLobbyIndex = 0;
+                    this.gameEngine.setGameState(com.tetris.controller.GameEngine.GameState.NET_LOBBY);
+                    break;
+                case 8:
                 default:
                     this.showModeSelectInMenu = false;
                     this.selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 1 : 0;
@@ -4395,7 +4441,7 @@ public class GamePanel extends JPanel {
         g2d.drawString(titleText, titleX, titleY);
 
         int cardW = 340;
-        int cardH = 405;
+        int cardH = isSelectingModeForAiDemo ? 405 : 445;
         int cardX = (getWidth() - cardW) / 2;
         int cardY = 170;
 
@@ -4416,16 +4462,16 @@ public class GamePanel extends JPanel {
         int btnH = 32;
         int btnX = cardX + (cardW - btnW) / 2;
         int startY = cardY + 45;
-        int gap = 40;
+        int gap = isSelectingModeForAiDemo ? 40 : 36;
 
         java.awt.Point mousePos = getMousePosition();
-        int numModes = isSelectingModeForAiDemo ? 6 : 8;
+        int numModes = isSelectingModeForAiDemo ? 6 : 9;
 
         for (int i = 0; i < numModes; i++) {
             int y = startY + i * gap;
             if (i == numModes - 1) {
                 // BACK button offset
-                y = cardY + 345;
+                y = cardY + (isSelectingModeForAiDemo ? 345 : 395);
             }
 
             if (modeOptionBounds[i] == null) modeOptionBounds[i] = new Rectangle(btnX, y, btnW, btnH); else modeOptionBounds[i].setBounds(btnX, y, btnW, btnH);
@@ -4438,7 +4484,7 @@ public class GamePanel extends JPanel {
 
             int effectiveIndex = i;
             if (isSelectingModeForAiDemo && i == 5) {
-                effectiveIndex = 7; // BACK
+                effectiveIndex = 8; // BACK
             }
 
             switch (effectiveIndex) {
@@ -4485,6 +4531,12 @@ public class GamePanel extends JPanel {
                     fillCol = new Color(255, 60, 60, isSelected ? 45 : 20);
                     break;
                 case 7:
+                    label = com.tetris.util.LanguageManager.get("網路連線對戰 (ONLINE PVP)", "Online PVP (NET PVP)");
+                    baseColor = new Color(255, 140, 0);
+                    selectColor = Color.WHITE;
+                    fillCol = new Color(255, 140, 0, isSelected ? 45 : 20);
+                    break;
+                case 8:
                 default:
                     label = com.tetris.util.LanguageManager.get("返回", "Back");
                     baseColor = new Color(160, 160, 180);
@@ -5600,5 +5652,313 @@ public class GamePanel extends JPanel {
             animationTimer.start();
         }
         repaint();
+    }
+
+    public void navigateLobby(int dir) {
+        if (netLobbyState == NetLobbyState.SELECT) {
+            selectedLobbyIndex = (selectedLobbyIndex + dir + 3) % 3;
+            repaint();
+        }
+    }
+
+    public void selectLobbyOption() {
+        if (netLobbyState == NetLobbyState.SELECT) {
+            switch (selectedLobbyIndex) {
+                case 0:
+                    startHostGame();
+                    break;
+                case 1:
+                    startJoinGame();
+                    break;
+                case 2:
+                    cancelNetwork();
+                    break;
+            }
+        }
+    }
+
+    public void cancelNetwork() {
+        com.tetris.util.NetworkManager.getInstance().shutdown();
+        if (netLobbyState != NetLobbyState.SELECT) {
+            netLobbyState = NetLobbyState.SELECT;
+            selectedLobbyIndex = 0;
+        } else {
+            gameEngine.setGameState(com.tetris.controller.GameEngine.GameState.MENU);
+            setShowModeSelectInMenu(true);
+            selectedModeIndex = 7; // Highlight NET_PVP
+        }
+        repaint();
+    }
+
+    private void startHostGame() {
+        netLobbyState = NetLobbyState.HOST_WAITING;
+        repaint();
+        com.tetris.util.NetworkManager.getInstance().startHost(5005, new com.tetris.util.NetworkManager.NetworkCallback() {
+            @Override
+            public void onConnected() {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    long seed = System.currentTimeMillis();
+                    com.tetris.util.NetworkManager.getInstance().send("START:" + seed);
+                    gameEngine.setRandomSeed(seed);
+                    gameEngine.startGame();
+                });
+            }
+
+            @Override
+            public void onDisconnected(String reason) {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    handleNetworkDisconnect(reason);
+                });
+            }
+
+            @Override
+            public void onMessageReceived(String message) {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    handleNetworkMessage(message);
+                });
+            }
+        });
+    }
+
+    private void startJoinGame() {
+        String ip = javax.swing.JOptionPane.showInputDialog(null, 
+            com.tetris.util.LanguageManager.get("請輸入對手的 IP 位址:", "Please enter opponent's IP:"), 
+            com.tetris.util.LanguageManager.get("加入房間 (Join Room)", "Join Room"), 
+            javax.swing.JOptionPane.QUESTION_MESSAGE);
+        
+        if (ip == null || ip.trim().isEmpty()) {
+            return;
+        }
+        
+        netLobbyState = NetLobbyState.JOIN_CONNECTING;
+        repaint();
+        
+        com.tetris.util.NetworkManager.getInstance().startJoin(ip.trim(), 5005, new com.tetris.util.NetworkManager.NetworkCallback() {
+            @Override
+            public void onConnected() {
+                // Client side: wait for Host's START signal
+            }
+
+            @Override
+            public void onDisconnected(String reason) {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    handleNetworkDisconnect(reason);
+                });
+            }
+
+            @Override
+            public void onMessageReceived(String message) {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    handleNetworkMessage(message);
+                });
+            }
+        });
+    }
+
+    private void handleNetworkDisconnect(String reason) {
+        com.tetris.util.NetworkManager.getInstance().shutdown();
+        if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
+            gameEngine.returnToMenu();
+            javax.swing.JOptionPane.showMessageDialog(null, 
+                com.tetris.util.LanguageManager.get("對手已斷開連線！遊戲結束。", "Opponent disconnected! Game over."), 
+                com.tetris.util.LanguageManager.get("連線中斷 (Disconnected)", "Disconnected"), 
+                javax.swing.JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            netLobbyState = NetLobbyState.SELECT;
+            selectedLobbyIndex = 0;
+            repaint();
+            javax.swing.JOptionPane.showMessageDialog(null, 
+                com.tetris.util.LanguageManager.get("連線失敗或已中斷: ", "Connection failed: ") + reason, 
+                com.tetris.util.LanguageManager.get("錯誤 (Error)", "Error"), 
+                javax.swing.JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handleNetworkMessage(String message) {
+        if (message.startsWith("START:")) {
+            try {
+                long seed = Long.parseLong(message.substring(6));
+                gameEngine.setRandomSeed(seed);
+                gameEngine.startGame();
+            } catch (Exception e) {
+                gameEngine.startGame();
+            }
+        } else if (message.startsWith("SYNC:")) {
+            if (gameEngine2 != null) {
+                gameEngine2.deserializeGameState(message.substring(5));
+                repaint();
+            }
+        } else if (message.startsWith("GARBAGE:")) {
+            try {
+                int lines = Integer.parseInt(message.substring(8));
+                gameEngine.receiveGarbage(lines);
+            } catch (Exception e) {
+                // Ignore
+            }
+        } else if (message.equals("GAMEOVER")) {
+            if (gameEngine2 != null) {
+                synchronized (this) {
+                    if (gameEngine.getPvpWinner() == 0 && gameEngine2.getPvpWinner() == 0) {
+                        gameEngine.setPvpWinner(1); // 本機獲獲勝
+                        gameEngine2.setPvpWinner(1);
+                        gameEngine2.setGameOver(true);
+                        com.tetris.util.SoundManager.stopBGM();
+                        repaint();
+                    }
+                }
+            }
+        } else if (message.equals("QUIT")) {
+            handleNetworkDisconnect("Opponent left.");
+        }
+    }
+
+    private void drawNetLobbyScreen(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 36));
+        FontMetrics fmTitle = g2d.getFontMetrics();
+        String titleText = com.tetris.util.LanguageManager.get("網路連線對戰", "ONLINE PVP");
+        int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
+        int titleY = 120;
+
+        g2d.setColor(new Color(0, 255, 255, 70));
+        g2d.drawString(titleText, titleX + 2, titleY + 2);
+        g2d.setColor(new Color(0, 255, 255));
+        g2d.drawString(titleText, titleX, titleY);
+
+        int cardW = 360;
+        int cardH = 320;
+        int cardX = (getWidth() - cardW) / 2;
+        int cardY = 180;
+
+        // Draw card background
+        g2d.setColor(new Color(255, 255, 255, 15));
+        g2d.fillRoundRect(cardX, cardY, cardW, cardH, 15, 15);
+        g2d.setColor(new Color(255, 255, 255, 40));
+        g2d.drawRoundRect(cardX, cardY, cardW, cardH, 15, 15);
+
+        if (netLobbyState == NetLobbyState.SELECT) {
+            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 15));
+            g2d.setColor(new Color(200, 200, 220));
+            String subText = com.tetris.util.LanguageManager.get("請選擇連線方式", "Please Select Connection Mode");
+            int subW = g2d.getFontMetrics().stringWidth(subText);
+            g2d.drawString(subText, cardX + (cardW - subW) / 2, cardY + 30);
+
+            int btnW = 260;
+            int btnH = 40;
+            int btnX = cardX + (cardW - btnW) / 2;
+            int startY = cardY + 65;
+            int gap = 60;
+
+            for (int i = 0; i < 3; i++) {
+                int y = startY + i * gap;
+                if (lobbyOptionBounds[i] == null) lobbyOptionBounds[i] = new Rectangle(btnX, y, btnW, btnH); else lobbyOptionBounds[i].setBounds(btnX, y, btnW, btnH);
+
+                boolean isSelected = (i == selectedLobbyIndex);
+                String label = "";
+                Color baseColor = Color.WHITE;
+                Color fillCol = new Color(255, 255, 255, 15);
+
+                switch (i) {
+                    case 0:
+                        label = com.tetris.util.LanguageManager.get("創建房間 (Host)", "Host Room");
+                        baseColor = new Color(0, 255, 255);
+                        fillCol = new Color(0, 255, 255, isSelected ? 45 : 20);
+                        break;
+                    case 1:
+                        label = com.tetris.util.LanguageManager.get("加入房間 (Join)", "Join Room");
+                        baseColor = new Color(255, 100, 255);
+                        fillCol = new Color(255, 100, 255, isSelected ? 45 : 20);
+                        break;
+                    case 2:
+                        label = com.tetris.util.LanguageManager.get("返回主選單 (Back)", "Back");
+                        baseColor = new Color(160, 160, 180);
+                        fillCol = new Color(255, 255, 255, isSelected ? 30 : 10);
+                        break;
+                }
+
+                g2d.setColor(fillCol);
+                g2d.fillRoundRect(btnX, y, btnW, btnH, 8, 8);
+
+                if (isSelected) {
+                    g2d.setColor(Color.WHITE);
+                    g2d.setStroke(new java.awt.BasicStroke(2.0f));
+                } else {
+                    g2d.setColor(new Color(baseColor.getRed(), baseColor.getGreen(), baseColor.getBlue(), 80));
+                    g2d.setStroke(new java.awt.BasicStroke(1.0f));
+                }
+                g2d.drawRoundRect(btnX, y, btnW, btnH, 8, 8);
+                g2d.setStroke(new java.awt.BasicStroke(1.0f));
+
+                g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 15));
+                FontMetrics fmOpt = g2d.getFontMetrics();
+                int labelW = fmOpt.stringWidth(label);
+                int labelH = fmOpt.getAscent();
+                
+                if (isSelected) {
+                    g2d.setColor(Color.WHITE);
+                } else {
+                    g2d.setColor(baseColor);
+                }
+                g2d.drawString(label, btnX + (btnW - labelW) / 2, y + (btnH + labelH) / 2 - 2);
+            }
+        } else if (netLobbyState == NetLobbyState.HOST_WAITING) {
+            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
+            g2d.setColor(Color.WHITE);
+            String waitText = com.tetris.util.LanguageManager.get("正在等待對手連線...", "Waiting for opponent...");
+            int waitW = g2d.getFontMetrics().stringWidth(waitText);
+            g2d.drawString(waitText, cardX + (cardW - waitW) / 2, cardY + 60);
+
+            // Get local IP
+            String ip = com.tetris.util.NetworkManager.getInstance().getLocalIPAddress();
+            g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 15));
+            g2d.setColor(new Color(0, 255, 255));
+            String ipText = com.tetris.util.LanguageManager.get("您的本機 IP Address: ", "Your IP Address: ") + ip;
+            int ipW = g2d.getFontMetrics().stringWidth(ipText);
+            g2d.drawString(ipText, cardX + (cardW - ipW) / 2, cardY + 110);
+
+            String portText = com.tetris.util.LanguageManager.get("連接埠 (Port): ", "Port: ") + "5005";
+            int portW = g2d.getFontMetrics().stringWidth(portText);
+            g2d.drawString(portText, cardX + (cardW - portW) / 2, cardY + 140);
+
+            // Draw CANCEL button
+            drawLobbyCancelButton(g2d, cardX, cardY, cardW);
+        } else if (netLobbyState == NetLobbyState.JOIN_CONNECTING) {
+            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
+            g2d.setColor(Color.WHITE);
+            String connText = com.tetris.util.LanguageManager.get("正在建立連線...", "Connecting to opponent...");
+            int connW = g2d.getFontMetrics().stringWidth(connText);
+            g2d.drawString(connText, cardX + (cardW - connW) / 2, cardY + 80);
+
+            g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 14));
+            g2d.setColor(new Color(255, 100, 255));
+            String tipText = com.tetris.util.LanguageManager.get("請稍候...", "Please wait...");
+            int tipW = g2d.getFontMetrics().stringWidth(tipText);
+            g2d.drawString(tipText, cardX + (cardW - tipW) / 2, cardY + 120);
+
+            // Draw CANCEL button
+            drawLobbyCancelButton(g2d, cardX, cardY, cardW);
+        }
+    }
+
+    private void drawLobbyCancelButton(Graphics2D g2d, int cardX, int cardY, int cardW) {
+        int btnW = 200;
+        int btnH = 36;
+        int btnX = cardX + (cardW - btnW) / 2;
+        int btnY = cardY + 230;
+
+        if (lobbyOptionBounds[2] == null) lobbyOptionBounds[2] = new Rectangle(btnX, btnY, btnW, btnH); else lobbyOptionBounds[2].setBounds(btnX, btnY, btnW, btnH);
+
+        g2d.setColor(new Color(255, 100, 100, 30));
+        g2d.fillRoundRect(btnX, btnY, btnW, btnH, 8, 8);
+
+        g2d.setColor(new Color(255, 100, 100, 100));
+        g2d.drawRoundRect(btnX, btnY, btnW, btnH, 8, 8);
+
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 14));
+        String cancelStr = com.tetris.util.LanguageManager.get("取消並返回 (Cancel)", "Cancel");
+        int labelW = g2d.getFontMetrics().stringWidth(cancelStr);
+        int labelH = g2d.getFontMetrics().getAscent();
+        g2d.setColor(new Color(255, 100, 100));
+        g2d.drawString(cancelStr, btnX + (btnW - labelW) / 2, btnY + (btnH + labelH) / 2 - 2);
     }
 }
