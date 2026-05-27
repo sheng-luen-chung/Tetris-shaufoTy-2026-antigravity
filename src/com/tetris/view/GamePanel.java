@@ -1945,7 +1945,9 @@ public class GamePanel extends JPanel {
 
             int padX = (hasSave && i == 0) ? 26 : 20;
             int padY = (hasSave && i == 0) ? 7 : 5;
-            if (menuOptionBounds[i] == null) menuOptionBounds[i] = new Rectangle(x - padX, y - textHeight + padY, textWidth + padX * 2, textHeight + padY * 2); else menuOptionBounds[i].setBounds(x - padX, y - textHeight + padY, textWidth + padX * 2, textHeight + padY * 2);
+            int boxHeight = fm.getAscent() + fm.getDescent() + padY * 2;
+            int boxY = y - fm.getAscent() - padY;
+            if (menuOptionBounds[i] == null) menuOptionBounds[i] = new Rectangle(x - padX, boxY, textWidth + padX * 2, boxHeight); else menuOptionBounds[i].setBounds(x - padX, boxY, textWidth + padX * 2, boxHeight);
 
             boolean isSelected = (i == selectedMenuIndex);
             if (isSelected) {
@@ -1961,8 +1963,9 @@ public class GamePanel extends JPanel {
                 g2d.drawString(label, x, y);
 
                 int sqSize = 8;
-                g2d.fillRect(menuOptionBounds[i].x + 6, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
-                g2d.fillRect(menuOptionBounds[i].x + menuOptionBounds[i].width - 14, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
+                int sqY = menuOptionBounds[i].y + (menuOptionBounds[i].height - sqSize) / 2;
+                g2d.fillRect(menuOptionBounds[i].x + 6, sqY, sqSize, sqSize);
+                g2d.fillRect(menuOptionBounds[i].x + menuOptionBounds[i].width - 14, sqY, sqSize, sqSize);
             } else {
                 g2d.setFont(useFont);
                 if (hasSave && i == 0) {
@@ -5226,7 +5229,10 @@ public class GamePanel extends JPanel {
             int x = baseX; // left-align within the centered block
             int y = startY + i * gap;
 
-            if (tutorialOptionBounds[i] == null) tutorialOptionBounds[i] = new Rectangle(x - 20, y - textHeight + 5, maxWidth + 40, textHeight + 14); else tutorialOptionBounds[i].setBounds(x - 20, y - textHeight + 5, maxWidth + 40, textHeight + 14);
+            int padY = 6;
+            int boxHeight = fmOpt.getAscent() + fmOpt.getDescent() + padY * 2;
+            int boxY = y - fmOpt.getAscent() - padY;
+            if (tutorialOptionBounds[i] == null) tutorialOptionBounds[i] = new Rectangle(x - 20, boxY, maxWidth + 40, boxHeight); else tutorialOptionBounds[i].setBounds(x - 20, boxY, maxWidth + 40, boxHeight);
 
             boolean isSelected = (i == selectedTutorialIndex);
             boolean isReturn = (i == levels.length - 1);
@@ -5252,8 +5258,9 @@ public class GamePanel extends JPanel {
                 } else {
                     g2d.drawString(levels[i], x, y);
                     int sqSize = 8;
-                    g2d.fillRect(tutorialOptionBounds[i].x + 6, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
-                    g2d.fillRect(tutorialOptionBounds[i].x + tutorialOptionBounds[i].width - 14, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
+                    int sqY = tutorialOptionBounds[i].y + (tutorialOptionBounds[i].height - sqSize) / 2;
+                    g2d.fillRect(tutorialOptionBounds[i].x + 6, sqY, sqSize, sqSize);
+                    g2d.fillRect(tutorialOptionBounds[i].x + tutorialOptionBounds[i].width - 14, sqY, sqSize, sqSize);
                 }
             } else {
                 g2d.setColor(new Color(150, 150, 180));
