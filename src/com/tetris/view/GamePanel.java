@@ -2178,6 +2178,9 @@ public class GamePanel extends JPanel {
         } else if (selectedLeaderboardMode == GameMode.SURVIVAL) {
             g2d.drawString(com.tetris.util.LanguageManager.get("時間", "TIME"), 205, headerY);
             g2d.drawString(com.tetris.util.LanguageManager.get("分數", "SCORE"), 295, headerY);
+        } else if (selectedLeaderboardMode == GameMode.STAGE) {
+            g2d.drawString(com.tetris.util.LanguageManager.get("分數", "SCORE"), 205, headerY);
+            g2d.drawString(com.tetris.util.LanguageManager.get("關卡", "STAGE"), 295, headerY);
         } else {
             g2d.drawString(com.tetris.util.LanguageManager.get("分數", "SCORE"), 205, headerY);
             g2d.drawString(com.tetris.util.LanguageManager.get("難度", "DIFF"), 295, headerY);
@@ -2257,6 +2260,11 @@ public class GamePanel extends JPanel {
                         String timeVal = String.format("%02d:%02d", sec / 60, sec % 60);
                         g2d.drawString(timeVal, 205, y);
                         g2d.drawString(String.format("%,d", entry.getScore()), 295, y);
+                    } else if (selectedLeaderboardMode == GameMode.STAGE) {
+                        g2d.drawString(String.format("%,d", entry.getScore()), 205, y);
+                        int stg = (entry.getScore() / 1000) + 1;
+                        String stgDisp = com.tetris.util.LanguageManager.get("第 " + stg + " 關", "Stage " + stg);
+                        g2d.drawString(stgDisp, 295, y);
                     } else {
                         g2d.drawString(String.format("%,d", entry.getScore()), 205, y);
                         String diffDisp;
@@ -3297,25 +3305,15 @@ public class GamePanel extends JPanel {
             g.setColor(Color.WHITE);
         }
 
-        // Draw Stage Mode Current Speed/Delay
-        if (targetEngine.getGameMode() == GameMode.STAGE) {
-            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 12));
-            g.setColor(new Color(255, 105, 180)); // Pink
-            int stageNum = targetEngine.getStageLevel();
-            int fallDelay = targetEngine.getFallDelayMs();
-            String stageText = "Stage: " + stageNum + " (" + fallDelay + " ms)";
-            g.drawString(stageText, startX + 20, 150);
-            g.setColor(Color.WHITE);
-        }
-
         // Draw Difficulty or STAGE status
         g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 18));
         if (targetEngine.getGameMode() == GameMode.STAGE) {
-            g.drawString(com.tetris.util.LanguageManager.get("關卡狀態", "STAGE status"), startX + 20, 170);
+            g.drawString(com.tetris.util.LanguageManager.get("關卡狀態", "Stage Status"), startX + 20, 170);
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 20));
-            int nextGoal = targetEngine.getStageLevel() * 1000;
-            String goalStr = com.tetris.util.LanguageManager.get("下一關: ", "Next: ") + nextGoal;
-            g.drawString(goalStr, startX + 20, 195);
+            int stageNum = targetEngine.getStageLevel();
+            int fallDelay = targetEngine.getFallDelayMs();
+            String stageText = "Stage: " + stageNum + " (" + fallDelay + " ms)";
+            g.drawString(stageText, startX + 20, 195);
         } else if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
             g.drawString(com.tetris.util.LanguageManager.get("遊戲難度", "Difficulty"), startX + 20, 170);
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
@@ -3587,11 +3585,17 @@ public class GamePanel extends JPanel {
             }
 
             g.setColor(new Color(240, 240, 240));
-            String diffDisp = com.tetris.util.LanguageManager.get("中等", "Medium");
-            if ("EASY".equalsIgnoreCase(entry.getDifficulty())) {
-                diffDisp = com.tetris.util.LanguageManager.get("簡單", "Easy");
-            } else if ("HARD".equalsIgnoreCase(entry.getDifficulty())) {
-                diffDisp = com.tetris.util.LanguageManager.get("困難", "Hard");
+            String diffDisp;
+            if (gameEngine.getGameMode() == GameMode.STAGE) {
+                int stg = (entry.getScore() / 1000) + 1;
+                diffDisp = com.tetris.util.LanguageManager.get("第 " + stg + " 關", "Stage " + stg);
+            } else {
+                diffDisp = com.tetris.util.LanguageManager.get("中等", "Medium");
+                if ("EASY".equalsIgnoreCase(entry.getDifficulty())) {
+                    diffDisp = com.tetris.util.LanguageManager.get("簡單", "Easy");
+                } else if ("HARD".equalsIgnoreCase(entry.getDifficulty())) {
+                    diffDisp = com.tetris.util.LanguageManager.get("困難", "Hard");
+                }
             }
             String text = String.format("%d. %d" + com.tetris.util.LanguageManager.get(" 分", " pts") + " | %s", rank, entry.getScore(), diffDisp);
             g.drawString(text, x, lineY);
