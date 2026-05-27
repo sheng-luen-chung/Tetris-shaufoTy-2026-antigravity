@@ -1875,66 +1875,101 @@ public class GamePanel extends JPanel {
         int subX = (getWidth() - g2d.getFontMetrics().stringWidth(subtitle)) / 2;
         g2d.drawString(subtitle, subX, 155);
 
-        // Options
+        // Options (single ordered list)
         boolean hasSave = com.tetris.util.SaveManager.hasSave();
         int numOptions = hasSave ? 8 : 7;
-        // Use a consistent start Y to avoid overlapping the animated title/subtitle
-        int startY = 205;
         int gap = 38;
-        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 20));
+        // Compute dynamic top/bottom bounds so options block is truly centered
+        // Measure subtitle and hint fonts to derive the available vertical area.
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 13));
+        FontMetrics fmSubtitle = g2d.getFontMetrics();
+        int subtitleBaseline = 155; // subtitle is drawn at y=155 above
+        int contentTop = subtitleBaseline + fmSubtitle.getHeight() + 6; // a small padding below subtitle
+
+        g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 12));
+        FontMetrics fmHint = g2d.getFontMetrics();
+        int hintBaseline = 530; // first hint is drawn at y=530 below
+        int contentBottom = hintBaseline - fmHint.getHeight() - 8; // a small padding above hints
+
+        // Compute block height including text height so visual centering accounts for box tops/bottoms
+        Font defaultOptionFont = getCachedFont("SansSerif", Font.BOLD, 20);
+        g2d.setFont(defaultOptionFont);
         FontMetrics fmOption = g2d.getFontMetrics();
+        int textHeightSample = fmOption.getHeight();
+        int totalSpan = (numOptions - 1) * gap; // vertical span between first and last option baselines
+
+        int blockHeight = totalSpan + textHeightSample; // from top of first box to baseline of last + descent
+        int available = Math.max(0, contentBottom - contentTop);
+        int topOfBlock = contentTop + Math.max(0, (available - blockHeight) / 2);
+
+        // first option padY may differ (Continue uses larger pad), compute accordingly
+        int firstPadY = (hasSave) ? 7 : 5;
+        // baseline y for first option so that its box top equals topOfBlock
+        int startY = topOfBlock + textHeightSample - firstPadY;
 
         for (int i = 0; i < numOptions; i++) {
             String label = "";
             if (hasSave) {
                 switch (i) {
-                    case 0: label = com.tetris.util.LanguageManager.get("繼續上一局", "Continue"); break;
-                    case 1: label = com.tetris.util.LanguageManager.get("開始新遊戲", "New Game"); break;
-                    case 2: label = com.tetris.util.LanguageManager.get("教學與新手引導", "Tutorial & Guide"); break;
-                    case 3: label = com.tetris.util.LanguageManager.get("AI 自動遊玩演示", "AI Demo"); break;
-                    case 4: label = com.tetris.util.LanguageManager.get("遊戲設定", "Settings"); break;
-                    case 5: label = com.tetris.util.LanguageManager.get("成就與說明", "Achievements & Help"); break;
-                    case 6: label = com.tetris.util.LanguageManager.get("高分排行榜", "Leaderboard"); break;
-                    case 7: label = com.tetris.util.LanguageManager.get("結束遊戲", "Exit Game"); break;
+                    case 0: label = com.tetris.util.LanguageManager.get("🔁 繼續上一局", "🔁 Continue"); break;
+                    case 1: label = com.tetris.util.LanguageManager.get("🆕 開始新遊戲", "🆕 New Game"); break;
+                    case 2: label = com.tetris.util.LanguageManager.get("📘 教學", "📘 Tutorial"); break;
+                    case 3: label = com.tetris.util.LanguageManager.get("🤖 AI 自動遊玩演示", "🤖 AI Demo"); break;
+                    case 4: label = com.tetris.util.LanguageManager.get("⚙️ 遊戲設定", "⚙️ Settings"); break;
+                    case 5: label = com.tetris.util.LanguageManager.get("🏆 成就", "🏆 Achievements"); break;
+                    case 6: label = com.tetris.util.LanguageManager.get("📈 高分排行榜", "📈 Leaderboard"); break;
+                    case 7: label = com.tetris.util.LanguageManager.get("❌ 結束遊戲", "❌ Exit Game"); break;
                 }
             } else {
                 switch (i) {
-                    case 0: label = com.tetris.util.LanguageManager.get("開始新遊戲", "New Game"); break;
-                    case 1: label = com.tetris.util.LanguageManager.get("教學與新手引導", "Tutorial & Guide"); break;
-                    case 2: label = com.tetris.util.LanguageManager.get("AI 自動遊玩演示", "AI Demo"); break;
-                    case 3: label = com.tetris.util.LanguageManager.get("遊戲設定", "Settings"); break;
-                    case 4: label = com.tetris.util.LanguageManager.get("成就與說明", "Achievements & Help"); break;
-                    case 5: label = com.tetris.util.LanguageManager.get("高分排行榜", "Leaderboard"); break;
-                    case 6: label = com.tetris.util.LanguageManager.get("結束遊戲", "Exit Game"); break;
+                    case 0: label = com.tetris.util.LanguageManager.get("🆕 開始新遊戲", "🆕 New Game"); break;
+                    case 1: label = com.tetris.util.LanguageManager.get("📘 教學", "📘 Tutorial"); break;
+                    case 2: label = com.tetris.util.LanguageManager.get("🤖 AI 自動遊玩演示", "🤖 AI Demo"); break;
+                    case 3: label = com.tetris.util.LanguageManager.get("⚙️ 遊戲設定", "⚙️ Settings"); break;
+                    case 4: label = com.tetris.util.LanguageManager.get("🏆 成就", "🏆 Achievements"); break;
+                    case 5: label = com.tetris.util.LanguageManager.get("📈 高分排行榜", "📈 Leaderboard"); break;
+                    case 6: label = com.tetris.util.LanguageManager.get("❌ 結束遊戲", "❌ Exit Game"); break;
                 }
             }
 
-            int textWidth = fmOption.stringWidth(label);
-            int textHeight = fmOption.getHeight();
+            // Choose font (single size for all; Continue will only be color-highlighted)
+            Font useFont = defaultOptionFont;
+            g2d.setFont(useFont);
+            FontMetrics fm = g2d.getFontMetrics();
+            java.awt.font.FontRenderContext frc = g2d.getFontRenderContext();
+            float textWidthF = new java.awt.font.TextLayout(label, g2d.getFont(), frc).getAdvance();
+            int textWidth = (int) Math.round(textWidthF);
+            int textHeight = fm.getHeight();
             int x = (getWidth() - textWidth) / 2;
             int y = startY + i * gap;
 
-            if (menuOptionBounds[i] == null) menuOptionBounds[i] = new Rectangle(x - 20, y - textHeight + 5, textWidth + 40, textHeight + 10); else menuOptionBounds[i].setBounds(x - 20, y - textHeight + 5, textWidth + 40, textHeight + 10);
+            int padX = (hasSave && i == 0) ? 26 : 20;
+            int padY = (hasSave && i == 0) ? 7 : 5;
+            if (menuOptionBounds[i] == null) menuOptionBounds[i] = new Rectangle(x - padX, y - textHeight + padY, textWidth + padX * 2, textHeight + padY * 2); else menuOptionBounds[i].setBounds(x - padX, y - textHeight + padY, textWidth + padX * 2, textHeight + padY * 2);
 
             boolean isSelected = (i == selectedMenuIndex);
             if (isSelected) {
-                // Background highlight box
-                g2d.setColor(new Color(0, 255, 255, 35));
-                g2d.fillRoundRect(menuOptionBounds[i].x, menuOptionBounds[i].y, menuOptionBounds[i].width, menuOptionBounds[i].height, 10, 10);
+                int arc = (hasSave && i == 0) ? 14 : 10;
+                g2d.setColor(new Color(0, 255, 255, 50));
+                g2d.fillRoundRect(menuOptionBounds[i].x, menuOptionBounds[i].y, menuOptionBounds[i].width, menuOptionBounds[i].height, arc, arc);
                 g2d.setColor(new Color(0, 255, 255));
-                g2d.drawRoundRect(menuOptionBounds[i].x, menuOptionBounds[i].y, menuOptionBounds[i].width, menuOptionBounds[i].height, 10, 10);
+                g2d.drawRoundRect(menuOptionBounds[i].x, menuOptionBounds[i].y, menuOptionBounds[i].width, menuOptionBounds[i].height, arc, arc);
 
-                // Highlighted text
+                // Draw text (use color highlight; no larger font for Continue)
+                g2d.setFont(useFont);
                 g2d.setColor(Color.WHITE);
                 g2d.drawString(label, x, y);
 
-                // Small neon block indicators on both sides
                 int sqSize = 8;
                 g2d.fillRect(menuOptionBounds[i].x + 6, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
                 g2d.fillRect(menuOptionBounds[i].x + menuOptionBounds[i].width - 14, y - textHeight/2 - sqSize/2 + 2, sqSize, sqSize);
             } else {
-                // Dim/inactive text
-                g2d.setColor(new Color(150, 150, 180));
+                g2d.setFont(useFont);
+                if (hasSave && i == 0) {
+                    g2d.setColor(new Color(255, 200, 80)); // keep Continue a bit warmer
+                } else {
+                    g2d.setColor(new Color(150, 150, 180));
+                }
                 g2d.drawString(label, x, y);
             }
         }
@@ -5154,7 +5189,7 @@ public class GamePanel extends JPanel {
         String titleFontName = (com.tetris.util.LanguageManager.getCurrentLanguage() == com.tetris.util.LanguageManager.Language.ZH) ? "Microsoft JhengHei" : "Impact";
         g2d.setFont(getCachedFont(titleFontName, Font.BOLD, 36));
         g2d.setColor(new Color(0, 255, 255));
-        String title = com.tetris.util.LanguageManager.get("互動教學與新手引導", "Interactive Tutorial & Guide");
+        String title = com.tetris.util.LanguageManager.get("互動教學", "Interactive Tutorial");
         FontMetrics fm = g2d.getFontMetrics();
         g2d.drawString(title, (getWidth() - fm.stringWidth(title)) / 2, 75);
 
@@ -5259,7 +5294,7 @@ public class GamePanel extends JPanel {
         String achFontName = (com.tetris.util.LanguageManager.getCurrentLanguage() == com.tetris.util.LanguageManager.Language.ZH) ? "Microsoft JhengHei" : "Impact";
         g2d.setFont(getCachedFont(achFontName, Font.BOLD, 36));
         g2d.setColor(new Color(255, 215, 0));
-        String title = com.tetris.util.LanguageManager.get("成就與說明", "Achievements & Help");
+        String title = com.tetris.util.LanguageManager.get("成就", "Achievements");
         FontMetrics fm = g2d.getFontMetrics();
         g2d.drawString(title, (getWidth() - fm.stringWidth(title)) / 2, 75);
 
