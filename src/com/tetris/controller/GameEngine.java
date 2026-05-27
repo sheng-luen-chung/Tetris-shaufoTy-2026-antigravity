@@ -1113,7 +1113,7 @@ public class GameEngine {
     public int getFallDelayMs() {
         if (gameMode == GameMode.STAGE) {
             int baseDelay = 500; // Always start at 500ms
-            // Decrease delay by 15ms every stage (each 1000 score is a new stage)
+            // Decrease delay by 15ms every stage (each 500 score is a new stage)
             int reduction = (getStageLevel() - 1) * 15;
             return Math.max(75, baseDelay - reduction);
         }
@@ -1121,7 +1121,7 @@ public class GameEngine {
     }
 
     public int getStageLevel() {
-        return (score / 1000) + 1;
+        return (score / 500) + 1;
     }
 
     // Save current game state
