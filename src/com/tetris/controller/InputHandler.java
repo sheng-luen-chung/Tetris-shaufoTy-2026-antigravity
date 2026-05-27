@@ -815,7 +815,9 @@ public class InputHandler extends KeyAdapter {
             }
 
             if (keyCode == KeyEvent.VK_A) {
-                engine.setAiPlay(!engine.isAiPlay());
+                if (!engine.isAiDemoMode()) {
+                    engine.setAiPlay(!engine.isAiPlay());
+                }
                 return;
             }
 

@@ -213,6 +213,7 @@ public class GamePanel extends JPanel {
     private boolean showDisplaySettingsInMenu = false;
     private Rectangle bgmTrackBounds = new Rectangle();
     private Rectangle sfxTrackBounds = new Rectangle();
+    private Rectangle aiSpeedTrackBounds = new Rectangle();
     private Rectangle bgmMuteBounds = new Rectangle();
     private Rectangle sfxMuteBounds = new Rectangle();
     private Rectangle menuSettingsBackButtonBounds = new Rectangle();
@@ -244,6 +245,7 @@ public class GamePanel extends JPanel {
     private int nextPiecesCount = 3;
     private boolean isDraggingBGM = false;
     private boolean isDraggingSFX = false;
+    private boolean isDraggingAiSpeed = false;
 
     // Game mode selection properties
     private boolean showModeSelectInMenu = false;
@@ -917,6 +919,11 @@ public class GamePanel extends JPanel {
                                 }
                             }
                         }
+                    } else {
+                        if (gameEngine.isAiDemoMode() && aiSpeedTrackBounds.contains(e.getPoint())) {
+                            isDraggingAiSpeed = true;
+                            updateAiSpeedFromMouse(e.getX());
+                        }
                     }
                 }
             }
@@ -928,6 +935,7 @@ public class GamePanel extends JPanel {
                 }
                 isDraggingBGM = false;
                 isDraggingSFX = false;
+                isDraggingAiSpeed = false;
             }
 
             @Override
@@ -1048,6 +1056,8 @@ public class GamePanel extends JPanel {
                     updateBGMVolumeFromMouse(e.getX());
                 } else if (isDraggingSFX) {
                     updateSFXVolumeFromMouse(e.getX());
+                } else if (isDraggingAiSpeed) {
+                    updateAiSpeedFromMouse(e.getX());
                 }
             }
         };
@@ -3329,7 +3339,32 @@ public class GamePanel extends JPanel {
 
         // Draw Difficulty or STAGE status
         g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 18));
-        if (targetEngine.getGameMode() == GameMode.STAGE) {
+        if (targetEngine.isAiDemoMode()) {
+            g.drawString(com.tetris.util.LanguageManager.get("DEMO 速度", "DEMO Speed"), startX + 20, 170);
+            double multiplier = targetEngine.getAiDemoDelayMultiplier();
+            double pct = (3.0 - multiplier) / 2.95;
+            if (pct < 0.0) pct = 0.0;
+            if (pct > 1.0) pct = 1.0;
+            double speedVal = 1.0 / multiplier;
+            String speedText = String.format("%.1fx", speedVal);
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
+            int textW = g.getFontMetrics().stringWidth(speedText);
+            g.drawString(speedText, startX + 180 - textW, 199);
+            
+            aiSpeedTrackBounds.setBounds(startX + 20, 191, 100, 8);
+            g2d.setColor(new Color(60, 60, 60));
+            g2d.fillRoundRect(aiSpeedTrackBounds.x, aiSpeedTrackBounds.y, aiSpeedTrackBounds.width, aiSpeedTrackBounds.height, 4, 4);
+            
+            int thumbX = (int) (aiSpeedTrackBounds.x + pct * aiSpeedTrackBounds.width);
+            int thumbY = aiSpeedTrackBounds.y + aiSpeedTrackBounds.height / 2;
+            g2d.setColor(new Color(0, 255, 255));
+            g2d.fillRoundRect(aiSpeedTrackBounds.x, aiSpeedTrackBounds.y, thumbX - aiSpeedTrackBounds.x, aiSpeedTrackBounds.height, 4, 4);
+            
+            g2d.setColor(Color.WHITE);
+            g2d.fillOval(thumbX - 6, thumbY - 6, 12, 12);
+            g2d.setColor(Color.GRAY);
+            g2d.drawOval(thumbX - 6, thumbY - 6, 12, 12);
+        } else if (targetEngine.getGameMode() == GameMode.STAGE) {
             g.drawString(com.tetris.util.LanguageManager.get("關卡狀態", "Stage"), startX + 20, 170);
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
             int stageNum = targetEngine.getStageLevel();
@@ -3505,7 +3540,11 @@ public class GamePanel extends JPanel {
                 g2d.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 10));
                 g2d.setColor(new Color(185, 175, 200));
                 g2d.drawString(com.tetris.util.LanguageManager.get("AI 正在替您遊玩遊戲中", "AI is currently playing for you"), aiX + 15, aiY + 44);
-                g2d.drawString(com.tetris.util.LanguageManager.get("按 [A] 鍵切換回手動操作", "Press [A] to switch back to manual"), aiX + 15, aiY + 59);
+                if (!targetEngine.isAiDemoMode()) {
+                    g2d.drawString(com.tetris.util.LanguageManager.get("按 [A] 鍵切換回手動操作", "Press [A] to switch back to manual"), aiX + 15, aiY + 59);
+                } else {
+                    g2d.drawString(com.tetris.util.LanguageManager.get("可於上方調整 Demo 速度", "Adjust Demo speed above"), aiX + 15, aiY + 59);
+                }
             } else if (targetEngine.hasUsedAiThisSession()) {
                 int warnX = startX + 15;
                 int warnW = 170;
@@ -4328,6 +4367,15 @@ public class GamePanel extends JPanel {
         if (pct < 0f) pct = 0f;
         if (pct > 1f) pct = 1f;
         com.tetris.util.SoundManager.setSFXVolume(pct);
+        repaint();
+    }
+
+    private void updateAiSpeedFromMouse(int mouseX) {
+        double pct = (mouseX - aiSpeedTrackBounds.x) / (double) aiSpeedTrackBounds.width;
+        if (pct < 0.0) pct = 0.0;
+        if (pct > 1.0) pct = 1.0;
+        double multiplier = 3.0 - pct * 2.95;
+        gameEngine.setAiDemoDelayMultiplier(multiplier);
         repaint();
     }
 

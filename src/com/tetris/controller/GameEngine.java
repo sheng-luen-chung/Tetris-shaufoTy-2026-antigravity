@@ -1713,6 +1713,14 @@ public class GameEngine {
         }
     }
 
+    public boolean isAiDemoMode() {
+        return aiDemoMode;
+    }
+
+    public double getAiDemoDelayMultiplier() {
+        return aiDemoDelayMultiplier;
+    }
+
     public void setAiDemoDelayMultiplier(double multiplier) {
         if (Double.isNaN(multiplier) || Double.isInfinite(multiplier) || multiplier <= 0.0) {
             return;
@@ -1731,7 +1739,7 @@ public class GameEngine {
         }
 
         if (aiDemoMode) {
-            return Math.max(120, (int) Math.round(baseDelay * aiDemoDelayMultiplier));
+            return Math.max(20, (int) Math.round(baseDelay * aiDemoDelayMultiplier));
         }
 
         return baseDelay;
