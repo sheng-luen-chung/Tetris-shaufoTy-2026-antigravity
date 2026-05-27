@@ -5,6 +5,8 @@ public enum GameMode {
     SPRINT,
     ULTRA,
     SURVIVAL,
+    STAGE,
     PVP,
     VS_AI
 }
+

@@ -290,7 +290,7 @@ public class GameEngine {
             if (!isGameOver && !isPaused && !isTransitioning) {
                 // Gravity
                 gravityAccumulator += dt;
-                if (gravityAccumulator >= difficulty.getFallDelayMs()) {
+                if (gravityAccumulator >= getFallDelayMs()) {
                     gravityAccumulator = 0;
                     update();
                 }
@@ -1109,9 +1109,24 @@ public class GameEngine {
         }
     }
 
+    // Get current fall delay in ms (incorporates STAGE mode dynamic speed up)
+    public int getFallDelayMs() {
+        if (gameMode == GameMode.STAGE) {
+            int baseDelay = 500; // Always start at 500ms
+            // Decrease delay by 15ms every stage (each 1000 score is a new stage)
+            int reduction = (getStageLevel() - 1) * 15;
+            return Math.max(75, baseDelay - reduction);
+        }
+        return difficulty.getFallDelayMs();
+    }
+
+    public int getStageLevel() {
+        return (score / 1000) + 1;
+    }
+
     // Save current game state
     public void saveGame() {
-        if (gameState != GameState.PLAYING || isGameOver || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL || gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) {
+        if (gameState != GameState.PLAYING || isGameOver || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL || gameMode == GameMode.STAGE || gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) {
             return;
         }
         SaveManager.save(score, secondsElapsed, difficulty, canHoldThisTurn, currentPiece, nextPiece, heldPiece, board,

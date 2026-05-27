@@ -75,6 +75,8 @@ public class LeaderboardManager {
                 prefix = "leaderboard_global_ultra_";
             } else if (mode == GameMode.SURVIVAL) {
                 prefix = "leaderboard_global_survival_";
+            } else if (mode == GameMode.STAGE) {
+                prefix = "leaderboard_global_stage_";
             } else {
                 prefix = "leaderboard_global_";
             }
@@ -85,6 +87,8 @@ public class LeaderboardManager {
                 prefix = "leaderboard_ultra_";
             } else if (mode == GameMode.SURVIVAL) {
                 prefix = "leaderboard_survival_";
+            } else if (mode == GameMode.STAGE) {
+                prefix = "leaderboard_stage_";
             } else {
                 prefix = "leaderboard_";
             }
@@ -205,6 +209,9 @@ public class LeaderboardManager {
             } else if (mode == GameMode.SURVIVAL) {
                 seconds = baseTime - i * 20 + rand.nextInt(5);
                 if (seconds < 10) seconds = 10;
+            } else if (mode == GameMode.STAGE) {
+                seconds = baseTime - i * 15 + rand.nextInt(5);
+                if (seconds < 20) seconds = 20;
             }
             
             entries.add(new LeaderboardEntry(

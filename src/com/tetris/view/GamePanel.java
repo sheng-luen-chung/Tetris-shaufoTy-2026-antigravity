@@ -248,7 +248,7 @@ public class GamePanel extends JPanel {
     // Game mode selection properties
     private boolean showModeSelectInMenu = false;
     private int selectedModeIndex = 0; // Normal: 0-6, AI demo: 0-4
-    private final Rectangle[] modeOptionBounds = new Rectangle[7];
+    private final Rectangle[] modeOptionBounds = new Rectangle[8];
     private boolean isSelectingModeForAiDemo = false;
     private boolean showVsAiControlsPrompt = false;
 
@@ -265,7 +265,7 @@ public class GamePanel extends JPanel {
     private com.tetris.controller.GameEngine.Difficulty selectedLeaderboardDifficulty = com.tetris.controller.GameEngine.Difficulty.NORMAL;
     private final Rectangle[] leaderboardTabBounds = new Rectangle[3];
     private GameMode selectedLeaderboardMode = GameMode.ENDLESS;
-    private final Rectangle[] leaderboardModeTabBounds = new Rectangle[4];
+    private final Rectangle[] leaderboardModeTabBounds = new Rectangle[5];
 
     private static class FloatingPiece {
         int typeIndex;
@@ -745,7 +745,7 @@ public class GamePanel extends JPanel {
                             repaint();
                         }
                     } else if (showModeSelectInMenu) {
-                        int numModes = isSelectingModeForAiDemo ? 5 : 7;
+                        int numModes = isSelectingModeForAiDemo ? 6 : 8;
                         for (int i = 0; i < numModes; i++) {
                             if (modeOptionBounds[i] != null && modeOptionBounds[i].contains(e.getPoint())) {
                                 selectedModeIndex = i;
@@ -802,8 +802,8 @@ public class GamePanel extends JPanel {
                             break;
                         }
                     }
-                    // Mode tabs (Endless vs Sprint vs Ultra vs Survival)
-                    for (int i = 0; i < 4; i++) {
+                    // Mode tabs (Endless vs Sprint vs Ultra vs Survival vs Stage)
+                    for (int i = 0; i < 5; i++) {
                         if (leaderboardModeTabBounds[i] != null && leaderboardModeTabBounds[i].contains(e.getPoint())) {
                             selectedLeaderboardMode = GameMode.values()[i];
                             if (selectedLeaderboardScope == LeaderboardScope.GLOBAL) {
@@ -963,7 +963,7 @@ public class GamePanel extends JPanel {
                         }
                         repaint();
                     } else if (showModeSelectInMenu) {
-                        int numModes = isSelectingModeForAiDemo ? 5 : 7;
+                        int numModes = isSelectingModeForAiDemo ? 6 : 8;
                         for (int i = 0; i < numModes; i++) {
                             if (modeOptionBounds[i] != null && modeOptionBounds[i].contains(e.getPoint())) {
                                 if (selectedModeIndex != i) {
@@ -1479,7 +1479,7 @@ public class GamePanel extends JPanel {
         if (showDifficultySelectInMenu) {
             selectedDifficultyIndex = (selectedDifficultyIndex + dir + 4) % 4;
         } else if (showModeSelectInMenu) {
-            int numModes = isSelectingModeForAiDemo ? 5 : 7;
+            int numModes = isSelectingModeForAiDemo ? 6 : 8;
             selectedModeIndex = (selectedModeIndex + dir + numModes) % numModes;
         } else {
             int numOptions = com.tetris.util.SaveManager.hasSave() ? 8 : 7;
@@ -1648,6 +1648,10 @@ public class GamePanel extends JPanel {
                     this.startAiDemo();
                     break;
                 case 4:
+                    this.gameEngine.setGameMode(GameMode.STAGE);
+                    this.startAiDemo();
+                    break;
+                case 5:
                     this.showModeSelectInMenu = false;
                     this.isSelectingModeForAiDemo = false;
                     this.selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 3 : 2;
@@ -1680,17 +1684,23 @@ public class GamePanel extends JPanel {
                     this.selectedDifficultyIndex = 1;
                     break;
                 case 4:
+                    this.gameEngine.setGameMode(GameMode.STAGE);
+                    this.gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
+                    this.showModeSelectInMenu = false;
+                    this.gameEngine.startGame();
+                    break;
+                case 5:
                     this.gameEngine.setGameMode(GameMode.VS_AI);
                     this.showModeSelectInMenu = false;
                     this.showDifficultySelectInMenu = true;
                     this.selectedDifficultyIndex = 1;
                     break;
-                case 5:
+                case 6:
                     this.gameEngine.setGameMode(GameMode.PVP);
                     this.showModeSelectInMenu = false;
                     this.gameEngine.startGame();
                     break;
-                case 6:
+                case 7:
                 default:
                     this.showModeSelectInMenu = false;
                     this.selectedMenuIndex = com.tetris.util.SaveManager.hasSave() ? 1 : 0;
@@ -1726,6 +1736,12 @@ public class GamePanel extends JPanel {
                     selectedModeIndex = 2;
                 } else if (gameEngine.getGameMode() == GameMode.SURVIVAL) {
                     selectedModeIndex = 3;
+                } else if (gameEngine.getGameMode() == GameMode.STAGE) {
+                    selectedModeIndex = 4;
+                } else if (gameEngine.getGameMode() == GameMode.VS_AI) {
+                    selectedModeIndex = 5;
+                } else if (gameEngine.getGameMode() == GameMode.PVP) {
+                    selectedModeIndex = 6;
                 } else {
                     selectedModeIndex = 0;
                 }
@@ -2055,15 +2071,15 @@ public class GamePanel extends JPanel {
             g2d.drawString(scopeLabel, x + (scopeTabW - labelW) / 2, scopeTabY + (scopeTabH + labelH) / 2 - 2);
         }
 
-        // Draw Mode Tabs (Endless vs Sprint vs Ultra vs Survival)
-        int modeTabW = 75;
+        // Draw Mode Tabs (Endless vs Sprint vs Ultra vs Survival vs Stage)
+        int modeTabW = 60;
         int modeTabH = 26;
-        int modeTabGap = 8;
+        int modeTabGap = 6;
         int totalModeW = 324;
         int startModeX = (getWidth() - totalModeW) / 2;
         int modeTabY = 122;
         
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 5; i++) {
             int x = startModeX + i * (modeTabW + modeTabGap);
             if (leaderboardModeTabBounds[i] == null) leaderboardModeTabBounds[i] = new Rectangle(x, modeTabY, modeTabW, modeTabH); else leaderboardModeTabBounds[i].setBounds(x, modeTabY, modeTabW, modeTabH);
             
@@ -2071,10 +2087,12 @@ public class GamePanel extends JPanel {
             boolean isSelected = (selectedLeaderboardMode == tabMode);
             boolean isHovered = (mousePos != null && leaderboardModeTabBounds[i].contains(mousePos));
             
+            Color glowColor = (tabMode == GameMode.STAGE) ? new Color(255, 105, 180) : new Color(255, 100, 255);
+            
             if (isSelected) {
-                g2d.setColor(new Color(255, 100, 255, 55)); // Neon purple/pink glow
+                g2d.setColor(new Color(glowColor.getRed(), glowColor.getGreen(), glowColor.getBlue(), 55)); // Neon purple/pink glow
                 g2d.fillRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
-                g2d.setColor(new Color(255, 100, 255));
+                g2d.setColor(glowColor);
                 g2d.drawRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
             } else if (isHovered) {
                 g2d.setColor(new Color(255, 255, 255, 30));
@@ -2088,17 +2106,19 @@ public class GamePanel extends JPanel {
                 g2d.drawRoundRect(x, modeTabY, modeTabW, modeTabH, 8, 8);
             }
             
-            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 10));
-            g2d.setColor(isSelected ? new Color(255, 100, 255) : new Color(200, 200, 200));
+            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 9));
+            g2d.setColor(isSelected ? glowColor : new Color(200, 200, 200));
             String modeLabel;
             if (tabMode == GameMode.ENDLESS) {
                 modeLabel = "ENDLESS";
             } else if (tabMode == GameMode.SPRINT) {
-                modeLabel = "SPRINT (40L)";
+                modeLabel = "SPRINT";
             } else if (tabMode == GameMode.ULTRA) {
-                modeLabel = "ULTRA (2M)";
-            } else {
+                modeLabel = "ULTRA";
+            } else if (tabMode == GameMode.SURVIVAL) {
                 modeLabel = "SURVIVAL";
+            } else {
+                modeLabel = "STAGE";
             }
             int labelW = g2d.getFontMetrics().stringWidth(modeLabel);
             int labelH = g2d.getFontMetrics().getAscent();
@@ -2307,7 +2327,7 @@ public class GamePanel extends JPanel {
 
     public void navigateLeaderboardModes(int dir) {
         int currentIndex = selectedLeaderboardMode.ordinal();
-        int nextIndex = (currentIndex + dir + 4) % 4;
+        int nextIndex = (currentIndex + dir + 5) % 5;
         selectedLeaderboardMode = GameMode.values()[nextIndex];
         repaint();
     }
@@ -2773,7 +2793,7 @@ public class GamePanel extends JPanel {
 
         drawStatCard(g2d, col1X, row1Y, cardW, cardH, com.tetris.util.LanguageManager.get("最終分數", "Final Score"), String.format("%,d", score), new Color(255, 215, 0));
         String timeLabel;
-        if (gameEngine.getGameMode() == GameMode.SURVIVAL) {
+        if (gameEngine.getGameMode() == GameMode.SURVIVAL || gameEngine.getGameMode() == GameMode.STAGE) {
             timeLabel = com.tetris.util.LanguageManager.get("生存時間", "Survival Time");
         } else if (gameEngine.getGameMode() == GameMode.ULTRA) {
             timeLabel = com.tetris.util.LanguageManager.get("消耗時間", "Elapsed Time");
@@ -3257,7 +3277,7 @@ public class GamePanel extends JPanel {
         g.setColor(Color.WHITE); // reset color
 
         // Draw Garbage Warning Countdown for Survival Mode
-            if (targetEngine.getGameMode() == GameMode.SURVIVAL) {
+        if (targetEngine.getGameMode() == GameMode.SURVIVAL) {
             int interval = 15;
             if (targetEngine.getDifficulty() == com.tetris.controller.GameEngine.Difficulty.EASY) {
                 interval = 20;
@@ -3277,15 +3297,33 @@ public class GamePanel extends JPanel {
             g.setColor(Color.WHITE);
         }
 
-        // 3. Draw Level
+        // Draw Stage Mode Current Speed/Delay
+        if (targetEngine.getGameMode() == GameMode.STAGE) {
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 12));
+            g.setColor(new Color(255, 105, 180)); // Pink
+            int stageNum = targetEngine.getStageLevel();
+            int fallDelay = targetEngine.getFallDelayMs();
+            String stageText = "Stage: " + stageNum + " (" + fallDelay + " ms)";
+            g.drawString(stageText, startX + 20, 150);
+            g.setColor(Color.WHITE);
+        }
+
+        // Draw Difficulty or STAGE status
         g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 18));
-        g.drawString(com.tetris.util.LanguageManager.get("遊戲難度", "Difficulty"), startX + 20, 170);
-        if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+        if (targetEngine.getGameMode() == GameMode.STAGE) {
+            g.drawString(com.tetris.util.LanguageManager.get("關卡狀態", "STAGE status"), startX + 20, 170);
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 20));
+            int nextGoal = targetEngine.getStageLevel() * 1000;
+            String goalStr = com.tetris.util.LanguageManager.get("下一關: ", "Next: ") + nextGoal;
+            g.drawString(goalStr, startX + 20, 195);
+        } else if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
+            g.drawString(com.tetris.util.LanguageManager.get("遊戲難度", "Difficulty"), startX + 20, 170);
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
             g.setColor(new Color(0, 255, 255));
             String tutorialLabel = com.tetris.util.LanguageManager.get("教學", "Tutorial");
             g.drawString(tutorialLabel + " " + targetEngine.getTutorialLevel() + " / 7", startX + 20, 195);
         } else {
+            g.drawString(com.tetris.util.LanguageManager.get("遊戲難度", "Difficulty"), startX + 20, 170);
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 20));
             String diffStr = com.tetris.util.LanguageManager.get("中等", "Normal");
             switch (targetEngine.getDifficulty()) {
@@ -4304,7 +4342,7 @@ public class GamePanel extends JPanel {
         int gap = 40;
 
         java.awt.Point mousePos = getMousePosition();
-        int numModes = isSelectingModeForAiDemo ? 5 : 7;
+        int numModes = isSelectingModeForAiDemo ? 6 : 8;
 
         for (int i = 0; i < numModes; i++) {
             int y = startY + i * gap;
@@ -4322,8 +4360,8 @@ public class GamePanel extends JPanel {
             Color fillCol;
 
             int effectiveIndex = i;
-            if (isSelectingModeForAiDemo && i == 4) {
-                effectiveIndex = 6; // BACK
+            if (isSelectingModeForAiDemo && i == 5) {
+                effectiveIndex = 7; // BACK
             }
 
             switch (effectiveIndex) {
@@ -4352,18 +4390,24 @@ public class GamePanel extends JPanel {
                     fillCol = new Color(255, 140, 0, isSelected ? 45 : 20);
                     break;
                 case 4:
+                    label = com.tetris.util.LanguageManager.get("漸進加速模式 (STAGE)", "Speed Run Mode (STAGE)");
+                    baseColor = new Color(255, 105, 180);
+                    selectColor = Color.WHITE;
+                    fillCol = new Color(255, 105, 180, isSelected ? 45 : 20);
+                    break;
+                case 5:
                     label = com.tetris.util.LanguageManager.get("與 AI 對戰模式 (VS AI)", "VS AI Battle (VS AI)");
                     baseColor = new Color(180, 100, 255);
                     selectColor = Color.WHITE;
                     fillCol = new Color(180, 100, 255, isSelected ? 45 : 20);
                     break;
-                case 5:
+                case 6:
                     label = com.tetris.util.LanguageManager.get("雙人對戰模式 (PVP)", "Local PVP Battle (PVP)");
                     baseColor = new Color(255, 60, 60);
                     selectColor = Color.WHITE;
                     fillCol = new Color(255, 60, 60, isSelected ? 45 : 20);
                     break;
-                case 6:
+                case 7:
                 default:
                     label = com.tetris.util.LanguageManager.get("返回", "Back");
                     baseColor = new Color(160, 160, 180);
