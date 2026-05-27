@@ -1126,7 +1126,7 @@ public class GameEngine {
 
     // Save current game state
     public void saveGame() {
-        if (gameState != GameState.PLAYING || isGameOver || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL || gameMode == GameMode.STAGE || gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) {
+        if (gameState != GameState.PLAYING || isGameOver || aiDemoMode || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL || gameMode == GameMode.STAGE || gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) {
             return;
         }
         SaveManager.save(score, secondsElapsed, difficulty, canHoldThisTurn, currentPiece, nextPiece, heldPiece, board,

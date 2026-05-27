@@ -3149,7 +3149,7 @@ public class GamePanel extends JPanel {
 
             if (System.currentTimeMillis() - lastSaveTime < 3000) {
                 g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 14));
-                boolean canSave = (gameEngine.getGameMode() == com.tetris.model.GameMode.ENDLESS);
+                boolean canSave = (gameEngine.getGameMode() == com.tetris.model.GameMode.ENDLESS && !gameEngine.isAiDemoMode());
                 String savedText = canSave
                         ? com.tetris.util.LanguageManager.get("進度已儲存！", "Saved!")
                         : com.tetris.util.LanguageManager.get("此模式不支援存檔！", "Saving not available in this mode");
@@ -3349,9 +3349,9 @@ public class GamePanel extends JPanel {
             String speedText = String.format("%.1fx", speedVal);
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
             int textW = g.getFontMetrics().stringWidth(speedText);
-            g.drawString(speedText, startX + 180 - textW, 199);
+            g.drawString(speedText, startX + 180 - textW, 201);
             
-            aiSpeedTrackBounds.setBounds(startX + 20, 191, 100, 8);
+            aiSpeedTrackBounds.setBounds(startX + 20, 193, 85, 8);
             g2d.setColor(new Color(60, 60, 60));
             g2d.fillRoundRect(aiSpeedTrackBounds.x, aiSpeedTrackBounds.y, aiSpeedTrackBounds.width, aiSpeedTrackBounds.height, 4, 4);
             
