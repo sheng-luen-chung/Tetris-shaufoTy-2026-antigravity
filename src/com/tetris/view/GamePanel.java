@@ -815,15 +815,17 @@ public class GamePanel extends JPanel {
                         }
                     }
                     // Difficulty tabs
-                    for (int i = 0; i < 3; i++) {
-                        if (leaderboardTabBounds[i] != null && leaderboardTabBounds[i].contains(e.getPoint())) {
-                            selectedLeaderboardDifficulty = com.tetris.controller.GameEngine.Difficulty.values()[i];
-                            if (selectedLeaderboardScope == LeaderboardScope.GLOBAL) {
-                                triggerGlobalLeaderboardLoad();
-                            } else {
-                                repaint();
+                    if (selectedLeaderboardMode != GameMode.STAGE) {
+                        for (int i = 0; i < 3; i++) {
+                            if (leaderboardTabBounds[i] != null && leaderboardTabBounds[i].contains(e.getPoint())) {
+                                selectedLeaderboardDifficulty = com.tetris.controller.GameEngine.Difficulty.values()[i];
+                                if (selectedLeaderboardScope == LeaderboardScope.GLOBAL) {
+                                    triggerGlobalLeaderboardLoad();
+                                } else {
+                                    repaint();
+                                }
+                                break;
                             }
-                            break;
                         }
                     }
                 } else if (state == com.tetris.controller.GameEngine.GameState.PLAYING || state == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
@@ -2126,44 +2128,46 @@ public class GamePanel extends JPanel {
         }
 
         // Draw Difficulty Tabs
-        int tabW = 85;
-        int tabH = 26;
-        int tabGap = 12;
-        int totalW = 3 * tabW + 2 * tabGap;
-        int startX = (getWidth() - totalW) / 2;
-        int tabY = 154;
-        
-        for (int i = 0; i < 3; i++) {
-            int x = startX + i * (tabW + tabGap);
-            if (leaderboardTabBounds[i] == null) leaderboardTabBounds[i] = new Rectangle(x, tabY, tabW, tabH); else leaderboardTabBounds[i].setBounds(x, tabY, tabW, tabH);
+        if (selectedLeaderboardMode != GameMode.STAGE) {
+            int tabW = 85;
+            int tabH = 26;
+            int tabGap = 12;
+            int totalW = 3 * tabW + 2 * tabGap;
+            int startX = (getWidth() - totalW) / 2;
+            int tabY = 154;
             
-            com.tetris.controller.GameEngine.Difficulty tabDiff = com.tetris.controller.GameEngine.Difficulty.values()[i];
-            boolean isSelected = (selectedLeaderboardDifficulty == tabDiff);
-            boolean isHovered = (mousePos != null && leaderboardTabBounds[i].contains(mousePos));
-            
-            if (isSelected) {
-                g2d.setColor(new Color(0, 255, 255, 55)); // Cyan glow
-                g2d.fillRoundRect(x, tabY, tabW, tabH, 8, 8);
-                g2d.setColor(new Color(0, 255, 255));
-                g2d.drawRoundRect(x, tabY, tabW, tabH, 8, 8);
-            } else if (isHovered) {
-                g2d.setColor(new Color(255, 255, 255, 30));
-                g2d.fillRoundRect(x, tabY, tabW, tabH, 8, 8);
-                g2d.setColor(new Color(255, 255, 255, 120));
-                g2d.drawRoundRect(x, tabY, tabW, tabH, 8, 8);
-            } else {
-                g2d.setColor(new Color(255, 255, 255, 10));
-                g2d.fillRoundRect(x, tabY, tabW, tabH, 8, 8);
-                g2d.setColor(new Color(255, 255, 255, 45));
-                g2d.drawRoundRect(x, tabY, tabW, tabH, 8, 8);
+            for (int i = 0; i < 3; i++) {
+                int x = startX + i * (tabW + tabGap);
+                if (leaderboardTabBounds[i] == null) leaderboardTabBounds[i] = new Rectangle(x, tabY, tabW, tabH); else leaderboardTabBounds[i].setBounds(x, tabY, tabW, tabH);
+                
+                com.tetris.controller.GameEngine.Difficulty tabDiff = com.tetris.controller.GameEngine.Difficulty.values()[i];
+                boolean isSelected = (selectedLeaderboardDifficulty == tabDiff);
+                boolean isHovered = (mousePos != null && leaderboardTabBounds[i].contains(mousePos));
+                
+                if (isSelected) {
+                    g2d.setColor(new Color(0, 255, 255, 55)); // Cyan glow
+                    g2d.fillRoundRect(x, tabY, tabW, tabH, 8, 8);
+                    g2d.setColor(new Color(0, 255, 255));
+                    g2d.drawRoundRect(x, tabY, tabW, tabH, 8, 8);
+                } else if (isHovered) {
+                    g2d.setColor(new Color(255, 255, 255, 30));
+                    g2d.fillRoundRect(x, tabY, tabW, tabH, 8, 8);
+                    g2d.setColor(new Color(255, 255, 255, 120));
+                    g2d.drawRoundRect(x, tabY, tabW, tabH, 8, 8);
+                } else {
+                    g2d.setColor(new Color(255, 255, 255, 10));
+                    g2d.fillRoundRect(x, tabY, tabW, tabH, 8, 8);
+                    g2d.setColor(new Color(255, 255, 255, 45));
+                    g2d.drawRoundRect(x, tabY, tabW, tabH, 8, 8);
+                }
+                
+                g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 11));
+                g2d.setColor(isSelected ? new Color(0, 255, 255) : new Color(200, 200, 200));
+                String tabLabel = tabDiff.getLabel();
+                int labelW = g2d.getFontMetrics().stringWidth(tabLabel);
+                int labelH = g2d.getFontMetrics().getAscent();
+                g2d.drawString(tabLabel, x + (tabW - labelW) / 2, tabY + (tabH + labelH) / 2 - 2);
             }
-            
-            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 11));
-            g2d.setColor(isSelected ? new Color(0, 255, 255) : new Color(200, 200, 200));
-            String tabLabel = tabDiff.getLabel();
-            int labelW = g2d.getFontMetrics().stringWidth(tabLabel);
-            int labelH = g2d.getFontMetrics().getAscent();
-            g2d.drawString(tabLabel, x + (tabW - labelW) / 2, tabY + (tabH + labelH) / 2 - 2);
         }
 
         // Columns headers (moved down slightly to avoid overlap with tabs)
@@ -2216,10 +2220,14 @@ public class GamePanel extends JPanel {
             g2d.setStroke(new java.awt.BasicStroke(1f));
         } else {
             List<LeaderboardEntry> entries;
+            com.tetris.controller.GameEngine.Difficulty queryDiff = (selectedLeaderboardMode == GameMode.STAGE) 
+                ? com.tetris.controller.GameEngine.Difficulty.NORMAL 
+                : selectedLeaderboardDifficulty;
+
             if (selectedLeaderboardScope == LeaderboardScope.GLOBAL) {
-                entries = gameEngine.getGlobalLeaderboardEntriesForDifficultyAndMode(selectedLeaderboardDifficulty, selectedLeaderboardMode);
+                entries = gameEngine.getGlobalLeaderboardEntriesForDifficultyAndMode(queryDiff, selectedLeaderboardMode);
             } else {
-                entries = gameEngine.getLeaderboardEntriesForDifficultyAndMode(selectedLeaderboardDifficulty, selectedLeaderboardMode);
+                entries = gameEngine.getLeaderboardEntriesForDifficultyAndMode(queryDiff, selectedLeaderboardMode);
             }
             
             g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 13));
@@ -2320,13 +2328,21 @@ public class GamePanel extends JPanel {
         // Help hints at the bottom
         g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 11));
         g2d.setColor(new Color(120, 120, 140));
-        String tabHint1 = com.tetris.util.LanguageManager.get("提示：點擊或按 ⬅ / ➡ 鍵切換難度，點擊或按 ⬆ / ⬇ 鍵切換模式", "Tip: Click or press ←/→ to change difficulty, ↑/↓ to change mode");
+        String tabHint1;
+        if (selectedLeaderboardMode == GameMode.STAGE) {
+            tabHint1 = com.tetris.util.LanguageManager.get("提示：點擊或按 ⬆ / ⬇ 鍵切換模式", "Tip: Click or press ↑/↓ to change mode");
+        } else {
+            tabHint1 = com.tetris.util.LanguageManager.get("提示：點擊或按 ⬅ / ➡ 鍵切換難度，點擊或按 ⬆ / ⬇ 鍵切換模式", "Tip: Click or press ←/→ to change difficulty, ↑/↓ to change mode");
+        }
         String tabHint2 = com.tetris.util.LanguageManager.get("提示：點擊最上方按鈕可在 本地 與 全球 排行榜之間切換", "Tip: Use the top buttons to toggle Local/Global leaderboards");
         g2d.drawString(tabHint1, (getWidth() - g2d.getFontMetrics().stringWidth(tabHint1)) / 2, 535);
         g2d.drawString(tabHint2, (getWidth() - g2d.getFontMetrics().stringWidth(tabHint2)) / 2, 555);
     }
 
     public void navigateLeaderboardTabs(int dir) {
+        if (selectedLeaderboardMode == GameMode.STAGE) {
+            return;
+        }
         int currentIndex = selectedLeaderboardDifficulty.ordinal();
         int nextIndex = (currentIndex + dir + 3) % 3;
         selectedLeaderboardDifficulty = com.tetris.controller.GameEngine.Difficulty.values()[nextIndex];
