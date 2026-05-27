@@ -1944,6 +1944,7 @@ public class GamePanel extends JPanel {
         g2d.setColor(new Color(120, 120, 150));
         String hint1 = com.tetris.util.LanguageManager.get("使用 ⬆ / ⬇ 方向鍵或滑鼠移動游標", "Use ↑ / ↓ keys or mouse to move the cursor");
         String hint2 = com.tetris.util.LanguageManager.get("按下 ENTER 鍵或點擊滑鼠確認選擇", "Press ENTER or click to confirm selection");
+        // Nudge hints slightly lower for better spacing
         g2d.drawString(hint1, (getWidth() - g2d.getFontMetrics().stringWidth(hint1)) / 2, 530);
         g2d.drawString(hint2, (getWidth() - g2d.getFontMetrics().stringWidth(hint2)) / 2, 550);
     }
@@ -3328,7 +3329,7 @@ public class GamePanel extends JPanel {
         }
 
         // 5. Draw Leaderboard or PVP info
-        int dynamicYStart = currentY + 15;
+        int dynamicYStart = currentY + 30;
         if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.TUTORIAL) {
             drawTutorialHints(g, startX + 15, dynamicYStart);
         } else if (targetEngine.getGameMode() == GameMode.PVP || targetEngine.getGameMode() == GameMode.VS_AI) {
@@ -3430,7 +3431,8 @@ public class GamePanel extends JPanel {
                     g2d.drawString(com.tetris.util.LanguageManager.get("分數將不寫入排行榜", "This score will not be submitted"), warnX + 10, aiY + 53);
             }
             if (targetEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING && targetEngine.getGameMode() != GameMode.PVP && !targetEngine.isAiPlay() && !targetEngine.hasUsedAiThisSession()) {
-                drawSidebarTipBox(g2d, startX + 15, 470, 170, 110);
+                // Nudge training tip card slightly lower for better spacing
+                drawSidebarTipBox(g2d, startX + 15, 482, 170, 110);
             }
         }
     }
@@ -4675,9 +4677,9 @@ public class GamePanel extends JPanel {
             g2d.fillRect(0, 0, boardW, boardH);
             
             boolean success = gameEngine.isLastTutorialSuccess();
-            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 32));
+            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 30));
             FontMetrics fm = g2d.getFontMetrics();
-            String text = success ? "挑戰成功！" : "挑戰失敗！請再試一次";
+            String text = success ? com.tetris.util.LanguageManager.get("挑戰成功！", "Challenge Success!") : com.tetris.util.LanguageManager.get("挑戰失敗！請再試一次", "Challenge Failed — Try Again");
             Color color = success ? new Color(0, 255, 100) : new Color(255, 50, 50);
             
             int textX = (boardW - fm.stringWidth(text)) / 2;
@@ -4694,7 +4696,7 @@ public class GamePanel extends JPanel {
             // Draw a small subtext
             g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 14));
             FontMetrics fmSub = g2d.getFontMetrics();
-            String subText = success ? "正在載入下一關..." : "正在重置版面...";
+            String subText = success ? com.tetris.util.LanguageManager.get("正在載入下一關...", "Loading next level...") : com.tetris.util.LanguageManager.get("正在重置版面...", "Resetting board...");
             g2d.setColor(new Color(200, 200, 200));
             g2d.drawString(subText, (boardW - fmSub.stringWidth(subText)) / 2, textY + 40);
         }
@@ -4713,7 +4715,7 @@ public class GamePanel extends JPanel {
         // Title: TUTORIAL COMPLETE
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 36));
         FontMetrics fmTitle = g2d.getFontMetrics();
-        String titleText = "教學關卡全部完成！";
+        String titleText = com.tetris.util.LanguageManager.get("教學關卡全部完成！", "All Tutorial Levels Complete!");
         int titleX = (width - fmTitle.stringWidth(titleText)) / 2;
         g2d.setColor(new Color(255, 215, 0)); // Gold
         g2d.drawString(titleText, titleX, 150);
@@ -4721,7 +4723,7 @@ public class GamePanel extends JPanel {
         // Subtitle: T-SPIN MASTER!
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 32));
         FontMetrics fmSub = g2d.getFontMetrics();
-        String subText = "T-SPIN 大師！";
+        String subText = com.tetris.util.LanguageManager.get("T-SPIN 大師！", "T-SPIN MASTER!");
         int subX = (width - fmSub.stringWidth(subText)) / 2;
         g2d.setColor(new Color(0, 255, 255)); // Neon Cyan
         g2d.drawString(subText, subX, 220);
@@ -4738,10 +4740,10 @@ public class GamePanel extends JPanel {
         
         g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 15));
         g2d.setColor(Color.WHITE);
-        String msg1 = "您已成功通過所有";
-        String msg2 = "T-Spin 旋轉訓練關卡！";
-        String msg3 = "現在您已準備好在實戰中";
-        String msg4 = "運用 T-Spin 主宰整場戰局！";
+        String msg1 = com.tetris.util.LanguageManager.get("您已成功通過所有", "You've completed all");
+        String msg2 = com.tetris.util.LanguageManager.get("T-Spin 旋轉訓練關卡！", "T-Spin training levels!");
+        String msg3 = com.tetris.util.LanguageManager.get("現在您已準備好在實戰中", "You're now ready to");
+        String msg4 = com.tetris.util.LanguageManager.get("運用 T-Spin 主宰整場戰局！", "use T-Spins to dominate battles!");
         
         int textY = cardY + 30;
         g2d.drawString(msg1, cardX + (cardW - g2d.getFontMetrics().stringWidth(msg1)) / 2, textY);
@@ -5058,7 +5060,7 @@ public class GamePanel extends JPanel {
         g2d.setColor(new Color(255, 215, 120, 65));
         g2d.drawRoundRect(x, y, w, h, 10, 10);
 
-        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 12));
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 14));
         g2d.setColor(new Color(255, 215, 120));
         g2d.drawString(com.tetris.util.LanguageManager.get("💡 新手小撇步", "💡 Quick Tips"), x + 10, y + 20);
 
