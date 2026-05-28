@@ -1,13 +1,13 @@
 package com.tetris.model;
 
 public enum GameMode {
+    STAGE,
     ENDLESS,
+    SURVIVAL,
     SPRINT,
     ULTRA,
-    SURVIVAL,
-    STAGE,
-    PVP,
     VS_AI,
+    PVP,
     NET_PVP
 }
 

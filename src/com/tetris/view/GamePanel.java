@@ -1683,23 +1683,23 @@ public class GamePanel extends JPanel {
         if (this.isSelectingModeForAiDemo) {
             switch (selectedModeIndex) {
                 case 0:
-                    this.gameEngine.setGameMode(GameMode.ENDLESS);
+                    this.gameEngine.setGameMode(GameMode.STAGE);
                     this.startAiDemo();
                     break;
                 case 1:
-                    this.gameEngine.setGameMode(GameMode.SPRINT);
+                    this.gameEngine.setGameMode(GameMode.ENDLESS);
                     this.startAiDemo();
                     break;
                 case 2:
-                    this.gameEngine.setGameMode(GameMode.ULTRA);
-                    this.startAiDemo();
-                    break;
-                case 3:
                     this.gameEngine.setGameMode(GameMode.SURVIVAL);
                     this.startAiDemo();
                     break;
+                case 3:
+                    this.gameEngine.setGameMode(GameMode.SPRINT);
+                    this.startAiDemo();
+                    break;
                 case 4:
-                    this.gameEngine.setGameMode(GameMode.STAGE);
+                    this.gameEngine.setGameMode(GameMode.ULTRA);
                     this.startAiDemo();
                     break;
                 case 5:
@@ -1711,34 +1711,34 @@ public class GamePanel extends JPanel {
         } else {
             switch (selectedModeIndex) {
                 case 0:
+                    this.gameEngine.setGameMode(GameMode.STAGE);
+                    this.gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
+                    this.showModeSelectInMenu = false;
+                    this.gameEngine.startGame();
+                    break;
+                case 1:
                     this.gameEngine.setGameMode(GameMode.ENDLESS);
                     this.showModeSelectInMenu = false;
                     this.showDifficultySelectInMenu = true;
                     this.selectedDifficultyIndex = 1; // Default to NORMAL
                     break;
-                case 1:
-                    this.gameEngine.setGameMode(GameMode.SPRINT);
-                    this.showModeSelectInMenu = false;
-                    this.showDifficultySelectInMenu = true;
-                    this.selectedDifficultyIndex = 1;
-                    break;
                 case 2:
-                    this.gameEngine.setGameMode(GameMode.ULTRA);
-                    this.showModeSelectInMenu = false;
-                    this.showDifficultySelectInMenu = true;
-                    this.selectedDifficultyIndex = 1;
-                    break;
-                case 3:
                     this.gameEngine.setGameMode(GameMode.SURVIVAL);
                     this.showModeSelectInMenu = false;
                     this.showDifficultySelectInMenu = true;
                     this.selectedDifficultyIndex = 1;
                     break;
-                case 4:
-                    this.gameEngine.setGameMode(GameMode.STAGE);
-                    this.gameEngine.setDifficulty(com.tetris.controller.GameEngine.Difficulty.NORMAL);
+                case 3:
+                    this.gameEngine.setGameMode(GameMode.SPRINT);
                     this.showModeSelectInMenu = false;
-                    this.gameEngine.startGame();
+                    this.showDifficultySelectInMenu = true;
+                    this.selectedDifficultyIndex = 1;
+                    break;
+                case 4:
+                    this.gameEngine.setGameMode(GameMode.ULTRA);
+                    this.showModeSelectInMenu = false;
+                    this.showDifficultySelectInMenu = true;
+                    this.selectedDifficultyIndex = 1;
                     break;
                 case 5:
                     this.gameEngine.setGameMode(GameMode.VS_AI);
@@ -1788,20 +1788,20 @@ public class GamePanel extends JPanel {
             case 3:
                 showDifficultySelectInMenu = false;
                 showModeSelectInMenu = true; // Return to Mode Selection
-                if (gameEngine.getGameMode() == GameMode.SPRINT) {
-                    selectedModeIndex = 1;
-                } else if (gameEngine.getGameMode() == GameMode.ULTRA) {
-                    selectedModeIndex = 2;
+                if (gameEngine.getGameMode() == GameMode.STAGE) {
+                    selectedModeIndex = 0;
                 } else if (gameEngine.getGameMode() == GameMode.SURVIVAL) {
+                    selectedModeIndex = 2;
+                } else if (gameEngine.getGameMode() == GameMode.SPRINT) {
                     selectedModeIndex = 3;
-                } else if (gameEngine.getGameMode() == GameMode.STAGE) {
+                } else if (gameEngine.getGameMode() == GameMode.ULTRA) {
                     selectedModeIndex = 4;
                 } else if (gameEngine.getGameMode() == GameMode.VS_AI) {
                     selectedModeIndex = 5;
                 } else if (gameEngine.getGameMode() == GameMode.PVP) {
                     selectedModeIndex = 6;
-                } else {
-                    selectedModeIndex = 0;
+                } else { // ENDLESS
+                    selectedModeIndex = 1;
                 }
                 break;
         }
@@ -4433,7 +4433,7 @@ public class GamePanel extends JPanel {
         FontMetrics fmTitle = g2d.getFontMetrics();
         String titleText = com.tetris.util.LanguageManager.get("選擇模式", "Select Mode");
         int titleX = (getWidth() - fmTitle.stringWidth(titleText)) / 2;
-        int titleY = 120;
+        int titleY = 105;
 
         g2d.setColor(new Color(0, 255, 255, 70));
         g2d.drawString(titleText, titleX + 2, titleY + 2);
@@ -4441,9 +4441,9 @@ public class GamePanel extends JPanel {
         g2d.drawString(titleText, titleX, titleY);
 
         int cardW = 340;
-        int cardH = isSelectingModeForAiDemo ? 405 : 445;
+        int cardH = isSelectingModeForAiDemo ? 335 : 425;
         int cardX = (getWidth() - cardW) / 2;
-        int cardY = 170;
+        int cardY = 135;
 
         // Draw card background
         g2d.setColor(new Color(255, 255, 255, 15));
@@ -4459,10 +4459,10 @@ public class GamePanel extends JPanel {
         g2d.drawString(subText, cardX + (cardW - subW) / 2, cardY + 25);
 
         int btnW = 240;
-        int btnH = 32;
+        int btnH = 30;
         int btnX = cardX + (cardW - btnW) / 2;
-        int startY = cardY + 45;
-        int gap = isSelectingModeForAiDemo ? 40 : 36;
+        int startY = cardY + 40;
+        int gap = isSelectingModeForAiDemo ? 38 : 37;
 
         java.awt.Point mousePos = getMousePosition();
         int numModes = isSelectingModeForAiDemo ? 6 : 9;
@@ -4471,7 +4471,7 @@ public class GamePanel extends JPanel {
             int y = startY + i * gap;
             if (i == numModes - 1) {
                 // BACK button offset
-                y = cardY + (isSelectingModeForAiDemo ? 345 : 395);
+                y = cardY + (isSelectingModeForAiDemo ? 285 : 375);
             }
 
             if (modeOptionBounds[i] == null) modeOptionBounds[i] = new Rectangle(btnX, y, btnW, btnH); else modeOptionBounds[i].setBounds(btnX, y, btnW, btnH);
@@ -4489,34 +4489,34 @@ public class GamePanel extends JPanel {
 
             switch (effectiveIndex) {
                 case 0:
+                    label = com.tetris.util.LanguageManager.get("漸進加速模式 (STAGE)", "Speed Run Mode (STAGE)");
+                    baseColor = new Color(255, 105, 180);
+                    selectColor = Color.WHITE;
+                    fillCol = new Color(255, 105, 180, isSelected ? 45 : 20);
+                    break;
+                case 1:
                     label = com.tetris.util.LanguageManager.get("無盡模式 (ENDLESS)", "Endless Mode (ENDLESS)");
                     baseColor = new Color(0, 255, 255);
                     selectColor = Color.WHITE;
                     fillCol = new Color(0, 255, 255, isSelected ? 45 : 20);
                     break;
-                case 1:
-                    label = com.tetris.util.LanguageManager.get("40行衝刺賽 (SPRINT)", "40-Line (SPRINT)");
-                    baseColor = new Color(255, 100, 255);
-                    selectColor = Color.WHITE;
-                    fillCol = new Color(255, 100, 255, isSelected ? 45 : 20);
-                    break;
                 case 2:
-                    label = com.tetris.util.LanguageManager.get("2分鐘限時賽 (ULTRA)", "2-Min Rush (ULTRA)");
-                    baseColor = new Color(255, 215, 0);
-                    selectColor = Color.WHITE;
-                    fillCol = new Color(255, 215, 0, isSelected ? 45 : 20);
-                    break;
-                case 3:
                     label = com.tetris.util.LanguageManager.get("生存挑戰賽 (SURVIVAL)", "Keep Alive (SURVIVAL)");
                     baseColor = new Color(255, 140, 0);
                     selectColor = Color.WHITE;
                     fillCol = new Color(255, 140, 0, isSelected ? 45 : 20);
                     break;
-                case 4:
-                    label = com.tetris.util.LanguageManager.get("漸進加速模式 (STAGE)", "Speed Run Mode (STAGE)");
-                    baseColor = new Color(255, 105, 180);
+                case 3:
+                    label = com.tetris.util.LanguageManager.get("40行衝刺賽 (SPRINT)", "40-Line (SPRINT)");
+                    baseColor = new Color(255, 100, 255);
                     selectColor = Color.WHITE;
-                    fillCol = new Color(255, 105, 180, isSelected ? 45 : 20);
+                    fillCol = new Color(255, 100, 255, isSelected ? 45 : 20);
+                    break;
+                case 4:
+                    label = com.tetris.util.LanguageManager.get("2分鐘限時賽 (ULTRA)", "2-Min Rush (ULTRA)");
+                    baseColor = new Color(255, 215, 0);
+                    selectColor = Color.WHITE;
+                    fillCol = new Color(255, 215, 0, isSelected ? 45 : 20);
                     break;
                 case 5:
                     label = com.tetris.util.LanguageManager.get("與 AI 對戰模式 (VS AI)", "VS AI Battle (VS AI)");
