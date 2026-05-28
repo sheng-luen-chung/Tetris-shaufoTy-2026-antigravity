@@ -495,8 +495,6 @@ public class GameEngine {
         gameState = GameState.MENU;
         if (playerNum == 1) {
             SoundManager.playBGM("/resources/menu_bgm.wav");
-        } else {
-            SoundManager.stopBGM();
         }
 
         if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI || gameMode == GameMode.NET_PVP) && opponent != null && opponent.getGameState() != GameState.MENU) {
