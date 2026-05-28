@@ -131,6 +131,7 @@ public class GameEngine {
     private volatile Difficulty difficulty = Difficulty.NORMAL;
     private final LeaderboardManager leaderboardManager;
     private volatile GameState gameState = GameState.MENU;
+    private volatile int netPvpCountdownMs = 0;
     private volatile boolean isEnteringName = false;
     private final StringBuilder nameInputBuffer = new StringBuilder();
 
@@ -279,6 +280,17 @@ public class GameEngine {
         }
         // 0. Process queued garbage and inputs from EDT first
         processGarbageQueue();
+
+        if (gameMode == GameMode.NET_PVP && netPvpCountdownMs > 0) {
+            actionQueue.clear();
+            netPvpCountdownMs -= dt;
+            if (netPvpCountdownMs < 0) {
+                netPvpCountdownMs = 0;
+            }
+            panel.repaint();
+            return;
+        }
+
         processInputActions();
 
         // 1. Tick inputs
@@ -390,6 +402,11 @@ public class GameEngine {
         spawnNewPiece();
         usedAiThisSession = false;
         gameState = GameState.PLAYING;
+        if (gameMode == GameMode.NET_PVP) {
+            netPvpCountdownMs = 3000;
+        } else {
+            netPvpCountdownMs = 0;
+        }
         aiDemoMode = false;
         aiDemoDelayMultiplier = DEFAULT_AI_DEMO_DELAY_MULTIPLIER;
 
@@ -1360,6 +1377,10 @@ public class GameEngine {
         this.difficulty = difficulty;
         gravityAccumulator = 0; // Reset gravity delay window
         panel.repaint();
+    }
+
+    public int getNetPvpCountdownMs() {
+        return netPvpCountdownMs;
     }
 
     public GameState getGameState() {

@@ -249,7 +249,7 @@ public class GamePanel extends JPanel {
 
     // Game mode selection properties
     private boolean showModeSelectInMenu = false;
-    private int selectedModeIndex = 0; // Normal: 0-7, AI demo: 0-4
+    private int selectedModeIndex = 0; // Normal: 0-8, AI demo: 0-5
     private final Rectangle[] modeOptionBounds = new Rectangle[9];
     private boolean isSelectingModeForAiDemo = false;
     private boolean showVsAiControlsPrompt = false;
@@ -1127,9 +1127,14 @@ public class GamePanel extends JPanel {
         java.awt.Window window = javax.swing.SwingUtilities.getWindowAncestor(this);
         if (window instanceof javax.swing.JFrame) {
             javax.swing.JFrame frame = (javax.swing.JFrame) window;
-            if (gameEngine != null && (gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI || gameEngine.getGameMode() == GameMode.NET_PVP)
-                    && gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
-                setPreferredSize(new Dimension(1000, ROWS * TILE_SIZE));
+            if (gameEngine != null && gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
+                if (gameEngine.getGameMode() == GameMode.NET_PVP) {
+                    setPreferredSize(new Dimension(800, ROWS * TILE_SIZE));
+                } else if (gameEngine.getGameMode() == GameMode.PVP || gameEngine.getGameMode() == GameMode.VS_AI) {
+                    setPreferredSize(new Dimension(1000, ROWS * TILE_SIZE));
+                } else {
+                    setPreferredSize(new Dimension(500, ROWS * TILE_SIZE));
+                }
             } else {
                 setPreferredSize(new Dimension(500, ROWS * TILE_SIZE));
             }
@@ -1332,6 +1337,9 @@ public class GamePanel extends JPanel {
                     }
 
                     drawGrid(g2d);
+                    if (gameEngine.getGameMode() == GameMode.NET_PVP) {
+                        drawYouWatermark(g2d);
+                    }
                     drawFixedBlocks(g2d, gameEngine.getBoard());
                     drawCurrentPiece(g2d, gameEngine.getCurrentPiece(), gameEngine.getBoard(), gameEngine);
                     drawParticles(g2d, particles);
@@ -1363,11 +1371,16 @@ public class GamePanel extends JPanel {
                     }
 
                     drawGrid(g2d);
+                    if (gameEngine.getGameMode() == GameMode.NET_PVP) {
+                        drawOpponentWatermark(g2d);
+                    }
                     drawFixedBlocks(g2d, localEngine2.getBoard());
                     drawCurrentPiece(g2d, localEngine2.getCurrentPiece(), localEngine2.getBoard(), localEngine2);
                     drawParticles(g2d, particles2);
                     drawScorePopups(g2d, scorePopups2);
-                    drawSidebar(g2d, localEngine2);
+                    if (gameEngine.getGameMode() != GameMode.NET_PVP) {
+                        drawSidebar(g2d, localEngine2);
+                    }
                     drawPerfectClearOverlay(g2d, perfectClearStartTime2);
                     if (localEngine2.isGameOver() && !gameEngine.isGameOver()) {
                         drawLocalPvpGameOver(g2d);
@@ -1387,6 +1400,11 @@ public class GamePanel extends JPanel {
                     // Draw Game Over Overlay
                     if (gameEngine.isGameOver() && localEngine2.isGameOver()) {
                         drawPvpGameOverOverlay(g2d);
+                    }
+
+                    // Draw Opening Countdown Overlay for Online PvP
+                    if (gameEngine.getGameMode() == GameMode.NET_PVP && gameEngine.getNetPvpCountdownMs() > 0) {
+                        drawNetPvpCountdownOverlay(g2d);
                     }
 
                 } else {
@@ -1530,7 +1548,7 @@ public class GamePanel extends JPanel {
         if (showDifficultySelectInMenu) {
             selectedDifficultyIndex = (selectedDifficultyIndex + dir + 4) % 4;
         } else if (showModeSelectInMenu) {
-            int numModes = isSelectingModeForAiDemo ? 6 : 8;
+            int numModes = isSelectingModeForAiDemo ? 6 : 9;
             selectedModeIndex = (selectedModeIndex + dir + numModes) % numModes;
         } else {
             int numOptions = com.tetris.util.SaveManager.hasSave() ? 8 : 7;
@@ -2457,8 +2475,134 @@ public class GamePanel extends JPanel {
         g2d.drawString(text2, x2, y2);
     }
 
+    private void drawNetPvpCountdownOverlay(Graphics2D g2d) {
+        int width = getWidth();
+        int height = getHeight();
+        if (width <= 0) width = 800;
+        if (height <= 0) height = ROWS * TILE_SIZE;
+
+        int countdownMs = gameEngine.getNetPvpCountdownMs();
+        if (countdownMs <= 0) return;
+
+        // 1. Semi-transparent background
+        g2d.setColor(new Color(10, 5, 20, 180));
+        g2d.fillRect(0, 0, width, height);
+
+        // 2. Draw Card Panel in Center
+        int cardW = 380;
+        int cardH = 280;
+        int cardX = (width - cardW) / 2;
+        int cardY = (height - cardH) / 2;
+
+        // Glassmorphism/Dark background for card
+        g2d.setColor(new Color(15, 15, 25, 230));
+        g2d.fillRoundRect(cardX, cardY, cardW, cardH, 12, 12);
+        
+        // Neon cyan border
+        g2d.setColor(new Color(0, 255, 255, 50));
+        g2d.setStroke(new java.awt.BasicStroke(4f));
+        g2d.drawRoundRect(cardX, cardY, cardW, cardH, 12, 12);
+        g2d.setColor(new Color(0, 255, 255));
+        g2d.setStroke(new java.awt.BasicStroke(2));
+        g2d.drawRoundRect(cardX, cardY, cardW, cardH, 12, 12);
+        g2d.setStroke(new java.awt.BasicStroke(1f)); // reset
+
+        // 3. Draw Countdown text
+        int secondsLeft = (countdownMs + 999) / 1000;
+        String numberText = String.valueOf(secondsLeft);
+        if (secondsLeft <= 0) {
+            numberText = "GO!";
+        }
+
+        // Animated zoom/pulse effect for the countdown number
+        double pulse = (countdownMs % 1000) / 1000.0; // 0.0 to 0.999
+        int baseFontSize = 72;
+        int animatedFontSize = (int) (baseFontSize + (1.0 - pulse) * 24); // zooms in as time ticks
+        int alpha = (int) (255 * pulse); // fades in
+        if (alpha < 50) alpha = 50;
+
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, animatedFontSize));
+        FontMetrics fmNum = g2d.getFontMetrics();
+        int numX = cardX + (cardW - fmNum.stringWidth(numberText)) / 2;
+        int numY = cardY + 110;
+
+        // Shadow/Glow
+        g2d.setColor(new Color(0, 255, 255, alpha / 3));
+        g2d.drawString(numberText, numX + 3, numY + 3);
+        g2d.drawString(numberText, numX - 3, numY - 3);
+
+        // Main text
+        g2d.setColor(new Color(0, 255, 255, alpha));
+        g2d.drawString(numberText, numX, numY);
+
+        // 4. Draw Controls Hint Box
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 14));
+        g2d.setColor(new Color(180, 180, 200));
+        String hintTitle = com.tetris.util.LanguageManager.get("— 玩家操作提示 —", "— CONTROLS GUIDE —");
+        int titleX = cardX + (cardW - g2d.getFontMetrics().stringWidth(hintTitle)) / 2;
+        g2d.drawString(hintTitle, titleX, cardY + 155);
+
+        // Individual controls
+        g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 12));
+        int textX = cardX + 50;
+        int startY = cardY + 185;
+        int spacing = 20;
+
+        g2d.setColor(new Color(220, 220, 240));
+        g2d.drawString(com.tetris.util.LanguageManager.get("移動:  ←  →  或  A  D", "Move:  ←  →  or  A  D"), textX, startY);
+        g2d.drawString(com.tetris.util.LanguageManager.get("旋轉:  ↑  或  W / X", "Rotate:  ↑  or  W / X"), textX, startY + spacing);
+        g2d.drawString(com.tetris.util.LanguageManager.get("瞬間下落:  Space", "Hard Drop:  Space"), textX, startY + spacing * 2);
+        g2d.drawString(com.tetris.util.LanguageManager.get("暫存方塊:  C  或  Shift", "Hold Piece:  C  or  Shift"), textX, startY + spacing * 3);
+    }
+
+    private void drawYouWatermark(Graphics2D g2d) {
+        int w = COLS * TILE_SIZE;
+        g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 44));
+        FontMetrics fmBig = g2d.getFontMetrics();
+        String bigText = "YOU";
+        int bigX = (w - fmBig.stringWidth(bigText)) / 2;
+        int bigY = 260;
+        
+        g2d.setColor(new Color(0, 255, 255, 35));
+        g2d.drawString(bigText, bigX, bigY);
+        
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 12));
+        FontMetrics fmSmall = g2d.getFontMetrics();
+        String smallText = com.tetris.util.LanguageManager.get("本機玩家 (P1)", "LOCAL PLAYER (P1)");
+        int smallX = (w - fmSmall.stringWidth(smallText)) / 2;
+        int smallY = 285;
+        
+        g2d.setColor(new Color(0, 255, 255, 45));
+        g2d.drawString(smallText, smallX, smallY);
+    }
+
+    private void drawOpponentWatermark(Graphics2D g2d) {
+        int w = COLS * TILE_SIZE;
+        g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 36));
+        FontMetrics fmBig = g2d.getFontMetrics();
+        String bigText = "OPPONENT";
+        int bigX = (w - fmBig.stringWidth(bigText)) / 2;
+        int bigY = 260;
+        
+        g2d.setColor(new Color(255, 100, 255, 35));
+        g2d.drawString(bigText, bigX, bigY);
+        
+        g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 12));
+        FontMetrics fmSmall = g2d.getFontMetrics();
+        String smallText = com.tetris.util.LanguageManager.get("遠端對手 (P2)", "REMOTE OPPONENT (P2)");
+        int smallX = (w - fmSmall.stringWidth(smallText)) / 2;
+        int smallY = 285;
+        
+        g2d.setColor(new Color(255, 100, 255, 45));
+        g2d.drawString(smallText, smallX, smallY);
+    }
+
     private void drawPvpGameOverOverlay(Graphics2D g2d) {
-        int width = 1000;
+        int width = (gameEngine.getGameMode() == GameMode.NET_PVP) ? 800 : 1000;
         int height = ROWS * TILE_SIZE;
 
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -5759,20 +5903,23 @@ public class GamePanel extends JPanel {
 
     private void handleNetworkDisconnect(String reason) {
         com.tetris.util.NetworkManager.getInstance().shutdown();
+        java.awt.Window ancestor = javax.swing.SwingUtilities.getWindowAncestor(this);
+        java.awt.Frame parentFrame = (ancestor instanceof java.awt.Frame) ? (java.awt.Frame) ancestor : null;
+
         if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
             gameEngine.returnToMenu();
-            javax.swing.JOptionPane.showMessageDialog(null, 
-                com.tetris.util.LanguageManager.get("對手已斷開連線！遊戲結束。", "Opponent disconnected! Game over."), 
+            MessageDialog.show(parentFrame, 
                 com.tetris.util.LanguageManager.get("連線中斷 (Disconnected)", "Disconnected"), 
-                javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                com.tetris.util.LanguageManager.get("對手已斷開連線！遊戲結束。", "Opponent disconnected! Game over."), 
+                false);
         } else {
             netLobbyState = NetLobbyState.SELECT;
             selectedLobbyIndex = 0;
             repaint();
-            javax.swing.JOptionPane.showMessageDialog(null, 
-                com.tetris.util.LanguageManager.get("連線失敗或已中斷: ", "Connection failed: ") + reason, 
+            MessageDialog.show(parentFrame, 
                 com.tetris.util.LanguageManager.get("錯誤 (Error)", "Error"), 
-                javax.swing.JOptionPane.ERROR_MESSAGE);
+                com.tetris.util.LanguageManager.get("連線失敗或已中斷: ", "Connection failed: ") + reason, 
+                true);
         }
     }
 

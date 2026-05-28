@@ -174,6 +174,7 @@ public class NetworkManager {
             in = null;
             clientSocket = null;
             serverSocket = null;
+            currentCallback = null;
         }
     }
 }
