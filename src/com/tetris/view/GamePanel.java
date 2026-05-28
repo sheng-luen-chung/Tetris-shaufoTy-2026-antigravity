@@ -2795,12 +2795,12 @@ public class GamePanel extends JPanel {
         g2d.drawString(com.tetris.util.LanguageManager.get("玩家 2 (右側)：人類玩家", "Player 2 (Right): Human Player"), p2X + 15, colY + 30);
         g2d.setColor(Color.WHITE);
         g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 13));
-        g2d.drawString(com.tetris.util.LanguageManager.get("• 使用【方向鍵】操控方塊：", "• Use [Arrow Keys] to control:"), p2X + 15, colY + 65);
+        g2d.drawString(com.tetris.util.LanguageManager.get("• 使用【一般操作】操控方塊：", "• Use standard controls:"), p2X + 15, colY + 65);
         g2d.drawString(com.tetris.util.LanguageManager.get("  -  ← / → ： 左右移動", "  -  ← / → : Move Left / Right"), p2X + 15, colY + 90);
         g2d.drawString(com.tetris.util.LanguageManager.get("  -  ↓ ： 軟降加速", "  -  ↓ : Soft Drop"), p2X + 15, colY + 112);
         g2d.drawString(com.tetris.util.LanguageManager.get("  -  ↑ ： 順時針旋轉", "  -  ↑ : Rotate Clockwise"), p2X + 15, colY + 134);
-        g2d.drawString(com.tetris.util.LanguageManager.get("  -  Enter ： 硬降直接落地", "  -  Enter : Hard Drop"), p2X + 15, colY + 156);
-        g2d.drawString(com.tetris.util.LanguageManager.get("  -  Shift ： 暫存保留方塊", "  -  Shift : Hold Piece"), p2X + 15, colY + 178);
+        g2d.drawString(com.tetris.util.LanguageManager.get("  -  空白鍵 ： 硬降直接落地", "  -  Space : Hard Drop"), p2X + 15, colY + 156);
+        g2d.drawString(com.tetris.util.LanguageManager.get("  -  C ： 暫存保留方塊", "  -  C : Hold Piece"), p2X + 15, colY + 178);
 
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
         long t = System.currentTimeMillis();
@@ -3570,6 +3570,13 @@ public class GamePanel extends JPanel {
             g.setColor(new Color(0, 255, 255));
             String tutorialLabel = com.tetris.util.LanguageManager.get("教學", "Tutorial");
             g.drawString(tutorialLabel + " " + targetEngine.getTutorialLevel() + " / 7", startX + 20, 195);
+        } else if (targetEngine.getGameMode() == GameMode.PVP || targetEngine.getGameMode() == GameMode.VS_AI || targetEngine.getGameMode() == GameMode.NET_PVP) {
+            g.drawString(com.tetris.util.LanguageManager.get("對手分數", "Opponent Score"), startX + 20, 170);
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
+            g.setColor(new Color(255, 100, 255)); // opponent purple color
+            int oppScore = (targetEngine.getOpponent() != null) ? targetEngine.getOpponent().getScore() : 0;
+            g.drawString(String.valueOf(oppScore), startX + 20, 195);
+            g.setColor(Color.WHITE); // reset color
         } else {
             g.drawString(com.tetris.util.LanguageManager.get("遊戲難度", "Difficulty"), startX + 20, 170);
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));

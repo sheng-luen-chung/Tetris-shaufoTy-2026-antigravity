@@ -810,12 +810,13 @@ public class InputHandler extends KeyAdapter {
                 
                 // Player 2 (Arrows) - Human player in both PvP and VS_AI modes
                 if (engine2 != null) {
-                    int p2Left = pvpP2KeyLeft;
-                    int p2Right = pvpP2KeyRight;
-                    int p2Down = pvpP2KeyDown;
-                    int p2Rotate = pvpP2KeyRotate;
-                    int p2Drop = pvpP2KeyDrop;
-                    int p2Hold = pvpP2KeyHold;
+                    boolean useSinglePlayerControls = engine.getGameMode() == com.tetris.model.GameMode.VS_AI;
+                    int p2Left = useSinglePlayerControls ? singleKeyLeft : pvpP2KeyLeft;
+                    int p2Right = useSinglePlayerControls ? singleKeyRight : pvpP2KeyRight;
+                    int p2Down = useSinglePlayerControls ? singleKeyDown : pvpP2KeyDown;
+                    int p2Rotate = useSinglePlayerControls ? singleKeyRotate : pvpP2KeyRotate;
+                    int p2Drop = useSinglePlayerControls ? singleKeyDrop : pvpP2KeyDrop;
+                    int p2Hold = useSinglePlayerControls ? singleKeyHold : pvpP2KeyHold;
 
                     if (keyCode == p2Left) {
                         p2LeftPressed = true;
