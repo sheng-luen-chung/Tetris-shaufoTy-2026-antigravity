@@ -2659,10 +2659,19 @@ public class GamePanel extends JPanel {
         g2d.drawString(subTitleText, subTitleX, 110);
 
         // 3. Side-by-side Player stats
-        int p1StartX = 50;
-        int p2StartX = 550;
+        int p1StartX;
+        int p2StartX;
+        int cardW;
+        if (width == 800) {
+            p1StartX = 30;
+            p2StartX = 420;
+            cardW = 350;
+        } else {
+            p1StartX = 50;
+            p2StartX = 550;
+            cardW = 400;
+        }
         int statsY = 150;
-        int cardW = 400;
         int cardH = 320;
 
         // Player 1 Card Background
@@ -2711,23 +2720,23 @@ public class GamePanel extends JPanel {
         int gap = 40;
 
         g2d.drawString(com.tetris.util.LanguageManager.get("最終分數:", "Final Score:"), startX + 40, itemY);
-        g2d.drawString(String.format("%,d", engine.getScore()), startX + 260, itemY);
+        g2d.drawString(String.format("%,d", engine.getScore()), startX + cardW - 130, itemY);
         itemY += gap;
 
         g2d.drawString(com.tetris.util.LanguageManager.get("消除行數:", "Lines Cleared:"), startX + 40, itemY);
-        g2d.drawString(String.valueOf(engine.getTotalLinesCleared()), startX + 260, itemY);
+        g2d.drawString(String.valueOf(engine.getTotalLinesCleared()), startX + cardW - 130, itemY);
         itemY += gap;
 
         g2d.drawString(com.tetris.util.LanguageManager.get("達成 T-Spin:", "T-Spins:"), startX + 40, itemY);
-        g2d.drawString(String.valueOf(engine.getTSpins()), startX + 260, itemY);
+        g2d.drawString(String.valueOf(engine.getTSpins()), startX + cardW - 130, itemY);
         itemY += gap;
 
         g2d.drawString(com.tetris.util.LanguageManager.get("最高連消:", "Max Combo:"), startX + 40, itemY);
-        g2d.drawString(String.valueOf(Math.max(0, engine.getMaxCombo())), startX + 260, itemY);
+        g2d.drawString(String.valueOf(Math.max(0, engine.getMaxCombo())), startX + cardW - 130, itemY);
         itemY += gap;
 
         g2d.drawString(com.tetris.util.LanguageManager.get("放置方塊:", "Pieces Spawned:"), startX + 40, itemY);
-        g2d.drawString(String.valueOf(engine.getPiecesSpawned()), startX + 260, itemY);
+        g2d.drawString(String.valueOf(engine.getPiecesSpawned()), startX + cardW - 130, itemY);
     }
 
     private void drawVsAiControlsPromptOverlay(Graphics2D g2d) {
@@ -3570,13 +3579,27 @@ public class GamePanel extends JPanel {
             g.setColor(new Color(0, 255, 255));
             String tutorialLabel = com.tetris.util.LanguageManager.get("教學", "Tutorial");
             g.drawString(tutorialLabel + " " + targetEngine.getTutorialLevel() + " / 7", startX + 20, 195);
-        } else if (targetEngine.getGameMode() == GameMode.PVP || targetEngine.getGameMode() == GameMode.VS_AI || targetEngine.getGameMode() == GameMode.NET_PVP) {
+        } else if (targetEngine.getGameMode() == GameMode.NET_PVP) {
+            // 只有 NET_PVP 模式下在 side panel 繪製對手分數
             g.drawString(com.tetris.util.LanguageManager.get("對手分數", "Opponent Score"), startX + 20, 170);
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
             g.setColor(new Color(255, 100, 255)); // opponent purple color
             int oppScore = (targetEngine.getOpponent() != null) ? targetEngine.getOpponent().getScore() : 0;
             g.drawString(String.valueOf(oppScore), startX + 20, 195);
             g.setColor(Color.WHITE); // reset color
+        } else if (targetEngine.getGameMode() == GameMode.VS_AI) {
+            // VS_AI 顯示選擇的難度
+            g.drawString(com.tetris.util.LanguageManager.get("遊戲難度", "Difficulty"), startX + 20, 170);
+            g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
+            String diffStr = com.tetris.util.LanguageManager.get("中等", "Normal");
+            switch (targetEngine.getDifficulty()) {
+                case EASY: diffStr = com.tetris.util.LanguageManager.get("簡單", "Easy"); break;
+                case NORMAL: diffStr = com.tetris.util.LanguageManager.get("中等", "Normal"); break;
+                case HARD: diffStr = com.tetris.util.LanguageManager.get("困難", "Hard"); break;
+            }
+            g.drawString(diffStr, startX + 20, 195);
+        } else if (targetEngine.getGameMode() == GameMode.PVP) {
+            // Local PvP 側邊欄難度與分數那一欄均不顯示
         } else {
             g.drawString(com.tetris.util.LanguageManager.get("遊戲難度", "Difficulty"), startX + 20, 170);
             g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 22));
@@ -5955,9 +5978,10 @@ public class GamePanel extends JPanel {
             if (gameEngine2 != null) {
                 synchronized (this) {
                     if (gameEngine.getPvpWinner() == 0 && gameEngine2.getPvpWinner() == 0) {
-                        gameEngine.setPvpWinner(1); // 本機獲獲勝
+                        gameEngine.setPvpWinner(1); // 本機獲勝
                         gameEngine2.setPvpWinner(1);
                         gameEngine2.setGameOver(true);
+                        gameEngine.setGameOver(true); // 讓本機也直接結算與停牌
                         com.tetris.util.SoundManager.stopBGM();
                         repaint();
                     }
