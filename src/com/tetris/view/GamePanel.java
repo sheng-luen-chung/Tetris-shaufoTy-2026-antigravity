@@ -5721,10 +5721,12 @@ public class GamePanel extends JPanel {
     }
 
     private void startJoinGame() {
-        String ip = javax.swing.JOptionPane.showInputDialog(null, 
-            com.tetris.util.LanguageManager.get("請輸入對手的 IP 位址:", "Please enter opponent's IP:"), 
-            com.tetris.util.LanguageManager.get("加入房間 (Join Room)", "Join Room"), 
-            javax.swing.JOptionPane.QUESTION_MESSAGE);
+        java.awt.Window ancestor = javax.swing.SwingUtilities.getWindowAncestor(this);
+        java.awt.Frame parentFrame = (ancestor instanceof java.awt.Frame) ? (java.awt.Frame) ancestor : null;
+        IPInputDialog dialog = new IPInputDialog(parentFrame, 
+            com.tetris.util.LanguageManager.get("加入對局 (CONNECT TO OPPONENT)", "CONNECT TO OPPONENT"), 
+            "127.0.0.1");
+        String ip = dialog.getInputIP();
         
         if (ip == null || ip.trim().isEmpty()) {
             return;
