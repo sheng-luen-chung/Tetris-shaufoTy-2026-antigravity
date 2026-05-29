@@ -132,6 +132,7 @@ public class GameEngine {
     private final LeaderboardManager leaderboardManager;
     private volatile GameState gameState = GameState.MENU;
     private volatile int netPvpCountdownMs = 0;
+    private volatile int pendingGarbageLines = 0;
     private volatile boolean isEnteringName = false;
     private final StringBuilder nameInputBuffer = new StringBuilder();
 
@@ -407,6 +408,9 @@ public class GameEngine {
         } else {
             netPvpCountdownMs = 0;
         }
+        pendingGarbageLines = 0;
+        actionQueue.clear();
+        garbageQueue.clear();
         aiDemoMode = false;
         aiDemoDelayMultiplier = DEFAULT_AI_DEMO_DELAY_MULTIPLIER;
 
@@ -447,6 +451,9 @@ public class GameEngine {
             opponent.tetrisClears = 0;
             opponent.tSpins = 0;
             opponent.maxCombo = 0;
+            opponent.actionQueue.clear();
+            opponent.garbageQueue.clear();
+            opponent.pendingGarbageLines = 0;
             opponent.nextPieces.clear();
             for (int i = 0; i < 5; i++) {
                 opponent.nextPieces.add(opponent.generateRandomPiece());
@@ -918,6 +925,19 @@ public class GameEngine {
             return;
         }
 
+        // Apply any accumulated pending garbage lines before spawning the new piece
+        if (pendingGarbageLines > 0) {
+            for (int i = 0; i < pendingGarbageLines; i++) {
+                int holeCol = rng.nextInt(Board.COLS);
+                board.addGarbageLine(holeCol);
+            }
+            pendingGarbageLines = 0;
+            if (gameMode == GameMode.NET_PVP && playerNum == 1) {
+                // Instantly sync the garbage board state to the opponent
+                sendNetworkGameState();
+            }
+        }
+
         spawnNewPiece(); // Spawn
         canHoldThisTurn = true; // Reset hold status for the next turn
         if (gameMode == GameMode.NET_PVP && playerNum == 1) {
@@ -932,19 +952,9 @@ public class GameEngine {
     private void receiveGarbageInternal(int garbageLinesCount) {
         if (isGameOver || isPaused) return;
 
-        // Generate garbage lines on this board
-        for (int i = 0; i < garbageLinesCount; i++) {
-            int holeCol = rng.nextInt(Board.COLS);
-            board.addGarbageLine(holeCol);
-        }
-
-        // If current piece collides and push it up if possible
-        if (currentPiece != null && !board.isValidMove(currentPiece)) {
-            currentPiece.move(-1, 0); // push up
-            if (!board.isValidMove(currentPiece)) {
-                currentPiece.move(1, 0); // push back if failed
-            }
-        }
+        // Accumulate to pending garbage buffer instead of applying immediately.
+        // This avoids colliding or eating the active falling tetromino.
+        pendingGarbageLines += garbageLinesCount;
 
         // Trigger screenshake on this player's screen!
         if (panel != null) {
@@ -2057,7 +2067,7 @@ public class GameEngine {
                 }
             }
         }
-        return score + "," + totalLinesCleared + "," + comboCount + "," + (isGameOver ? "1" : "0") + "," + heldType + "," + curType + "," + curCol + "," + curRow + "," + curRot + "|" + gridSb.toString();
+        return score + "," + totalLinesCleared + "," + comboCount + "," + (isGameOver ? "1" : "0") + "," + heldType + "," + curType + "," + curCol + "," + curRow + "," + curRot + "," + piecesSpawned + "|" + gridSb.toString();
     }
 
     public void deserializeGameState(String stateStr) {
@@ -2089,6 +2099,10 @@ public class GameEngine {
                     int curRow = Integer.parseInt(parts[7]);
                     int curRot = Integer.parseInt(parts[8]);
                     this.currentPiece = new Piece(Tetromino.valueOf(curType), curRow, curCol, curRot);
+                }
+                
+                if (parts.length >= 10) {
+                    this.piecesSpawned = Integer.parseInt(parts[9]);
                 }
             }
             
