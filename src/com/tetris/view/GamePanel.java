@@ -5097,26 +5097,38 @@ public class GamePanel extends JPanel {
             boolean success = gameEngine.isLastTutorialSuccess();
             g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 30));
             FontMetrics fm = g2d.getFontMetrics();
-            String text = success ? com.tetris.util.LanguageManager.get("挑戰成功！", "Challenge Success!") : com.tetris.util.LanguageManager.get("挑戰失敗！請再試一次", "Challenge Failed — Try Again");
+            String text = success ? com.tetris.util.LanguageManager.get("挑戰成功！", "Challenge Success!") : com.tetris.util.LanguageManager.get("挑戰失敗！\n請再試一次", "Challenge Failed\nTry Again");
+            String[] textLines = text.split("\\n");
             Color color = success ? new Color(0, 255, 100) : new Color(255, 50, 50);
             
-            int textX = (boardW - fm.stringWidth(text)) / 2;
-            int textY = boardH / 2 - 10;
+            int lineHeight = fm.getHeight() + 4;
+            int textBlockHeight = lineHeight * textLines.length;
+            int textStartY = boardH / 2 - textBlockHeight / 2 + fm.getAscent();
             
             // Draw neon glow
             g2d.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 80));
-            g2d.drawString(text, textX - 2, textY - 2);
-            g2d.drawString(text, textX + 2, textY + 2);
+            for (int i = 0; i < textLines.length; i++) {
+                String line = textLines[i];
+                int lineX = (boardW - fm.stringWidth(line)) / 2;
+                int lineY = textStartY + i * lineHeight;
+                g2d.drawString(line, lineX - 2, lineY - 2);
+                g2d.drawString(line, lineX + 2, lineY + 2);
+            }
             
             g2d.setColor(Color.WHITE);
-            g2d.drawString(text, textX, textY);
+            for (int i = 0; i < textLines.length; i++) {
+                String line = textLines[i];
+                int lineX = (boardW - fm.stringWidth(line)) / 2;
+                int lineY = textStartY + i * lineHeight;
+                g2d.drawString(line, lineX, lineY);
+            }
             
             // Draw a small subtext
             g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 14));
             FontMetrics fmSub = g2d.getFontMetrics();
             String subText = success ? com.tetris.util.LanguageManager.get("正在載入下一關...", "Loading next level...") : com.tetris.util.LanguageManager.get("正在重置版面...", "Resetting board...");
             g2d.setColor(new Color(200, 200, 200));
-            g2d.drawString(subText, (boardW - fmSub.stringWidth(subText)) / 2, textY + 40);
+            g2d.drawString(subText, (boardW - fmSub.stringWidth(subText)) / 2, textStartY + textBlockHeight + 14);
         }
     }
 
