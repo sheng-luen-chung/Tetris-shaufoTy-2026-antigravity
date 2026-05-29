@@ -2699,8 +2699,10 @@ public class GamePanel extends JPanel {
 
         // 4. Return Hint at bottom
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
-        g2d.setColor(new Color(120, 120, 150));
         String hintText = com.tetris.util.LanguageManager.get("按下 ENTER 或 空白鍵 返回主選單", "Press ENTER or SPACE to Return to Menu");
+        long now = System.currentTimeMillis();
+        float pulse = (float) (0.6 + 0.4 * Math.sin(now / 250.0));
+        g2d.setColor(new Color(180, 180, 200, (int) (255 * pulse)));
         int hintX = (width - g2d.getFontMetrics().stringWidth(hintText)) / 2;
         g2d.drawString(hintText, hintX, 520);
     }
@@ -2748,8 +2750,8 @@ public class GamePanel extends JPanel {
         g2d.setColor(new Color(15, 10, 25, 230));
         g2d.fillRect(0, 0, w, h);
 
-        int cardW = 600;
-        int cardH = 420;
+        int cardW = Math.min(w - 120, 900);
+        int cardH = Math.max(420, Math.min(h - 120, 520));
         int cardX = (w - cardW) / 2;
         int cardY = (h - cardH) / 2;
 
@@ -2774,16 +2776,18 @@ public class GamePanel extends JPanel {
         g2d.setColor(new Color(255, 255, 255, 30));
         g2d.drawLine(cardX + 40, cardY + 75, cardX + cardW - 40, cardY + 75);
 
-        int colW = 240;
+        int colGap = 40; // Elegant gap between the two cards
+        int colW = (cardW - 80 - colGap) / 2;
         int p1X = cardX + 40;
-        int p2X = cardX + cardW - 40 - colW;
+        int p2X = p1X + colW + colGap;
         int colY = cardY + 110;
 
         // Player 1 Card (Left - AI CPU)
+        int cardInnerH = Math.max(220, cardH - 200);
         g2d.setColor(new Color(0, 255, 255, 10));
-        g2d.fillRoundRect(p1X, colY, colW, 200, 10, 10);
+        g2d.fillRoundRect(p1X, colY, colW, cardInnerH, 10, 10);
         g2d.setColor(new Color(0, 255, 255, 40));
-        g2d.drawRoundRect(p1X, colY, colW, 200, 10, 10);
+        g2d.drawRoundRect(p1X, colY, colW, cardInnerH, 10, 10);
         g2d.setColor(new Color(0, 255, 255));
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
         g2d.drawString(com.tetris.util.LanguageManager.get("玩家 1 (左側)：電腦 AI", "Player 1 (Left): Computer AI"), p1X + 15, colY + 30);
@@ -2796,20 +2800,27 @@ public class GamePanel extends JPanel {
 
         // Player 2 Card (Right - Human)
         g2d.setColor(new Color(255, 100, 255, 10));
-        g2d.fillRoundRect(p2X, colY, colW, 200, 10, 10);
+        g2d.fillRoundRect(p2X, colY, colW, cardInnerH, 10, 10);
         g2d.setColor(new Color(255, 100, 255, 40));
-        g2d.drawRoundRect(p2X, colY, colW, 200, 10, 10);
+        g2d.drawRoundRect(p2X, colY, colW, cardInnerH, 10, 10);
         g2d.setColor(new Color(255, 100, 255));
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
         g2d.drawString(com.tetris.util.LanguageManager.get("玩家 2 (右側)：人類玩家", "Player 2 (Right): Human Player"), p2X + 15, colY + 30);
         g2d.setColor(Color.WHITE);
         g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 13));
-        g2d.drawString(com.tetris.util.LanguageManager.get("• 使用【一般操作】操控方塊：", "• Use standard controls:"), p2X + 15, colY + 65);
-        g2d.drawString(com.tetris.util.LanguageManager.get("  -  ← / → ： 左右移動", "  -  ← / → : Move Left / Right"), p2X + 15, colY + 90);
-        g2d.drawString(com.tetris.util.LanguageManager.get("  -  ↓ ： 軟降加速", "  -  ↓ : Soft Drop"), p2X + 15, colY + 112);
-        g2d.drawString(com.tetris.util.LanguageManager.get("  -  ↑ ： 順時針旋轉", "  -  ↑ : Rotate Clockwise"), p2X + 15, colY + 134);
-        g2d.drawString(com.tetris.util.LanguageManager.get("  -  空白鍵 ： 硬降直接落地", "  -  Space : Hard Drop"), p2X + 15, colY + 156);
-        g2d.drawString(com.tetris.util.LanguageManager.get("  -  C ： 暫存保留方塊", "  -  C : Hold Piece"), p2X + 15, colY + 178);
+        int lineY = colY + 65;
+        int lineGap = 26;
+        g2d.drawString(com.tetris.util.LanguageManager.get("• 使用【一般操作】操控方塊：", "• Use standard controls:"), p2X + 15, lineY);
+        lineY += lineGap;
+        g2d.drawString(com.tetris.util.LanguageManager.get("• ← / → ： 左右移動", "• ← / → : Move Left / Right"), p2X + 15, lineY);
+        lineY += lineGap;
+        g2d.drawString(com.tetris.util.LanguageManager.get("• ↓ ： 軟降加速", "• ↓ : Soft Drop"), p2X + 15, lineY);
+        lineY += lineGap;
+        g2d.drawString(com.tetris.util.LanguageManager.get("• ↑ ： 順時針旋轉", "• ↑ : Rotate Clockwise"), p2X + 15, lineY);
+        lineY += lineGap;
+        g2d.drawString(com.tetris.util.LanguageManager.get("• Space ： 硬降直接落地", "• Space : Hard Drop"), p2X + 15, lineY);
+        lineY += lineGap;
+        g2d.drawString(com.tetris.util.LanguageManager.get("• C ： 暫存保留方塊", "• C : Hold Piece"), p2X + 15, lineY);
 
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
         long t = System.currentTimeMillis();
@@ -2817,7 +2828,29 @@ public class GamePanel extends JPanel {
         g2d.setColor(new Color(255, 215, 0, alpha));
         String startPrompt = com.tetris.util.LanguageManager.get("按下 [ENTER] 或 [空白鍵] 開始對戰...", "Press [ENTER] or [SPACEBAR] to Battle...");
         FontMetrics fmPrompt = g2d.getFontMetrics();
-        g2d.drawString(startPrompt, cardX + (cardW - fmPrompt.stringWidth(startPrompt)) / 2, cardY + cardH - 30);
+        int availW = cardW - 80;
+        if (fmPrompt.stringWidth(startPrompt) <= availW) {
+            g2d.drawString(startPrompt, cardX + (cardW - fmPrompt.stringWidth(startPrompt)) / 2, cardY + cardH - 30);
+        } else {
+            // try smaller font
+            g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 14));
+            fmPrompt = g2d.getFontMetrics();
+            if (fmPrompt.stringWidth(startPrompt) <= availW) {
+                g2d.drawString(startPrompt, cardX + (cardW - fmPrompt.stringWidth(startPrompt)) / 2, cardY + cardH - 30);
+            } else {
+                // wrap into two lines by splitting at nearest space
+                String s = startPrompt;
+                int breakIdx = s.length() / 2;
+                while (breakIdx > 0 && s.charAt(breakIdx) != ' ') breakIdx--;
+                if (breakIdx <= 0) breakIdx = s.length() / 2; // fallback
+                String line1 = s.substring(0, breakIdx).trim();
+                String line2 = s.substring(Math.min(breakIdx + 1, s.length())).trim();
+                int w1 = g2d.getFontMetrics().stringWidth(line1);
+                int w2 = g2d.getFontMetrics().stringWidth(line2);
+                g2d.drawString(line1, cardX + (cardW - w1) / 2, cardY + cardH - 42);
+                g2d.drawString(line2, cardX + (cardW - w2) / 2, cardY + cardH - 22);
+            }
+        }
     }
 
     private void startAiDemo() {
@@ -5136,10 +5169,12 @@ public class GamePanel extends JPanel {
         g2d.drawString(msg3, cardX + (cardW - g2d.getFontMetrics().stringWidth(msg3)) / 2, textY + 60);
         g2d.drawString(msg4, cardX + (cardW - g2d.getFontMetrics().stringWidth(msg4)) / 2, textY + 85);
         
-        // Prompt
+        // Prompt (pulsing)
         g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 16));
-        g2d.setColor(new Color(150, 150, 180));
         String prompt = com.tetris.util.LanguageManager.get("按下 ENTER 鍵或 ESC 返回主選單", "Press ENTER or ESC to return to main menu");
+        long nowP = System.currentTimeMillis();
+        float pulseP = (float) (0.6 + 0.4 * Math.sin(nowP / 250.0));
+        g2d.setColor(new Color(180, 180, 200, (int) (255 * pulseP)));
         g2d.drawString(prompt, (width - g2d.getFontMetrics().stringWidth(prompt)) / 2, 480);
     }
 
