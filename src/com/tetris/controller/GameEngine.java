@@ -510,6 +510,9 @@ public class GameEngine {
 
         panel.resetUIState();
         panel.setGameEngine2(null);
+        if (inputHandler != null) {
+            inputHandler.setEngine2(null);
+        }
         panel.updateWindowSize();
         panel.repaint();
     }
@@ -1886,6 +1889,11 @@ public class GameEngine {
     }
 
     public void startTutorialLevel(int level) {
+        this.gameMode = GameMode.ENDLESS;
+        panel.setGameEngine2(null);
+        if (inputHandler != null) {
+            inputHandler.setEngine2(null);
+        }
         this.tutorialLevel = level;
         this.isTransitioning = false;
         

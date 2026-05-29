@@ -293,7 +293,7 @@ public class InputHandler extends KeyAdapter {
                 } else {
                     resetKeyStates();
                 }
-            } else if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
+            } else if ((engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) && state != GameEngine.GameState.TUTORIAL) {
                 if (engine2 != null && !engine.isPaused()) {
                     if (engine.getGameMode() == com.tetris.model.GameMode.PVP && !engine.isGameOver()) {
                         updateP1Inputs(deltaTime);
@@ -780,7 +780,7 @@ public class InputHandler extends KeyAdapter {
                 return;
             }
 
-            if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
+            if (state != GameEngine.GameState.TUTORIAL && (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI)) {
                 // PVP / VS_AI Controls
                 // Resolve dynamic keys
                 int p1Left = pvpP1KeyLeft;
@@ -892,7 +892,7 @@ public class InputHandler extends KeyAdapter {
         int keyCode = e.getKeyCode();
         GameEngine.GameState state = engine.getGameState();
         if (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL) {
-            if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
+            if (state != GameEngine.GameState.TUTORIAL && (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI)) {
                 int p1Left = pvpP1KeyLeft;
                 int p1Right = pvpP1KeyRight;
                 int p1Down = pvpP1KeyDown;
