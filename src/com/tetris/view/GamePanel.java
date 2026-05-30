@@ -19,7 +19,6 @@ import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.KeyEvent;
-// import java.awt.event.MouseMotionAdapter;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -52,6 +51,7 @@ public class GamePanel extends JPanel {
     private final List<Particle> particlePool = new ArrayList<>();
     private final Timer animationTimer;
 
+    // Reuse particles whenever possible to avoid frequent allocations during gameplay effects.
     private Particle getOrCreateParticle(double x, double y, Color color, int size, double angle, double speed, float decay) {
         synchronized (particlePool) {
             if (!particlePool.isEmpty()) {
@@ -63,7 +63,7 @@ public class GamePanel extends JPanel {
         return new Particle(x, y, color, size, angle, speed, decay);
     }
 
-    // Utility: truncate a single-line string to fit maxWidth, adding ellipsis if needed
+    // Truncate a single-line string to fit the available width.
     private String truncateToWidth(Graphics2D g2, String text, int maxWidth) {
         if (text == null) return "";
         FontMetrics fm = g2.getFontMetrics();
@@ -82,8 +82,8 @@ public class GamePanel extends JPanel {
         return sb.toString() + ell;
     }
 
-    // Utility: wrap text into up to maxLines lines fitting maxWidth.
-    // Handles English word-wrapping and falls back to character-wrapping for CJK.
+    // Wrap text into up to maxLines lines while respecting the rendered width.
+    // Word-wrap is used when spaces exist; otherwise we fall back to character wrapping.
     private java.util.List<String> wrapText(Graphics2D g2, String text, int maxWidth, int maxLines) {
         java.util.List<String> lines = new java.util.ArrayList<>();
         if (text == null || text.isEmpty()) return lines;
@@ -105,12 +105,12 @@ public class GamePanel extends JPanel {
             }
             if (lines.size() < maxLines && cur.length() > 0) lines.add(cur.toString());
         } else {
-            // Character wrap for languages without spaces (e.g., Chinese)
+            // Character wrap for languages without spaces.
             StringBuilder cur = new StringBuilder();
             for (int i = 0; i < text.length(); i++) {
                 cur.append(text.charAt(i));
                 if (fm.stringWidth(cur.toString()) > maxWidth) {
-                    // remove last char
+                    // Remove the character that caused the overflow.
                     cur.setLength(Math.max(0, cur.length() - 1));
                     lines.add(cur.toString());
                     cur.setLength(0);
@@ -121,7 +121,7 @@ public class GamePanel extends JPanel {
             if (lines.size() < maxLines && cur.length() > 0) lines.add(cur.toString());
         }
 
-        // If too many lines, truncate the last line with ellipsis
+        // If the text still overflows, clamp the last visible line.
         if (lines.size() > maxLines) {
             while (lines.size() > maxLines) lines.remove(lines.size() - 1);
         }
@@ -130,7 +130,6 @@ public class GamePanel extends JPanel {
             if (fm.stringWidth(last) > maxWidth) {
                 lines.set(lines.size() - 1, truncateToWidth(g2, last, maxWidth));
             } else if (lines.get(lines.size() - 1).length() < text.length()) {
-                // Add ellipsis if original text has been truncated
                 if (!last.endsWith("...")) lines.set(lines.size() - 1, truncateToWidth(g2, last, maxWidth));
             }
         }
@@ -138,6 +137,7 @@ public class GamePanel extends JPanel {
         return lines;
     }
 
+    // Variant used for shaped particles such as line-clear bursts and special effects.
     private Particle getOrCreateParticle(double x, double y, Color color, int size, double angle, double speed, float decay, int shapeType) {
         synchronized (particlePool) {
             if (!particlePool.isEmpty()) {
@@ -151,6 +151,7 @@ public class GamePanel extends JPanel {
 
     private static final java.util.Map<String, Font> fontCache = new java.util.concurrent.ConcurrentHashMap<>();
 
+    // Cache Font instances because they are requested frequently during repaint.
     private static Font getCachedFont(String name, int style, int size) {
         String key = name + "_" + style + "_" + size;
         Font font = fontCache.get(key);
@@ -178,7 +179,6 @@ public class GamePanel extends JPanel {
 
     // Toast Notification properties
     private String activeToastTitle = null;
-    private String activeToastDesc = null;
     private long toastStartTime = 0;
     private static final int TOAST_DURATION = 3000;
 
@@ -217,7 +217,6 @@ public class GamePanel extends JPanel {
     private Rectangle bgmMuteBounds = new Rectangle();
     private Rectangle sfxMuteBounds = new Rectangle();
     private Rectangle menuSettingsBackButtonBounds = new Rectangle();
-    private Rectangle menuSettingsThemeBounds = new Rectangle();
 
     private Rectangle menuSettingsLanguageBounds = new Rectangle();
     private Rectangle menuSettingsDisplayBounds = new Rectangle();
@@ -226,7 +225,6 @@ public class GamePanel extends JPanel {
     private Rectangle menuDisplayGridBounds = new Rectangle();
     private Rectangle menuDisplayThemeBounds = new Rectangle();
     private Rectangle menuDisplayColorBlindBounds = new Rectangle();
-    private Rectangle menuSettingsColorBlindBounds = new Rectangle();
     private Rectangle menuSettingsSoundPackBounds = new Rectangle();
     private Rectangle menuSettingsPreviewCountBounds = new Rectangle();
     private Rectangle menuSettingsControlBounds = new Rectangle();
@@ -381,16 +379,16 @@ public class GamePanel extends JPanel {
             lineText = "B2B " + lineText;
         }
 
-        // If no lines cleared and not a T-spin, we don't display anything unless it's a raw T-Spin
+        // Skip empty popups unless the event still needs visible feedback.
         if (lineText.isEmpty() && score <= 0) {
             return;
         }
 
-        // Center popup horizontally in the grid
+        // Anchor the popup near the center of the board so it stays readable in both modes.
         int px = (COLS * TILE_SIZE) / 2;
         int py = gridRow * TILE_SIZE;
         if (py < 120) {
-            py = 120; // Keep it low enough to not be cut off by top border
+            py = 120; // Keep it below the top border.
         }
 
         synchronized (playerNum == 2 ? scorePopups2 : scorePopups) {
@@ -403,7 +401,7 @@ public class GamePanel extends JPanel {
         repaint();
     }
 
-    // Draw and update active score popups
+    // Draw and update active score popups.
     private void drawScorePopups(Graphics g) {
         drawScorePopups(g, scorePopups);
     }
@@ -413,7 +411,7 @@ public class GamePanel extends JPanel {
             return;
 
         Graphics2D g2 = (Graphics2D) g.create();
-        // Enable anti-aliasing for smooth rendering of text
+        // Enable anti-aliasing for smoother text rendering.
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         long now = System.currentTimeMillis();
 
@@ -429,43 +427,43 @@ public class GamePanel extends JPanel {
 
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
 
-                // 1. Draw Line clear text (e.g. TETRIS!)
+                // Draw the line-clear label first so it sits above the score text.
                 g2.setFont(sp.font);
                 FontMetrics fmLine = g2.getFontMetrics();
                 int lineW = fmLine.stringWidth(sp.lineText);
                 int lineH = fmLine.getAscent();
 
-                // Shadow
+                // Shadow layer.
                 g2.setColor(new Color(0, 0, 0, (int) (200 * alpha)));
                 g2.drawString(sp.lineText, sp.startX - lineW / 2 + 2, y + 2);
-                // Main
+                // Main text layer.
                 g2.setColor(sp.color);
                 g2.drawString(sp.lineText, sp.startX - lineW / 2, y);
 
-                // 2. Draw Score text (e.g. +800) right below it
+                // Draw the score value below the line-clear label.
                 g2.setFont(getCachedFont("Arial", Font.BOLD, 22)); // Score font size
                 FontMetrics fmScore = g2.getFontMetrics();
                 int scoreW = fmScore.stringWidth(sp.scoreText);
                 int scoreY = y + lineH + 6;
 
-                // Shadow
+                // Shadow layer.
                 g2.setColor(new Color(0, 0, 0, (int) (180 * alpha)));
                 g2.drawString(sp.scoreText, sp.startX - scoreW / 2 + 1, scoreY + 1);
-                // Main
+                // Main text layer.
                 g2.setColor(Color.WHITE);
                 g2.drawString(sp.scoreText, sp.startX - scoreW / 2, scoreY);
 
-                // 3. Draw Combo text if present
+                // Render the combo indicator when it exists.
                 if (sp.comboText != null && !sp.comboText.isEmpty()) {
                     g2.setFont(getCachedFont("Impact", Font.ITALIC, 22));
                     FontMetrics fmCombo = g2.getFontMetrics();
                     int comboW = fmCombo.stringWidth(sp.comboText);
                     int comboY = scoreY + fmScore.getAscent() + 10;
 
-                    // Shadow
+                    // Shadow layer.
                     g2.setColor(new Color(0, 0, 0, (int) (180 * alpha)));
                     g2.drawString(sp.comboText, sp.startX - comboW / 2 + 1, comboY + 1);
-                    // Main - Neon Orange/Gold
+                    // Main text layer.
                     g2.setColor(new Color(255, 140, 0));
                     g2.drawString(sp.comboText, sp.startX - comboW / 2, comboY);
                 }
@@ -548,7 +546,7 @@ public class GamePanel extends JPanel {
             }
         });
 
-        // Initialize floating pieces for the menu background
+        // Seed the menu background with drifting tetromino pieces.
         Random rand = new Random();
         com.tetris.model.Tetromino[] types = com.tetris.model.Tetromino.values();
         for (int i = 0; i < 8; i++) {
@@ -564,7 +562,7 @@ public class GamePanel extends JPanel {
             floatingPieces.add(fp);
         }
 
-        // Start menu animation timer (30 FPS)
+        // Drive background animation while the panel is on non-game screens.
         menuAnimationTimer = new Timer(33, e -> {
             if (gameEngine != null) {
                 com.tetris.controller.GameEngine.GameState state = gameEngine.getGameState();
@@ -580,7 +578,7 @@ public class GamePanel extends JPanel {
         });
         menuAnimationTimer.start();
 
-        // Unified mouse inputs for hover, click, and volume dragging
+        // Handle clicks, hover behavior, and slider dragging through one listener.
         MouseAdapter mouseAdapter = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
@@ -590,7 +588,7 @@ public class GamePanel extends JPanel {
                 if (state == com.tetris.controller.GameEngine.GameState.MENU) {
                     if (showSettingsInMenu) {
                         if (showControlSettings) {
-                            // Clicks inside control settings
+                            // Handle clicks inside the control settings submenu.
                             if (controlBackButtonBounds != null && controlBackButtonBounds.contains(e.getPoint())) {
                                 showControlSettings = false;
                                 rebindingAction = null;
@@ -1081,7 +1079,7 @@ public class GamePanel extends JPanel {
         addMouseListener(mouseAdapter);
         addMouseMotionListener(mouseAdapter);
 
-        // Set the size of the game panel (grid + sidebar)
+        // Set the default panel size for the standard single-player layout.
         setPreferredSize(new Dimension(COLS * TILE_SIZE + SIDEBAR_WIDTH, ROWS * TILE_SIZE));
         setBackground(Color.BLACK);
         setFocusable(true);
@@ -1239,7 +1237,7 @@ public class GamePanel extends JPanel {
         this.currentPiece = piece;
     }
 
-    // Deprecated: Score is now retrieved from gameEngine
+    // Deprecated: score now comes directly from gameEngine.
     public void setScore(int score) {
         // Keeping it for compatibility with existing calls, but will use engine's score
     }
@@ -1807,19 +1805,6 @@ public class GamePanel extends JPanel {
         repaint();
     }
 
-    // private com.tetris.controller.GameEngine.Difficulty getNextDifficulty(com.tetris.controller.GameEngine.Difficulty current) {
-    //     switch (current) {
-    //         case EASY:
-    //             return com.tetris.controller.GameEngine.Difficulty.NORMAL;
-    //         case NORMAL:
-    //             return com.tetris.controller.GameEngine.Difficulty.HARD;
-    //         case HARD:
-    //             return com.tetris.controller.GameEngine.Difficulty.EASY;
-    //         default:
-    //             return com.tetris.controller.GameEngine.Difficulty.NORMAL;
-    //     }
-    // }
-
     // Update floating particle positions
     private void updateFloatingPieces() {
         int width = getWidth();
@@ -1885,7 +1870,6 @@ public class GamePanel extends JPanel {
                 drawControlSettings(g2d);
             } else if (showDisplaySettingsInMenu) {
                 int cardW = 340;
-                int cardH = 270;
                 int cardX = (getWidth() - cardW) / 2;
                 int cardY = 150;
                 drawDisplaySettings(g2d, cardX, cardY, cardW, false);
@@ -2012,7 +1996,7 @@ public class GamePanel extends JPanel {
             java.awt.font.FontRenderContext frc = g2d.getFontRenderContext();
             float textWidthF = new java.awt.font.TextLayout(label, g2d.getFont(), frc).getAdvance();
             int textWidth = (int) Math.round(textWidthF);
-            int textHeight = fm.getHeight();
+            
             int x = (getWidth() - textWidth) / 2;
             int y = startY + i * gap;
 
@@ -3374,11 +3358,7 @@ public class GamePanel extends JPanel {
         }
     }
 
-    // Draw the ghost piece
-    private void drawGhostPiece(Graphics g) {
-        drawGhostPiece(g, currentPiece, board);
-    }
-
+    // Draw ghost piece (translucent preview of where the piece will land)
     private void drawGhostPiece(Graphics g, Piece targetPiece, Board targetBoard) {
         if (targetPiece == null || targetBoard == null)
             return;
@@ -4578,7 +4558,6 @@ public class GamePanel extends JPanel {
         int startY = cardY + 40;
         int gap = isSelectingModeForAiDemo ? 38 : 37;
 
-        java.awt.Point mousePos = getMousePosition();
         int numModes = isSelectingModeForAiDemo ? 6 : 9;
 
         for (int i = 0; i < numModes; i++) {
@@ -4736,8 +4715,6 @@ public class GamePanel extends JPanel {
         int btnX = cardX + (cardW - btnW) / 2;
         int startY = cardY + 45;
         int gap = 55;
-
-        java.awt.Point mousePos = getMousePosition();
 
         for (int i = 0; i < 4; i++) {
             int y = startY + i * gap;
@@ -5526,7 +5503,7 @@ public class GamePanel extends JPanel {
 
         for (int i = 0; i < 8; i++) {
             int textWidth = fmOpt.stringWidth(levels[i]);
-            int textHeight = fmOpt.getHeight();
+            
             int x = baseX; // left-align within the centered block
             int y = startY + i * gap;
 
@@ -5770,7 +5747,6 @@ public class GamePanel extends JPanel {
 
     public void showAchievementToast(String title, String desc) {
         this.activeToastTitle = title;
-        this.activeToastDesc = desc;
         this.toastStartTime = System.currentTimeMillis();
         
         // Play clear sound as achievement chime
