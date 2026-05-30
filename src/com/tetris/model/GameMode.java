@@ -10,4 +10,3 @@ public enum GameMode {
     PVP,
     NET_PVP
 }
-
