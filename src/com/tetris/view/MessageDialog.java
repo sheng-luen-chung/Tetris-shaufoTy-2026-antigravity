@@ -5,11 +5,8 @@ import java.awt.*;
 import java.awt.event.*;
 
 public class MessageDialog extends JDialog {
-    private boolean isError = false;
-
     public MessageDialog(Frame parent, String titleText, String messageText, boolean isError) {
         super(parent, true); // Modal dialog
-        this.isError = isError;
         setUndecorated(true);
         setSize(380, 160);
         setLocationRelativeTo(parent);
