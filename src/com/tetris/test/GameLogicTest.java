@@ -5,6 +5,7 @@ import com.tetris.model.Piece;
 import com.tetris.model.Tetromino;
 import com.tetris.controller.GameEngine;
 import com.tetris.view.GamePanel;
+import com.tetris.util.AchievementManager;
 import java.awt.Color;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +24,7 @@ public class GameLogicTest {
         testCCWWallKick();
         testTSpinMiniUpgrade();
         testBackToBackScoring();
+        testComboAchievementSync();
         
         System.out.println("All tests passed successfully!");
     }
@@ -123,6 +125,22 @@ public class GameLogicTest {
         java.lang.reflect.Field field = obj.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         return field.get(obj);
+    }
+
+    private static void setAchievementUnlocked(String id, boolean unlocked) throws Exception {
+        java.lang.reflect.Field achievementsField = AchievementManager.class.getDeclaredField("achievements");
+        achievementsField.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<String, ?> achievements = (Map<String, ?>) achievementsField.get(null);
+        Object info = achievements.get(id);
+        if (info == null) {
+            throw new Exception("Unknown achievement id: " + id);
+        }
+
+        java.lang.reflect.Field unlockedField = info.getClass().getDeclaredField("unlocked");
+        unlockedField.setAccessible(true);
+        unlockedField.setBoolean(info, unlocked);
     }
 
     private static void test7BagRandomizer() throws Exception {
@@ -298,5 +316,40 @@ public class GameLogicTest {
         }
 
         System.out.println("  - testBackToBackScoring: PASSED");
+    }
+
+    private static void testComboAchievementSync() throws Exception {
+        Board board = new Board();
+        GamePanel panel = new GamePanel(board);
+        GameEngine engine = new GameEngine(board, panel);
+
+        // Make sure the achievement starts locked for this test.
+        setAchievementUnlocked("combo_master", false);
+
+        // Simulate that the player already has a 4-combo streak before the next clear.
+        setField(engine, "gameState", GameEngine.GameState.PLAYING);
+        setField(engine, "comboCount", 4);
+        setField(engine, "maxCombo", 4);
+
+        // Prepare a single line clear with an O piece that completes the bottom row.
+        Color[][] grid = board.getGrid();
+        for (int c = 0; c < Board.COLS; c++) {
+            grid[Board.ROWS - 1][c] = (c == 4 || c == 5) ? null : Color.BLUE;
+        }
+        Piece oPiece = new Piece(Tetromino.O, Board.ROWS - 2, 3, 0);
+        setField(engine, "currentPiece", oPiece);
+
+        invokeMethod(engine, "freezeAndSpawn", new Class<?>[0], new Object[0]);
+
+        int comboAfter = (int) getField(engine, "comboCount");
+        if (comboAfter != 5) {
+            throw new Exception("comboCount should become 5 after the 5th consecutive clear, got: " + comboAfter);
+        }
+
+        if (!AchievementManager.isUnlocked("combo_master")) {
+            throw new Exception("combo_master achievement should unlock when comboCount reaches 5");
+        }
+
+        System.out.println("  - testComboAchievementSync: PASSED");
     }
 }
