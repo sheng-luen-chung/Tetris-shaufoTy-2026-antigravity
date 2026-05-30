@@ -5,7 +5,6 @@ import com.tetris.model.LeaderboardEntry;
 import com.tetris.model.Piece;
 import com.tetris.model.Tetromino;
 import com.tetris.view.GamePanel;
-import javax.swing.Timer;
 import java.util.Random;
 import java.util.List;
 import com.tetris.util.SoundManager;
@@ -13,6 +12,11 @@ import com.tetris.util.SaveManager;
 import com.tetris.model.GameMode;
 import java.awt.Color;
 
+/**
+ * Core game engine for Tetris: handles game state, timing, input processing,
+ * piece spawning, scoring, AI autoplay, networking (NET_PVP) and leaderboard
+ * interactions. Runs a fixed-timestep game loop and updates the `GamePanel`.
+ */
 public class GameEngine {
     public enum GameState {
         MENU,
@@ -239,6 +243,8 @@ public class GameEngine {
         }
     }
 
+    // Main fixed-timestep game loop running on a background thread.
+    // Keeps game logic at a stable 100Hz while aiming for ~60 FPS rendering.
     private void runGameLoop() {
         long lastTime = System.nanoTime();
         double tickTimeNs = 1000000000.0 / 100.0; // 100Hz logic tick
@@ -347,6 +353,7 @@ public class GameEngine {
         }
     }
 
+    // Handle per-second updates: mode-specific timers and periodic events.
     private void handleSecondsTick() {
         if (gameMode == GameMode.ULTRA && secondsElapsed >= 120) {
             isGameOver = true;
@@ -379,7 +386,7 @@ public class GameEngine {
         }
     }
 
-    // Start a new game session
+    // Initialize and start a new game session (reset state and timers)
     public void startGame() {
         board.clear();
         SaveManager.deleteSave();
@@ -504,7 +511,7 @@ public class GameEngine {
         panel.repaint();
     }
 
-    // Return to main menu
+    // Switch from gameplay back to main menu and reset UI state
     public void returnToMenu() {
         setAiPlay(false); // Stop AI Autoplay
         gameState = GameState.MENU;
@@ -525,13 +532,13 @@ public class GameEngine {
         panel.repaint();
     }
 
-    // Go to leaderboard screen
+    // Enter leaderboard view
     public void showLeaderboard() {
         gameState = GameState.LEADERBOARD;
         panel.repaint();
     }
 
-    // Toggle pause
+    // Toggle game pause state (no-op in NET_PVP)
     public void togglePause() {
         if (gameMode == GameMode.NET_PVP)
             return;
@@ -552,7 +559,8 @@ public class GameEngine {
         panel.repaint();
     }
 
-    // Lock Delay Logic
+    // Lock delay (ARE) mechanism: controls when a piece locks after touching
+    // the ground, with per-move resets and a hard cap to avoid infinite delay.
     private void startLockDelay() {
         if (!isLocking) {
             isLocking = true;
@@ -573,6 +581,8 @@ public class GameEngine {
         }
     }
 
+    // Pause lock delay (piece left the ground). Note: we intentionally do
+    // not reset the `lockMoveResets` counter here so the reset budget persists.
     private void stopLockDelay() {
         isLocking = false;
         // NOTE: do NOT reset lockMoveResets here.
@@ -580,6 +590,8 @@ public class GameEngine {
         // bypass MAX_LOCK_RESETS by briefly lifting the piece and re-landing it.
     }
 
+    // Refresh lock delay when a valid move/rotation occurs while the piece
+    // is on the ground (consumes a reset from the budget).
     private void resetLockDelay() {
         // Check if the piece is actually on the ground
         currentPiece.move(1, 0);
@@ -603,6 +615,8 @@ public class GameEngine {
         }
     }
 
+    // Check lock delay expiry and, if expired and piece still on ground,
+    // lock the piece and spawn the next one.
     public void tickLockDelay() {
         if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused)
             return;
@@ -678,7 +692,8 @@ public class GameEngine {
         panel.repaint(); // Repaint
     }
 
-    // Freeze and spawn piece
+    // Freeze current piece into board, handle clears, scoring, garbage,
+    // achievements, effects, and then spawn the next piece.
     private void freezeAndSpawn() {
         int popupCol = getCurrentPieceCenterCol();
         int popupRow = getCurrentPieceCenterRow();
@@ -1105,7 +1120,7 @@ public class GameEngine {
         return count == 0 ? 0 : Math.round(sum / (float) count);
     }
 
-    // Generate a random piece using 7-bag system
+    // Generate a new Piece. Uses tutorial overrides or 7-bag RNG otherwise.
     private Piece generateRandomPiece() {
         if (gameState == GameState.TUTORIAL) {
             switch (tutorialLevel) {
@@ -1128,7 +1143,8 @@ public class GameEngine {
         return new Piece(tetrominoBag.remove(0));
     }
 
-    // Spawn new piece
+    // Spawn a new piece, reset per-piece state, and handle spawn-time
+    // collision (game over) and leaderboard entry logic.
     private void spawnNewPiece() {
         // Fully reset all lock-delay state for the incoming piece
         stopLockDelay();
@@ -1167,7 +1183,7 @@ public class GameEngine {
             if (gameMode == GameMode.NET_PVP && playerNum == 1) {
                 synchronized (panel) {
                     if (this.pvpWinner == 0 && opponent != null && opponent.getPvpWinner() == 0) {
-                        int winner = 2; // 對手獲勝
+                        int winner = 2; // opponent wins
                         this.pvpWinner = winner;
                         opponent.setPvpWinner(winner);
                         opponent.isGameOver = true;
@@ -1227,7 +1243,7 @@ public class GameEngine {
         return (score / 500) + 1;
     }
 
-    // Save current game state
+    // Save current game state to persistent storage (unless mode prevents saving)
     public void saveGame() {
         if (gameState != GameState.PLAYING || isGameOver || aiDemoMode || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL || gameMode == GameMode.STAGE || gameMode == GameMode.PVP || gameMode == GameMode.VS_AI || gameMode == GameMode.NET_PVP) {
             return;
@@ -1236,7 +1252,7 @@ public class GameEngine {
                          piecesSpawned, totalActions, totalLinesCleared, tetrisClears, tSpins, maxCombo);
     }
 
-    // Load game state from save file
+    // Load game state from persistent storage and restore engine state
     public void loadGame() {
         if (!SaveManager.hasSave()) {
             return;
@@ -1889,7 +1905,7 @@ public class GameEngine {
         return baseDelay;
     }
 
-    // AI step execution
+    // Run one AI decision step: compute best move and queue actions
     private void runAIStep() {
         if (gameState != GameState.PLAYING || isPaused || isGameOver) {
             return;
@@ -2130,6 +2146,7 @@ public class GameEngine {
         return score + "," + totalLinesCleared + "," + comboCount + "," + (isGameOver ? "1" : "0") + "," + heldType + "," + curType + "," + curCol + "," + curRow + "," + curRot + "," + piecesSpawned + "|" + gridSb.toString();
     }
 
+    // Deserialize a serialized game state string (used for NET_PVP sync)
     public void deserializeGameState(String stateStr) {
         try {
             int pipeIdx = stateStr.indexOf('|');
