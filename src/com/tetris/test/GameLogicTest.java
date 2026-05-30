@@ -24,6 +24,7 @@ public class GameLogicTest {
         testCCWWallKick();
         testTSpinMiniUpgrade();
         testBackToBackScoring();
+        testGarbageRuleTable();
         testComboAchievementSync();
         
         System.out.println("All tests passed successfully!");
@@ -316,6 +317,37 @@ public class GameLogicTest {
         }
 
         System.out.println("  - testBackToBackScoring: PASSED");
+    }
+
+    private static void testGarbageRuleTable() throws Exception {
+        Board board = new Board();
+        GamePanel panel = new GamePanel(board);
+        GameEngine engine = new GameEngine(board, panel);
+
+        assertGarbageLines(engine, 1, GameEngine.TSpinType.NONE, false, 1, 0, "single");
+        assertGarbageLines(engine, 2, GameEngine.TSpinType.NONE, false, 1, 1, "double");
+        assertGarbageLines(engine, 3, GameEngine.TSpinType.NONE, false, 1, 2, "triple");
+        assertGarbageLines(engine, 4, GameEngine.TSpinType.NONE, false, 1, 4, "tetris");
+
+        assertGarbageLines(engine, 1, GameEngine.TSpinType.REGULAR, false, 1, 2, "t-spin single");
+        assertGarbageLines(engine, 2, GameEngine.TSpinType.REGULAR, false, 1, 4, "t-spin double");
+        assertGarbageLines(engine, 3, GameEngine.TSpinType.REGULAR, false, 1, 6, "t-spin triple");
+
+        assertGarbageLines(engine, 1, GameEngine.TSpinType.MINI, false, 1, 1, "mini single");
+        assertGarbageLines(engine, 2, GameEngine.TSpinType.MINI, false, 1, 2, "mini double");
+
+        assertGarbageLines(engine, 4, GameEngine.TSpinType.NONE, true, 1, 5, "b2b tetris");
+        assertGarbageLines(engine, 2, GameEngine.TSpinType.NONE, false, 3, 3, "combo double");
+
+        System.out.println("  - testGarbageRuleTable: PASSED");
+    }
+
+    private static void assertGarbageLines(GameEngine engine, int lines, GameEngine.TSpinType tSpinType, boolean isB2B, int comboCount, int expected, String label) throws Exception {
+        Object result = invokeMethod(engine, "getGarbageLinesToSend", new Class<?>[] { int.class, GameEngine.TSpinType.class, boolean.class, int.class }, new Object[] { lines, tSpinType, isB2B, comboCount });
+        int actual = (int) result;
+        if (actual != expected) {
+            throw new Exception("Garbage rule mismatch for " + label + ": expected " + expected + ", got " + actual);
+        }
     }
 
     private static void testComboAchievementSync() throws Exception {

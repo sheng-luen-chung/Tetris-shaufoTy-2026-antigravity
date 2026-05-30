@@ -796,60 +796,12 @@ public class GameEngine {
 
         // PVP Garbage Generation
         if (gameMode == GameMode.NET_PVP && playerNum == 1 && (lines > 0 || isTSpin)) {
-            int garbageToSend = 0;
-            if (isTSpin) {
-                if (tSpinType == TSpinType.REGULAR) {
-                    switch (lines) {
-                        case 0: garbageToSend = 1; break;
-                        case 1: garbageToSend = 2; break;
-                        case 2: garbageToSend = 4; break;
-                        case 3: garbageToSend = 6; break;
-                    }
-                } else if (tSpinType == TSpinType.MINI) {
-                    garbageToSend = (lines >= 1) ? lines : 1;
-                }
-            } else {
-                switch (lines) {
-                    case 2: garbageToSend = 1; break;
-                    case 3: garbageToSend = 2; break;
-                    case 4: garbageToSend = 4; break;
-                }
-            }
-            if (isB2BThisTurn) {
-                garbageToSend += 1;
-            }
-            if (comboCount > 1) {
-                garbageToSend += comboCount - 1;
-            }
+            int garbageToSend = getGarbageLinesToSend(lines, tSpinType, isB2BThisTurn, comboCount);
             if (garbageToSend > 0) {
                 com.tetris.util.NetworkManager.getInstance().send("GARBAGE:" + garbageToSend);
             }
         } else if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null && (lines > 0 || isTSpin)) {
-            int garbageToSend = 0;
-            if (isTSpin) {
-                if (tSpinType == TSpinType.REGULAR) {
-                    switch (lines) {
-                        case 0: garbageToSend = 1; break;
-                        case 1: garbageToSend = 2; break;
-                        case 2: garbageToSend = 4; break;
-                        case 3: garbageToSend = 6; break;
-                    }
-                } else if (tSpinType == TSpinType.MINI) {
-                    garbageToSend = (lines >= 1) ? lines : 1;
-                }
-            } else {
-                switch (lines) {
-                    case 2: garbageToSend = 1; break;
-                    case 3: garbageToSend = 2; break;
-                    case 4: garbageToSend = 4; break;
-                }
-            }
-            if (isB2BThisTurn) {
-                garbageToSend += 1;
-            }
-            if (comboCount > 1) {
-                garbageToSend += comboCount - 1;
-            }
+            int garbageToSend = getGarbageLinesToSend(lines, tSpinType, isB2BThisTurn, comboCount);
             if (garbageToSend > 0) {
                 opponent.receiveGarbage(garbageToSend);
             }
@@ -1088,6 +1040,41 @@ public class GameEngine {
                 default: return 0;
             }
         }
+    }
+
+    private int getGarbageLinesToSend(int lines, TSpinType tSpinType, boolean isB2BThisTurn, int comboCount) {
+        int garbageToSend = 0;
+
+        if (tSpinType == TSpinType.REGULAR) {
+            switch (lines) {
+                case 1: garbageToSend = 2; break;
+                case 2: garbageToSend = 4; break;
+                case 3: garbageToSend = 6; break;
+                default: garbageToSend = 0; break;
+            }
+        } else if (tSpinType == TSpinType.MINI) {
+            switch (lines) {
+                case 1: garbageToSend = 1; break;
+                case 2: garbageToSend = 2; break;
+                default: garbageToSend = 0; break;
+            }
+        } else {
+            switch (lines) {
+                case 2: garbageToSend = 1; break;
+                case 3: garbageToSend = 2; break;
+                case 4: garbageToSend = 4; break;
+                default: garbageToSend = 0; break;
+            }
+        }
+
+        if (isB2BThisTurn) {
+            garbageToSend += 1;
+        }
+        if (comboCount > 1) {
+            garbageToSend += comboCount - 1;
+        }
+
+        return garbageToSend;
     }
 
     private void updateScore(int points) {
