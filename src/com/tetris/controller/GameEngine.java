@@ -86,7 +86,7 @@ public class GameEngine {
     private boolean leaderboardRecorded = false;
     private int score = 0;
     private int secondsElapsed = 0;
-    private int comboCount = -1; // -1 means no combo, 0+ means consecutive clears
+    private int comboCount = 0; // 0 means no combo, 1+ means consecutive clears
     private boolean lastMoveWasRotation = false;
     private int[] lastRotationKickOffset = {0, 0};
     private int lastRotationFromState = 0;
@@ -385,7 +385,7 @@ public class GameEngine {
         SaveManager.deleteSave();
         score = 0;
         secondsElapsed = 0;
-        comboCount = -1;
+        comboCount = 0;
         isGameOver = false;
         isVictory = false;
         isPaused = false;
@@ -445,7 +445,7 @@ public class GameEngine {
             opponent.board.clear();
             opponent.score = 0;
             opponent.secondsElapsed = 0;
-            opponent.comboCount = -1;
+            opponent.comboCount = 0;
             opponent.isGameOver = false;
             opponent.isVictory = false;
             opponent.isPaused = false;
@@ -790,7 +790,7 @@ public class GameEngine {
             maxCombo = Math.max(maxCombo, comboCount);
             SoundManager.playSFX("/resources/clear.wav");
         } else {
-            comboCount = -1;
+            comboCount = 0;
             SoundManager.playSynthSound(SoundManager.SoundType.LOCK);
         }
 
@@ -818,8 +818,8 @@ public class GameEngine {
             if (isB2BThisTurn) {
                 garbageToSend += 1;
             }
-            if (comboCount >= 1) {
-                garbageToSend += comboCount;
+            if (comboCount > 1) {
+                garbageToSend += comboCount - 1;
             }
             if (garbageToSend > 0) {
                 com.tetris.util.NetworkManager.getInstance().send("GARBAGE:" + garbageToSend);
@@ -847,8 +847,8 @@ public class GameEngine {
             if (isB2BThisTurn) {
                 garbageToSend += 1;
             }
-            if (comboCount >= 1) {
-                garbageToSend += comboCount;
+            if (comboCount > 1) {
+                garbageToSend += comboCount - 1;
             }
             if (garbageToSend > 0) {
                 opponent.receiveGarbage(garbageToSend);
@@ -906,7 +906,7 @@ public class GameEngine {
                 intensity += 4;
                 duration = Math.max(duration, 180);
             }
-            if (comboCount >= 2) {
+            if (comboCount > 1) {
                 intensity += 2;
                 duration += 50;
             }
@@ -927,8 +927,8 @@ public class GameEngine {
             }
             
             // Add Combo Bonus
-            if (comboCount > 0) {
-                points += 50 * comboCount;
+            if (comboCount > 1) {
+                points += 50 * (comboCount - 1);
             }
             
             // Add Perfect Clear Bonus
@@ -1279,7 +1279,7 @@ public class GameEngine {
         this.tetrisClears = state.tetrisClears;
         this.tSpins = state.tSpins;
         this.maxCombo = state.maxCombo;
-        this.comboCount = -1;
+        this.comboCount = 0;
         this.isGameOver = false;
         this.isVictory = false;
         this.isPaused = true; // Start paused for safety
@@ -1971,7 +1971,7 @@ public class GameEngine {
         board.clear();
         score = 0;
         secondsElapsed = 0;
-        comboCount = -1;
+        comboCount = 0;
         isGameOver = false;
         isPaused = false;
         heldPiece = null;

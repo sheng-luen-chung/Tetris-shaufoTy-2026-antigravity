@@ -3127,10 +3127,10 @@ public class GamePanel extends JPanel {
             String dFmt = com.tetris.util.LanguageManager.get("達成 T-Spin 3 次以上 (%d 次)", "Achieved T-Spin 3+ times (%d times)");
             earnedBadges.add(new Badge(t, String.format(dFmt, gameEngine.getTSpins()), new Color(180, 100, 255)));
         }
-        if (gameEngine.getMaxCombo() >= 3) { // 4+ consecutive clears
+        if (gameEngine.getMaxCombo() >= 4) { // 4+ consecutive clears
             String t = com.tetris.util.LanguageManager.get("🔥 連消專家", "🔥 Combo Expert");
             String dFmt = com.tetris.util.LanguageManager.get("最高連消次數達 %d 次", "Max combo reached %d");
-            earnedBadges.add(new Badge(t, String.format(dFmt, (gameEngine.getMaxCombo() + 1)), new Color(255, 50, 150)));
+            earnedBadges.add(new Badge(t, String.format(dFmt, gameEngine.getMaxCombo()), new Color(255, 50, 150)));
         }
 
         // Draw Badges
@@ -3147,29 +3147,29 @@ public class GamePanel extends JPanel {
             for (int i = 0; i < Math.min(3, earnedBadges.size()); i++) {
                 Badge badge = earnedBadges.get(i);
 
-                int titleX = badgeContainerX + 20;
-                int descX = badgeContainerX + 160;
-                int descMaxWidth = badgeContainerX + badgeContainerW - 20 - descX;
+                int badgeTitleX = badgeContainerX + 20;
+                int badgeDescX = badgeContainerX + 160;
+                int badgeDescMaxWidth = badgeContainerX + badgeContainerW - 20 - badgeDescX;
                 
                 // Draw badge title
                 g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 12));
                 g2d.setColor(badge.color);
-                g2d.drawString(badge.title, titleX, badgeY);
+                g2d.drawString(badge.title, badgeTitleX, badgeY);
 
                 // Draw badge description
                 g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 11));
                 g2d.setColor(new Color(210, 210, 220));
-                java.util.List<String> descLines = wrapText(g2d, badge.description, descMaxWidth, 2);
-                int descLineHeight = g2d.getFontMetrics().getHeight();
-                int descBaseY = badgeY;
+                java.util.List<String> descLines = wrapText(g2d, badge.description, badgeDescMaxWidth, 2);
+                int badgeDescLineHeight = g2d.getFontMetrics().getHeight();
+                int badgeDescBaseY = badgeY;
                 for (int lineIndex = 0; lineIndex < descLines.size(); lineIndex++) {
-                    g2d.drawString(descLines.get(lineIndex), descX, descBaseY + (lineIndex * descLineHeight));
+                    g2d.drawString(descLines.get(lineIndex), badgeDescX, badgeDescBaseY + (lineIndex * badgeDescLineHeight));
                 }
 
                 // Draw a divider line
                 if (i < Math.min(3, earnedBadges.size()) - 1) {
                     g2d.setColor(new Color(255, 255, 255, 15));
-                    int dividerY = badgeY + Math.max(12, descLineHeight + 2);
+                    int dividerY = badgeY + Math.max(12, badgeDescLineHeight + 2);
                     g2d.drawLine(badgeContainerX + 15, dividerY, badgeContainerX + badgeContainerW - 15, dividerY);
                 }
 
