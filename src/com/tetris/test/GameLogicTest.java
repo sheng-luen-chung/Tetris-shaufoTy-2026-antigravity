@@ -1,38 +1,49 @@
 package com.tetris.test;
 
+import com.tetris.controller.GameEngine;
 import com.tetris.model.Board;
 import com.tetris.model.Piece;
 import com.tetris.model.Tetromino;
-import com.tetris.controller.GameEngine;
-import com.tetris.view.GamePanel;
 import com.tetris.util.AchievementManager;
+import com.tetris.view.GamePanel;
 import java.awt.Color;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 集中式的簡易測試集合 (非 JUnit)。
+ *
+ * 此類使用靜態方法來驗證遊戲邏輯（例如消行、旋轉、7-bag 隨機化、B2B 計分等）。
+ * 為了測試私有成員與方法，部分測試透過反射存取/呼叫。
+ */
 public class GameLogicTest {
 
+    /**
+     * 執行所有測試方法的入口。若任一測試失敗會丟出例外並停止執行。
+     */
     public static void runAllTests() throws Exception {
         System.out.println("Running Tetris Game Logic Tests...");
-        testBoardLineClear();
-        testPieceMovement();
-        testPieceRotation();
-        testCollisionChecking();
-        
-        // New Tests
-        test7BagRandomizer();
-        testCCWWallKick();
-        testTSpinMiniUpgrade();
-        testBackToBackScoring();
-        testGarbageRuleTable();
-        testComboAchievementSync();
-        
+        testBoardLineClear();      // 測試單行消除
+        testPieceMovement();       // 測試方塊移動
+        testPieceRotation();       // 測試方塊旋轉
+        testCollisionChecking();   // 測試碰撞 / 邊界檢查
+
+        // 進階測項
+        test7BagRandomizer();      // 測試 7-bag 隨機器
+        testCCWWallKick();         // 測試牆壁補位 (CCW)
+        testTSpinMiniUpgrade();    // 測試 T-Spin mini 升級為 REGULAR 的情形
+        testBackToBackScoring();   // 測試 B2B 計分與分數累計
+        testGarbageRuleTable();    // 測試送垃圾行規則表
+        testComboAchievementSync(); // 測試連擊與成就同步
+
         System.out.println("All tests passed successfully!");
     }
 
+    // --- 基本單元測試 ---
     private static void testBoardLineClear() throws Exception {
         Board board = new Board();
         Color[][] grid = board.getGrid();
+        // 填滿最底一列
         for (int c = 0; c < Board.COLS; c++) {
             grid[Board.ROWS - 1][c] = Color.BLUE;
         }
@@ -42,6 +53,7 @@ public class GameLogicTest {
             throw new Exception("Board failed to clear exactly 1 line. Cleared: " + cleared);
         }
 
+        // 確認該列已被清空
         for (int c = 0; c < Board.COLS; c++) {
             if (grid[Board.ROWS - 1][c] != null) {
                 throw new Exception("Cell in bottom row should be null after line clear!");
@@ -51,6 +63,7 @@ public class GameLogicTest {
     }
 
     private static void testPieceMovement() throws Exception {
+        // 測試 move() 對 row / col 的影響
         Piece piece = new Piece(Tetromino.I);
         int initialRow = piece.getRow();
         int initialCol = piece.getCol();
@@ -63,6 +76,7 @@ public class GameLogicTest {
     }
 
     private static void testPieceRotation() throws Exception {
+        // 測試 rotate() / undoRotate() 是否正確更新 rotation index
         Piece piece = new Piece(Tetromino.T);
         if (piece.getRotationIndex() != 0) {
             throw new Exception("Initial rotation index should be 0");
@@ -81,6 +95,7 @@ public class GameLogicTest {
     }
 
     private static void testCollisionChecking() throws Exception {
+        // 測試有效位置判定與碰撞偵測
         Board board = new Board();
         Piece piece = new Piece(Tetromino.O, 0, 3, 0);
 
@@ -98,6 +113,7 @@ public class GameLogicTest {
             throw new Exception("Piece below board should be invalid!");
         }
 
+        // 放一格已凍結的方塊，測試碰撞
         Color[][] grid = board.getGrid();
         grid[2][4] = Color.RED;
         Piece collidingPiece = new Piece(Tetromino.O, 1, 3, 0);
@@ -107,21 +123,19 @@ public class GameLogicTest {
         System.out.println("  - testCollisionChecking: PASSED");
     }
 
-    // Reflective helper to invoke private methods
+    // --- 反射輔助方法（用於存取私有欄位／方法以便測試內部細節） ---
     private static Object invokeMethod(Object obj, String methodName, Class<?>[] paramTypes, Object[] args) throws Exception {
         java.lang.reflect.Method method = obj.getClass().getDeclaredMethod(methodName, paramTypes);
         method.setAccessible(true);
         return method.invoke(obj, args);
     }
 
-    // Reflective helper to set private fields
     private static void setField(Object obj, String fieldName, Object value) throws Exception {
         java.lang.reflect.Field field = obj.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(obj, value);
     }
 
-    // Reflective helper to get private fields
     private static Object getField(Object obj, String fieldName) throws Exception {
         java.lang.reflect.Field field = obj.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
@@ -129,6 +143,7 @@ public class GameLogicTest {
     }
 
     private static void setAchievementUnlocked(String id, boolean unlocked) throws Exception {
+        // 透過反射修改 AchievementManager 的靜態成就資料，確保測試可重複執行
         java.lang.reflect.Field achievementsField = AchievementManager.class.getDeclaredField("achievements");
         achievementsField.setAccessible(true);
 
@@ -144,17 +159,16 @@ public class GameLogicTest {
         unlockedField.setBoolean(info, unlocked);
     }
 
+    // --- 進階邏輯測試 ---
     private static void test7BagRandomizer() throws Exception {
         Board board = new Board();
         GamePanel panel = new GamePanel(board);
         GameEngine engine = new GameEngine(board, panel);
 
-        // Clear the bag first to align our loop perfectly with the bag boundary
+        // 清空 bag 以便精準測試每個 7-bag 是否包含完整 7 種型態
         java.util.List<?> bag = (java.util.List<?>) getField(engine, "tetrominoBag");
         bag.clear();
 
-        // Generate 14 pieces and track counts.
-        // Each bag of 7 tetrominoes should contain exactly one of each of the 7 types.
         Map<Tetromino, Integer> firstBag = new HashMap<>();
         Map<Tetromino, Integer> secondBag = new HashMap<>();
 
@@ -184,13 +198,11 @@ public class GameLogicTest {
         GamePanel panel = new GamePanel(board);
         GameEngine engine = new GameEngine(board, panel);
 
-        // Access getSrsKickOffsets
+        // 以反射取得 SRS 的 CCW kick offsets，並比對期望的反號結果
         int[][] ccwOffsets = (int[][]) invokeMethod(engine, "getSrsKickOffsets",
                 new Class<?>[]{Tetromino.class, int.class, int.class},
                 new Object[]{Tetromino.I, 1, 0}); // CCW 1 -> 0
 
-        // CW 0 -> 1 of I-piece is { {0, -2}, {0, 1}, {1, -2}, {-2, 1} }
-        // CCW 1 -> 0 of I-piece should be negated: { {0, 2}, {0, -1}, {-1, 2}, {2, -1} }
         int[][] expected = { {0, 2}, {0, -1}, {-1, 2}, {2, -1} };
         if (ccwOffsets.length != expected.length) {
             throw new Exception("CCW offset list length mismatch");
@@ -209,8 +221,7 @@ public class GameLogicTest {
         GamePanel panel = new GamePanel(board);
         GameEngine engine = new GameEngine(board, panel);
 
-        // Setup a T-piece in a rotation state requiring Test 5 (Test index 3)
-        // Transition: 0 -> 1 CW (kick offset index 3 is {2, -1})
+        // 模擬一個使用 Test 5 kick 的旋轉，使 mini 升級為 REGULAR
         Piece tPiece = new Piece(Tetromino.T, 2, 3, 1); // rotation state 1
         setField(engine, "currentPiece", tPiece);
         setField(engine, "lastMoveWasRotation", true);
@@ -218,21 +229,14 @@ public class GameLogicTest {
         setField(engine, "lastRotationToState", 1);
         setField(engine, "lastRotationKickOffset", new int[]{2, -1}); // Test 5 kick
 
-        // Setup corners so 3-corner rule is satisfied, but only 1 front corner is occupied
-        // Center of T-Piece is at (r+1, c+1) = (3, 4)
-        // Corners:
-        // Front (pointing right): TR (2, 5), BR (4, 5)
-        // Back (left side): TL (2, 3), BL (4, 3)
-        // 3 Corners occupied: TL, BL (both back corners), and TR (1 front corner). BR is empty.
+        // 以角落佔據設定滿足 3-corner 規則
         Color[][] grid = board.getGrid();
         grid[2][3] = Color.BLUE; // TL
         grid[4][3] = Color.BLUE; // BL
         grid[2][5] = Color.BLUE; // TR
         grid[4][5] = null;       // BR (empty)
 
-        // Invoke checkTSpinType
         Object result = invokeMethod(engine, "checkTSpinType", new Class<?>[0], new Object[0]);
-        // TSpinType.REGULAR since it used Test 5 kick!
         if (!result.toString().equals("REGULAR")) {
             throw new Exception("T-Spin mini did not upgrade to REGULAR on Test 5 kick: got " + result);
         }
@@ -244,29 +248,26 @@ public class GameLogicTest {
         GamePanel panel = new GamePanel(board);
         GameEngine engine = new GameEngine(board, panel);
 
-        // Verify isBackToBackActive starts as false
+        // 檢查初始 B2B 狀態
         boolean b2b = (boolean) getField(engine, "isBackToBackActive");
         if (b2b) {
             throw new Exception("isBackToBackActive should initialize to false");
         }
 
-        // Setup board for a Tetris clear (4 rows filled except column 9)
+        // 準備第一個 Tetris 清除的板面
         Color[][] grid = board.getGrid();
-        grid[0][0] = Color.RED; // Non-clearing block to avoid Perfect Clear bonus
+        grid[0][0] = Color.RED; // 非清除方塊，避免 Perfect Clear
         for (int r = Board.ROWS - 4; r < Board.ROWS; r++) {
             for (int c = 0; c < Board.COLS - 1; c++) {
                 grid[r][c] = Color.BLUE;
             }
         }
 
-        // 1st Tetris: spawn vertical I piece in column 9 (rotation 1, col 7 -> absolute col 7 + 2 = 9)
+        // 1st Tetris
         Piece iPiece1 = new Piece(Tetromino.I, Board.ROWS - 4, 7, 1);
         setField(engine, "currentPiece", iPiece1);
-
-        // Call freezeAndSpawn directly using reflection
         invokeMethod(engine, "freezeAndSpawn", new Class<?>[0], new Object[0]);
 
-        // Points for 1st Tetris should be 800, and isBackToBackActive should become true
         int score1 = (int) getField(engine, "score");
         boolean b2b1 = (boolean) getField(engine, "isBackToBackActive");
 
@@ -277,20 +278,17 @@ public class GameLogicTest {
             throw new Exception("isBackToBackActive should be true after 1st Tetris");
         }
 
-        // Setup board for 2nd Tetris
+        // 2nd Tetris (連續)
         for (int r = Board.ROWS - 4; r < Board.ROWS; r++) {
             for (int c = 0; c < Board.COLS - 1; c++) {
                 grid[r][c] = Color.BLUE;
             }
         }
 
-        // 2nd Tetris
         Piece iPiece2 = new Piece(Tetromino.I, Board.ROWS - 4, 7, 1);
         setField(engine, "currentPiece", iPiece2);
-
         invokeMethod(engine, "freezeAndSpawn", new Class<?>[0], new Object[0]);
 
-        // Points for 2nd Tetris should receive B2B bonus and a 1-combo: 800 + 1200 + 50 = 2050.
         int score2 = (int) getField(engine, "score");
         boolean b2b2 = (boolean) getField(engine, "isBackToBackActive");
 
@@ -301,16 +299,14 @@ public class GameLogicTest {
             throw new Exception("isBackToBackActive should remain true after consecutive Tetris");
         }
 
-        // Setup a single line clear to break B2B
+        // 單行消除中斷 B2B
         for (int c = 0; c < Board.COLS - 1; c++) {
             grid[Board.ROWS - 1][c] = Color.BLUE;
         }
         Piece iPiece3 = new Piece(Tetromino.I, Board.ROWS - 2, 6, 0);
         setField(engine, "currentPiece", iPiece3);
-
         invokeMethod(engine, "freezeAndSpawn", new Class<?>[0], new Object[0]);
 
-        // B2B should now be false
         boolean b2b3 = (boolean) getField(engine, "isBackToBackActive");
         if (b2b3) {
             throw new Exception("isBackToBackActive should be false after a normal single line clear");
@@ -324,6 +320,7 @@ public class GameLogicTest {
         GamePanel panel = new GamePanel(board);
         GameEngine engine = new GameEngine(board, panel);
 
+        // 使用表驅動的方式驗證不同情境應送出的垃圾行數
         assertGarbageLines(engine, 1, GameEngine.TSpinType.NONE, false, 1, 0, "single");
         assertGarbageLines(engine, 2, GameEngine.TSpinType.NONE, false, 1, 1, "double");
         assertGarbageLines(engine, 3, GameEngine.TSpinType.NONE, false, 1, 2, "triple");
@@ -355,15 +352,15 @@ public class GameLogicTest {
         GamePanel panel = new GamePanel(board);
         GameEngine engine = new GameEngine(board, panel);
 
-        // Make sure the achievement starts locked for this test.
+        // 確保測試開始時成就還未解鎖
         setAchievementUnlocked("combo_master", false);
 
-        // Simulate that the player already has a 4-combo streak before the next clear.
+        // 模擬已經有 4 連擊
         setField(engine, "gameState", GameEngine.GameState.PLAYING);
         setField(engine, "comboCount", 4);
         setField(engine, "maxCombo", 4);
 
-        // Prepare a single line clear with an O piece that completes the bottom row.
+        // 準備一個能完成底列的 O 方塊，以觸發第 5 次連擊
         Color[][] grid = board.getGrid();
         for (int c = 0; c < Board.COLS; c++) {
             grid[Board.ROWS - 1][c] = (c == 4 || c == 5) ? null : Color.BLUE;
