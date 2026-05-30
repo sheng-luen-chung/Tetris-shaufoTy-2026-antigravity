@@ -3,22 +3,38 @@ package com.tetris.controller;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 
+/**
+ * InputHandler handles keyboard input for the Tetris game.
+ *
+ * It supports single-player, local PvP (two local players),
+ * and network PvP modes. This class converts low-level KeyEvents
+ * into higher-level game commands and implements professional
+ * Tetris tuning features such as DAS (Delayed Auto Shift), ARR
+ * (Auto Repeat Rate) and soft drop timing.
+ *
+ * Threading notes:
+ * - Key event callbacks (keyPressed/keyReleased) may be called
+ *   from the AWT event thread. Movement flags used by the game
+ *   loop are marked `volatile` where needed.
+ */
 public class InputHandler extends KeyAdapter {
+    // Primary game engine (player 1 or single-player)
     private final GameEngine engine;
 
+    // Optional second engine for local PvP or VS_AI opponent
     private GameEngine engine2 = null;
 
-    // Movement state flags for Player 1
+    // Movement state flags for Player 1 (volatile because modified from event thread)
     private volatile boolean p1LeftPressed = false;
     private volatile boolean p1RightPressed = false;
     private volatile boolean p1DownPressed = false;
-    private int p1LeftHoldTime = 0;
+    private int p1LeftHoldTime = 0;      // ms the key has been held
     private int p1RightHoldTime = 0;
     private int p1DownHoldTime = 0;
-    private int p1LeftRepeatCounter = 0;
+    private int p1LeftRepeatCounter = 0; // accumulator for ARR repeats
     private int p1RightRepeatCounter = 0;
 
-    // Movement state flags for Player 2
+    // Movement state flags for Player 2 (volatile because modified from event thread)
     private volatile boolean p2LeftPressed = false;
     private volatile boolean p2RightPressed = false;
     private volatile boolean p2DownPressed = false;
@@ -28,7 +44,7 @@ public class InputHandler extends KeyAdapter {
     private int p2LeftRepeatCounter = 0;
     private int p2RightRepeatCounter = 0;
 
-    // Backward compatibility for single player
+    // Backward-compatible single-player movement flags (volatile for thread-safety)
     private volatile boolean leftPressed = false;
     private volatile boolean rightPressed = false;
     private volatile boolean downPressed = false;
@@ -38,27 +54,26 @@ public class InputHandler extends KeyAdapter {
     private int leftRepeatCounter = 0;
     private int rightRepeatCounter = 0;
 
-    // Tracking flags for Player 1 (only accessed on Game Loop thread)
+    // Tracking flags that are only accessed from the game loop thread
+    // These track whether the key was already considered "pressed" for DAS initial trigger
     private boolean p1LeftWasPressed = false;
     private boolean p1RightWasPressed = false;
     private boolean p1DownWasPressed = false;
 
-    // Tracking flags for Player 2 (only accessed on Game Loop thread)
     private boolean p2LeftWasPressed = false;
     private boolean p2RightWasPressed = false;
     private boolean p2DownWasPressed = false;
 
-    // Tracking flags for Single Player (only accessed on Game Loop thread)
     private boolean leftWasPressed = false;
     private boolean rightWasPressed = false;
     private boolean downWasPressed = false;
 
-    // Professional Tetris Tuning Constants (Configurable)
-    private static volatile int dasDelayMs = 170;
-    private static volatile int arrRateMs = 45;
-    private static volatile int softDropIntervalMs = 30;
+    // Professional Tetris tuning constants (modifiable via settings)
+    private static volatile int dasDelayMs = 170;         // Delayed Auto Shift delay (ms)
+    private static volatile int arrRateMs = 45;           // Auto Repeat Rate interval (ms)
+    private static volatile int softDropIntervalMs = 30;  // Soft drop repeat interval (ms)
 
-    // Single Player Keys
+    // Single-player default key bindings and customization flag
     private static boolean singleCustomized = false;
     private static int singleKeyLeft = KeyEvent.VK_LEFT;
     private static int singleKeyRight = KeyEvent.VK_RIGHT;
@@ -67,7 +82,7 @@ public class InputHandler extends KeyAdapter {
     private static int singleKeyDrop = KeyEvent.VK_SPACE;
     private static int singleKeyHold = KeyEvent.VK_C;
 
-    // PvP Player 1 (Left) Keys
+    // PvP Player 1 (left-side) default keys and customization flag
     private static boolean pvpP1Customized = false;
     private static int pvpP1KeyLeft = KeyEvent.VK_A;
     private static int pvpP1KeyRight = KeyEvent.VK_D;
@@ -76,7 +91,7 @@ public class InputHandler extends KeyAdapter {
     private static int pvpP1KeyDrop = KeyEvent.VK_SPACE;
     private static int pvpP1KeyHold = KeyEvent.VK_C;
 
-    // PvP Player 2 (Right) Keys
+    // PvP Player 2 (right-side) default keys and customization flag
     private static boolean pvpP2Customized = false;
     private static int pvpP2KeyLeft = KeyEvent.VK_LEFT;
     private static int pvpP2KeyRight = KeyEvent.VK_RIGHT;
