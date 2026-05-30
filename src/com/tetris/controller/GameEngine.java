@@ -523,6 +523,18 @@ public class GameEngine {
             opponent.returnToMenu();
         }
 
+        if (gameMode == GameMode.NET_PVP) {
+            if (playerNum == 1) {
+                com.tetris.util.NetworkManager.getInstance().send("QUIT");
+                try {
+                    Thread.sleep(100); // Wait for the quit packet to be flushed to socket
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            com.tetris.util.NetworkManager.getInstance().shutdown();
+        }
+
         panel.resetUIState();
         panel.setGameEngine2(null);
         if (inputHandler != null) {

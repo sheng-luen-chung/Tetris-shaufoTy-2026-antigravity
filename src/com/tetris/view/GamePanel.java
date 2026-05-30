@@ -5867,6 +5867,12 @@ public class GamePanel extends JPanel {
         java.awt.Frame parentFrame = (ancestor instanceof java.awt.Frame) ? (java.awt.Frame) ancestor : null;
 
         if (gameEngine.getGameState() == com.tetris.controller.GameEngine.GameState.PLAYING) {
+            if (gameEngine.isGameOver()) {
+                // Game is already over, opponent leaving is normal.
+                // Do not pop up error/disconnect message dialog.
+                repaint();
+                return;
+            }
             gameEngine.returnToMenu();
             MessageDialog.show(parentFrame, 
                 com.tetris.util.LanguageManager.get("連線中斷 (Disconnected)", "Disconnected"), 
