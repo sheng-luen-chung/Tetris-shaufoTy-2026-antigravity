@@ -14,9 +14,17 @@ import java.util.List;
 import java.util.Map;
 
 public class AchievementManager {
+    // File name used to persist unlocked achievements in the user's home directory
     private static final String FILE_NAME = "achievements.csv";
+
+    // Reference to the running GameEngine so the manager can trigger UI toasts
     private static GameEngine gameEngine = null;
 
+    /**
+     * Data container for a single achievement.
+     * Contains localized title, description and requirement strings (ZH/EN),
+     * an identifier, and an unlocked flag.
+     */
     public static class AchievementInfo {
         public String id;
         public String titleZh;
@@ -27,6 +35,9 @@ public class AchievementManager {
         public String reqEn;
         public boolean unlocked;
 
+        /**
+         * Construct an AchievementInfo with localized fields.
+         */
         public AchievementInfo(String id, String titleZh, String titleEn, String descZh, String descEn, String reqZh, String reqEn) {
             this.id = id;
             this.titleZh = titleZh;
@@ -38,14 +49,23 @@ public class AchievementManager {
             this.unlocked = false;
         }
 
+        /**
+         * Return the title in the currently selected language.
+         */
         public String getTitle() {
             return LanguageManager.get(titleZh, titleEn);
         }
 
+        /**
+         * Return the description in the currently selected language.
+         */
         public String getDesc() {
             return LanguageManager.get(descZh, descEn);
         }
 
+        /**
+         * Return the requirement text in the currently selected language.
+         */
         public String getRequirement() {
             return LanguageManager.get(reqZh, reqEn);
         }
@@ -54,7 +74,8 @@ public class AchievementManager {
     private static final Map<String, AchievementInfo> achievements = new LinkedHashMap<>();
 
     static {
-        // Define all 10 achievements
+        // Define all achievements used by the game. Each call registers
+        // an achievement id along with localized text for display.
         add("first_steps", "初試身手", "First Steps", "完成基礎移動與軟降教學關卡", "Complete basic movement and soft drop tutorial", "通過教學關卡 1", "Clear Tutorial Level 1");
         add("tspin_master", "T-Spin 大師", "T-Spin Master", "通過所有教學與 T-Spin 練習關卡", "Clear all tutorial levels", "通過教學關卡 7", "Clear Tutorial Level 7");
         add("first_clear", "初次消行", "First Clear", "在一般遊戲中成功消除任一行", "Clear any line in a normal game", "消除 ≥ 1 行", "Clear >= 1 Line");
@@ -72,10 +93,14 @@ public class AchievementManager {
     }
 
     private static Path getFilePath() {
+        // Store the achievements file under the user's home directory in a
+        // hidden `.tetris` folder so it persists across runs.
         return Paths.get(System.getProperty("user.home"), ".tetris", FILE_NAME);
     }
 
     public static void init(GameEngine engine) {
+        // Save a reference to the engine so UI notifications can be shown
+        // and then load persisted achievement state from disk.
         gameEngine = engine;
         load();
     }
@@ -94,8 +119,8 @@ public class AchievementManager {
         if (info != null && !info.unlocked) {
             info.unlocked = true;
             save();
-            
-            // Trigger toast notification in UI
+            // Trigger a UI toast if the game engine is available. This gives
+            // immediate feedback to the player that they unlocked an achievement.
             if (gameEngine != null && gameEngine.getPanel() != null) {
                 gameEngine.getPanel().showAchievementToast(info.getTitle(), info.getDesc());
             }
@@ -108,10 +133,13 @@ public class AchievementManager {
             Files.createDirectories(path.getParent());
             try (BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
                 for (AchievementInfo info : achievements.values()) {
+                    // Persist each achievement as `id=true/false` on its own line.
                     writer.write(info.id + "=" + info.unlocked + "\n");
                 }
             }
         } catch (IOException e) {
+            // Log saving failures to stderr; nothing else should crash the game
+            // if achievements cannot be written.
             System.err.println("Failed to save achievements: " + e.getMessage());
         }
     }
@@ -119,7 +147,7 @@ public class AchievementManager {
     public static void load() {
         Path path = getFilePath();
         if (!Files.exists(path)) {
-            // Reset all to locked if file does not exist
+            // If the file doesn't exist yet, keep all achievements locked.
             for (AchievementInfo info : achievements.values()) {
                 info.unlocked = false;
             }
@@ -134,11 +162,14 @@ public class AchievementManager {
                     String val = line.substring(eqIdx + 1).trim();
                     AchievementInfo info = achievements.get(id);
                     if (info != null) {
+                        // Parse and apply the saved unlocked state for this id.
                         info.unlocked = Boolean.parseBoolean(val);
                     }
                 }
             }
         } catch (Exception e) {
+            // If loading fails, log the error and leave achievements at
+            // their default (locked) state so gameplay is not interrupted.
             System.err.println("Failed to load achievements: " + e.getMessage());
         }
     }
