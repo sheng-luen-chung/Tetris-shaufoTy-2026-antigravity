@@ -63,35 +63,17 @@ public class LeaderboardManager {
     }
 
     private Path getLeaderboardFile(String difficultyLabel, GameMode mode) {
-        return getLeaderboardFile(difficultyLabel, mode, false);
-    }
-
-    private Path getLeaderboardFile(String difficultyLabel, GameMode mode, boolean isGlobal) {
         String prefix;
-        if (isGlobal) {
-            if (mode == GameMode.SPRINT) {
-                prefix = "leaderboard_global_sprint_";
-            } else if (mode == GameMode.ULTRA) {
-                prefix = "leaderboard_global_ultra_";
-            } else if (mode == GameMode.SURVIVAL) {
-                prefix = "leaderboard_global_survival_";
-            } else if (mode == GameMode.STAGE) {
-                prefix = "leaderboard_global_stage_";
-            } else {
-                prefix = "leaderboard_global_";
-            }
+        if (mode == GameMode.SPRINT) {
+            prefix = "leaderboard_sprint_";
+        } else if (mode == GameMode.ULTRA) {
+            prefix = "leaderboard_ultra_";
+        } else if (mode == GameMode.SURVIVAL) {
+            prefix = "leaderboard_survival_";
+        } else if (mode == GameMode.STAGE) {
+            prefix = "leaderboard_stage_";
         } else {
-            if (mode == GameMode.SPRINT) {
-                prefix = "leaderboard_sprint_";
-            } else if (mode == GameMode.ULTRA) {
-                prefix = "leaderboard_ultra_";
-            } else if (mode == GameMode.SURVIVAL) {
-                prefix = "leaderboard_survival_";
-            } else if (mode == GameMode.STAGE) {
-                prefix = "leaderboard_stage_";
-            } else {
-                prefix = "leaderboard_";
-            }
+            prefix = "leaderboard_";
         }
         String fileName = prefix + difficultyLabel.toLowerCase() + ".csv";
         return Paths.get(System.getProperty("user.home"), ".tetris", fileName);
@@ -107,7 +89,7 @@ public class LeaderboardManager {
 
     public synchronized void recordScore(int score, int secondsElapsed, int linesCleared, GameEngine.Difficulty difficulty, GameMode mode, String playerName) {
         String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label, mode, false);
+        Path file = getLeaderboardFile(label, mode);
         List<LeaderboardEntry> entries = loadEntries(file);
         entries.add(new LeaderboardEntry(score, secondsElapsed, linesCleared, label, System.currentTimeMillis(), playerName));
         entries.sort(entryComparator(mode));
@@ -116,21 +98,7 @@ public class LeaderboardManager {
 
     public synchronized List<LeaderboardEntry> getTopEntries(GameEngine.Difficulty difficulty, GameMode mode) {
         String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label, mode, false);
-        List<LeaderboardEntry> entries = loadEntries(file);
-        entries.sort(entryComparator(mode));
-        if (entries.size() > MAX_ENTRIES) {
-            return new ArrayList<>(entries.subList(0, MAX_ENTRIES));
-        }
-        return entries;
-    }
-
-    public synchronized List<LeaderboardEntry> getGlobalTopEntries(GameEngine.Difficulty difficulty, GameMode mode) {
-        String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label, mode, true);
-        if (!Files.exists(file)) {
-            initializeGlobalMockFile(file, label, mode);
-        }
+        Path file = getLeaderboardFile(label, mode);
         List<LeaderboardEntry> entries = loadEntries(file);
         entries.sort(entryComparator(mode));
         if (entries.size() > MAX_ENTRIES) {
@@ -141,7 +109,7 @@ public class LeaderboardManager {
 
     public synchronized boolean qualifiesForLeaderboard(int score, int secondsElapsed, int linesCleared, GameEngine.Difficulty difficulty, GameMode mode) {
         String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label, mode, false);
+        Path file = getLeaderboardFile(label, mode);
         List<LeaderboardEntry> entries = loadEntries(file);
         if (entries.size() < MAX_ENTRIES) {
             return true;
@@ -150,79 +118,6 @@ public class LeaderboardManager {
         Comparator<LeaderboardEntry> comp = entryComparator(mode);
         LeaderboardEntry temp = new LeaderboardEntry(score, secondsElapsed, linesCleared, label, System.currentTimeMillis(), "TEMP");
         return comp.compare(temp, last) < 0;
-    }
-
-    public void submitGlobalScoreAsync(int score, int secondsElapsed, int linesCleared, GameEngine.Difficulty difficulty, GameMode mode, String name) {
-        String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label, mode, true);
-        
-        synchronized (this) {
-            List<LeaderboardEntry> entries = loadEntries(file);
-            entries.add(new LeaderboardEntry(score, secondsElapsed, linesCleared, label, System.currentTimeMillis(), name));
-            entries.sort(entryComparator(mode));
-            saveEntries(file, entries);
-        }
-
-        new Thread(() -> {
-            try {
-                // Background network request mockup
-                String cloudUrl = "https://api.example.com/tetris/leaderboard";
-                Thread.sleep(1000);
-            } catch (Exception e) {
-                // Ignore network exceptions in mock simulation
-            }
-        }).start();
-    }
-
-    private void initializeGlobalMockFile(Path file, String difficultyLabel, GameMode mode) {
-        List<LeaderboardEntry> entries = new ArrayList<>();
-        String[] mockNames = {
-            "[TW] T-Spin大師", "[JP] BlockKing", "[US] PixelZen", 
-            "[KR] DoubleClear", "[TW] 俄羅斯神手", "[US] TetrisPro", 
-            "[DE] SpeedRacer", "[TW] 快樂消方塊"
-        };
-        
-        int baseScore;
-        int baseTime;
-        if ("HARD".equals(difficultyLabel)) {
-            baseScore = 280000;
-            baseTime = 120;
-        } else if ("EASY".equals(difficultyLabel)) {
-            baseScore = 70000;
-            baseTime = 300;
-        } else {
-            baseScore = 150000;
-            baseTime = 200;
-        }
-        
-        java.util.Random rand = new java.util.Random();
-        for (int i = 0; i < mockNames.length; i++) {
-            int score = baseScore - i * 15000 - rand.nextInt(5000);
-            if (score < 0) score = 0;
-            int seconds = baseTime + i * 25 + rand.nextInt(10);
-            int lines = score / 200;
-            if (mode == GameMode.SPRINT) {
-                lines = 40;
-                seconds = 45 + i * 12 + rand.nextInt(5);
-            } else if (mode == GameMode.ULTRA) {
-                seconds = 120;
-            } else if (mode == GameMode.SURVIVAL) {
-                seconds = baseTime - i * 20 + rand.nextInt(5);
-                if (seconds < 10) seconds = 10;
-            } else if (mode == GameMode.STAGE) {
-                seconds = baseTime - i * 15 + rand.nextInt(5);
-                if (seconds < 20) seconds = 20;
-            }
-            
-            entries.add(new LeaderboardEntry(
-                score, seconds, lines, difficultyLabel, 
-                System.currentTimeMillis() - (long)i * 3600000L * 24L - rand.nextInt(3600000), 
-                mockNames[i]
-            ));
-        }
-        
-        entries.sort(entryComparator(mode));
-        saveEntries(file, entries);
     }
 
     private Comparator<LeaderboardEntry> entryComparator(GameMode mode) {

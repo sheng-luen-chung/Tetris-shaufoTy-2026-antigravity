@@ -1373,10 +1373,6 @@ public class GameEngine {
         return leaderboardManager.getTopEntries(diff, mode);
     }
 
-    public List<LeaderboardEntry> getGlobalLeaderboardEntriesForDifficultyAndMode(Difficulty diff, GameMode mode) {
-        return leaderboardManager.getGlobalTopEntries(diff, mode);
-    }
-
     public GameMode getGameMode() {
         return gameMode;
     }
@@ -2073,7 +2069,6 @@ public class GameEngine {
             name = "Guest";
         }
         leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, name);
-        leaderboardManager.submitGlobalScoreAsync(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, name);
         isEnteringName = false;
         leaderboardRecorded = true;
         panel.repaint();
@@ -2081,7 +2076,6 @@ public class GameEngine {
 
     public synchronized void submitDefaultName() {
         leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
-        leaderboardManager.submitGlobalScoreAsync(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
         isEnteringName = false;
         leaderboardRecorded = true;
         panel.repaint();

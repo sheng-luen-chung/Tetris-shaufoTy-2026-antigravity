@@ -834,7 +834,7 @@ public class InputHandler extends KeyAdapter {
                     }
                 }
 
-                // Global PVP pause
+                // Network PVP pause
                 if (keyCode == KeyEvent.VK_P || keyCode == KeyEvent.VK_ESCAPE) {
                     engine.togglePause();
                     resetKeyStates();
