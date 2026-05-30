@@ -16,7 +16,8 @@ public class LeaderboardManager {
     private static final int MAX_ENTRIES = 10;
 
     public LeaderboardManager() {
-        // Perform migration if old single leaderboard file exists
+        // If the game still has the old single leaderboard file, split it into the newer
+        // per-mode files once so existing player scores are not lost after the format change.
         Path oldFile = Paths.get(System.getProperty("user.home"), ".tetris", "leaderboard.csv");
         if (Files.exists(oldFile)) {
             List<LeaderboardEntry> allEntries = loadEntries(oldFile);
@@ -40,6 +41,8 @@ public class LeaderboardManager {
                 Path normalFile = getLeaderboardFile("NORMAL", GameMode.ENDLESS);
                 Path hardFile = getLeaderboardFile("HARD", GameMode.ENDLESS);
 
+                // Only create the new files when they do not already exist, so a later
+                // run does not overwrite a newer leaderboard with older migrated data.
                 if (!Files.exists(easyFile) && !easy.isEmpty()) {
                     easy.sort(entryComparator(GameMode.ENDLESS));
                     saveEntries(easyFile, easy);
@@ -55,6 +58,7 @@ public class LeaderboardManager {
             }
 
             try {
+                // Rename the legacy file after migration to keep a backup for recovery.
                 Files.move(oldFile, oldFile.resolveSibling("leaderboard.csv.bak"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException e) {
                 System.err.println("Failed to backup old leaderboard: " + e.getMessage());
@@ -63,6 +67,7 @@ public class LeaderboardManager {
     }
 
     private Path getLeaderboardFile(String difficultyLabel, GameMode mode) {
+        // Build the file name from the mode and difficulty so each leaderboard stays isolated.
         String prefix;
         if (mode == GameMode.SPRINT) {
             prefix = "leaderboard_sprint_";
@@ -91,6 +96,8 @@ public class LeaderboardManager {
         String label = (difficulty == null ? "NORMAL" : difficulty.name());
         Path file = getLeaderboardFile(label, mode);
         List<LeaderboardEntry> entries = loadEntries(file);
+        // Add the new result, re-rank the list, and write back only the top slice.
+        // This keeps the file size bounded and guarantees the saved order matches the UI.
         entries.add(new LeaderboardEntry(score, secondsElapsed, linesCleared, label, System.currentTimeMillis(), playerName));
         entries.sort(entryComparator(mode));
         saveEntries(file, entries);
@@ -100,6 +107,8 @@ public class LeaderboardManager {
         String label = (difficulty == null ? "NORMAL" : difficulty.name());
         Path file = getLeaderboardFile(label, mode);
         List<LeaderboardEntry> entries = loadEntries(file);
+        // The caller should always receive a display-ready list, even if the on-disk
+        // order was edited or loaded from an older format.
         entries.sort(entryComparator(mode));
         if (entries.size() > MAX_ENTRIES) {
             return new ArrayList<>(entries.subList(0, MAX_ENTRIES));
@@ -114,6 +123,8 @@ public class LeaderboardManager {
         if (entries.size() < MAX_ENTRIES) {
             return true;
         }
+        // Since the list is already ranked, the last entry is the weakest one currently
+        // saved; if the new score beats it, the player should enter the leaderboard.
         LeaderboardEntry last = entries.get(entries.size() - 1);
         Comparator<LeaderboardEntry> comp = entryComparator(mode);
         LeaderboardEntry temp = new LeaderboardEntry(score, secondsElapsed, linesCleared, label, System.currentTimeMillis(), "TEMP");
@@ -122,6 +133,10 @@ public class LeaderboardManager {
 
     private Comparator<LeaderboardEntry> entryComparator(GameMode mode) {
         if (mode == GameMode.SPRINT) {
+            // Sprint ranking has a special rule set:
+            // 1) completed 40-line runs always outrank incomplete runs,
+            // 2) among completed runs, lower clear time is better,
+            // 3) tie-breakers use score and then recency.
             return (a, b) -> {
                 boolean aCompleted = a.getLinesCleared() >= 40;
                 boolean bCompleted = b.getLinesCleared() >= 40;
@@ -143,10 +158,13 @@ public class LeaderboardManager {
                 return Long.compare(b.getPlayedAt(), a.getPlayedAt());
             };
         } else if (mode == GameMode.SURVIVAL) {
+            // Survival mode is time-based, so longer survival comes first.
+            // Score and playedAt are only used as tie-breakers.
             return Comparator.comparingInt(LeaderboardEntry::getSecondsElapsed).reversed()
                     .thenComparing(Comparator.comparingInt(LeaderboardEntry::getScore).reversed())
                     .thenComparing(Comparator.comparingLong(LeaderboardEntry::getPlayedAt).reversed());
         } else {
+            // Standard ranking is score-first, then faster completion time, then newer runs.
             return Comparator.comparingInt(LeaderboardEntry::getScore).reversed()
                     .thenComparingInt(LeaderboardEntry::getSecondsElapsed)
                     .thenComparing(Comparator.comparingLong(LeaderboardEntry::getPlayedAt).reversed());
@@ -159,6 +177,8 @@ public class LeaderboardManager {
             return entries;
         }
 
+        // Older files may not contain the lines-cleared column, especially legacy sprint
+        // data, so the reader reconstructs the missing value instead of failing.
         boolean isSprint = file.getFileName().toString().contains("sprint");
 
         try {
@@ -179,6 +199,8 @@ public class LeaderboardManager {
         int limit = Math.min(entries.size(), MAX_ENTRIES);
         for (int i = 0; i < limit; i++) {
             LeaderboardEntry entry = entries.get(i);
+            // Write a compact CSV row so the file stays easy to inspect and migrate.
+            // The order matches parseLine(), which keeps read and write behavior aligned.
             lines.add(entry.getScore() + "," + entry.getSecondsElapsed() + "," + escape(entry.getDifficulty()) + ","
                     + entry.getPlayedAt() + "," + entry.getLinesCleared() + "," + escape(entry.getPlayerName()));
         }
@@ -192,6 +214,9 @@ public class LeaderboardManager {
     }
 
     private LeaderboardEntry parseLine(String line, boolean isSprint) {
+        // Parse one saved CSV row.
+        // Invalid or partially broken rows are skipped so a bad line does not block
+        // the rest of the leaderboard from loading.
         String[] parts = line.split(",", -1);
         if (parts.length < 4) {
             return null;
