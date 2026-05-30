@@ -291,13 +291,17 @@ public class GamePanel extends JPanel {
 
     // Add a score popup at a grid cell (col, row)
     public void addScorePopup(int gridCol, int gridRow, int score, int lines, com.tetris.controller.GameEngine.TSpinType tSpinType, int comboCount) {
-        addScorePopup(gridCol, gridRow, score, lines, tSpinType, comboCount, 1);
+        addScorePopup(gridCol, gridRow, score, lines, tSpinType, comboCount, 1, false);
     }
 
     public void addScorePopup(int gridCol, int gridRow, int score, int lines, com.tetris.controller.GameEngine.TSpinType tSpinType, int comboCount, int playerNum) {
+        addScorePopup(gridCol, gridRow, score, lines, tSpinType, comboCount, playerNum, false);
+    }
+
+    public void addScorePopup(int gridCol, int gridRow, int score, int lines, com.tetris.controller.GameEngine.TSpinType tSpinType, int comboCount, int playerNum, boolean isB2B) {
         String scoreText = "+" + score;
         String lineText = "";
-        String comboText = (comboCount >= 1) ? ((comboCount + 1) + " COMBO!") : "";
+        String comboText = (comboCount >= 1) ? (comboCount + " COMBO!") : "";
         Color popupColor = new Color(255, 235, 120); // Default gold
         Font font = getCachedFont("Arial", Font.BOLD, 24); // Font size
 
@@ -375,6 +379,10 @@ public class GamePanel extends JPanel {
                     lineText = "";
                     break;
             }
+        }
+
+        if (isB2B && !lineText.isEmpty()) {
+            lineText = "B2B " + lineText;
         }
 
         // If no lines cleared and not a T-spin, we don't display anything unless it's a raw T-Spin
@@ -3135,24 +3143,34 @@ public class GamePanel extends JPanel {
             g2d.drawString(emptyTip, badgeContainerX + 25, badgeContainerY + 95);
         } else {
             int badgeY = badgeContainerY + 45;
-            int gap = 38;
+            int gap = 42;
             for (int i = 0; i < Math.min(3, earnedBadges.size()); i++) {
                 Badge badge = earnedBadges.get(i);
+
+                int titleX = badgeContainerX + 20;
+                int descX = badgeContainerX + 160;
+                int descMaxWidth = badgeContainerX + badgeContainerW - 20 - descX;
                 
                 // Draw badge title
                 g2d.setFont(getCachedFont("SansSerif", Font.BOLD, 12));
                 g2d.setColor(badge.color);
-                g2d.drawString(badge.title, badgeContainerX + 20, badgeY);
+                g2d.drawString(badge.title, titleX, badgeY);
 
                 // Draw badge description
                 g2d.setFont(getCachedFont("SansSerif", Font.PLAIN, 11));
                 g2d.setColor(new Color(210, 210, 220));
-                g2d.drawString(badge.description, badgeContainerX + 160, badgeY);
+                java.util.List<String> descLines = wrapText(g2d, badge.description, descMaxWidth, 2);
+                int descLineHeight = g2d.getFontMetrics().getHeight();
+                int descBaseY = badgeY;
+                for (int lineIndex = 0; lineIndex < descLines.size(); lineIndex++) {
+                    g2d.drawString(descLines.get(lineIndex), descX, descBaseY + (lineIndex * descLineHeight));
+                }
 
                 // Draw a divider line
                 if (i < Math.min(3, earnedBadges.size()) - 1) {
                     g2d.setColor(new Color(255, 255, 255, 15));
-                    g2d.drawLine(badgeContainerX + 15, badgeY + 12, badgeContainerX + badgeContainerW - 15, badgeY + 12);
+                    int dividerY = badgeY + Math.max(12, descLineHeight + 2);
+                    g2d.drawLine(badgeContainerX + 15, dividerY, badgeContainerX + badgeContainerW - 15, dividerY);
                 }
 
                 badgeY += gap;

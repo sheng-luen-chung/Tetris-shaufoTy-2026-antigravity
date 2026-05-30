@@ -65,6 +65,8 @@ public class GameEngine {
     private final java.util.List<Piece> nextPieces = new java.util.ArrayList<>();
     private Piece heldPiece = null;
     private boolean canHoldThisTurn = true;
+    private final java.util.List<Tetromino> tetrominoBag = new java.util.ArrayList<>();
+    private boolean isBackToBackActive = false;
     
     // PVP Mode fields
     private GameEngine opponent = null;
@@ -87,6 +89,8 @@ public class GameEngine {
     private int comboCount = -1; // -1 means no combo, 0+ means consecutive clears
     private boolean lastMoveWasRotation = false;
     private int[] lastRotationKickOffset = {0, 0};
+    private int lastRotationFromState = 0;
+    private int lastRotationToState = 0;
 
     // Tutorial Mode fields
     private int tutorialLevel = 1;
@@ -395,6 +399,8 @@ public class GameEngine {
         tSpins = 0;
         maxCombo = 0;
         pvpWinner = 0;
+        tetrominoBag.clear();
+        isBackToBackActive = false;
         nextPieces.clear();
         for (int i = 0; i < 5; i++) {
             nextPieces.add(generateRandomPiece());
@@ -451,6 +457,8 @@ public class GameEngine {
             opponent.tetrisClears = 0;
             opponent.tSpins = 0;
             opponent.maxCombo = 0;
+            opponent.tetrominoBag.clear();
+            opponent.isBackToBackActive = false;
             opponent.actionQueue.clear();
             opponent.garbageQueue.clear();
             opponent.pendingGarbageLines = 0;
@@ -759,6 +767,19 @@ public class GameEngine {
 
         int lines = board.clearLines(); // Clear lines
         
+        boolean isDifficult = (lines == 4) || (isTSpin && lines > 0);
+        boolean isB2BThisTurn = false;
+        if (lines > 0) {
+            if (isDifficult) {
+                if (isBackToBackActive) {
+                    isB2BThisTurn = true;
+                }
+                isBackToBackActive = true;
+            } else {
+                isBackToBackActive = false;
+            }
+        }
+
         // Update Combo
         if (lines > 0) {
             comboCount++;
@@ -794,6 +815,9 @@ public class GameEngine {
                     case 4: garbageToSend = 4; break;
                 }
             }
+            if (isB2BThisTurn) {
+                garbageToSend += 1;
+            }
             if (comboCount >= 1) {
                 garbageToSend += comboCount;
             }
@@ -819,6 +843,9 @@ public class GameEngine {
                     case 3: garbageToSend = 2; break;
                     case 4: garbageToSend = 4; break;
                 }
+            }
+            if (isB2BThisTurn) {
+                garbageToSend += 1;
             }
             if (comboCount >= 1) {
                 garbageToSend += comboCount;
@@ -893,7 +920,11 @@ public class GameEngine {
         }
 
         if (lines > 0 || isTSpin) {
-            int points = getLineClearPoints(lines, tSpinType);
+            int basePoints = getLineClearPoints(lines, tSpinType);
+            int points = basePoints;
+            if (isB2BThisTurn) {
+                points += basePoints / 2; // +50% B2B bonus
+            }
             
             // Add Combo Bonus
             if (comboCount > 0) {
@@ -906,7 +937,7 @@ public class GameEngine {
             }
             
             updateScore(points);
-            panel.addScorePopup(popupCol, popupRow, points, lines, tSpinType, comboCount, playerNum);
+            panel.addScorePopup(popupCol, popupRow, points, lines, tSpinType, comboCount, playerNum, isB2BThisTurn);
 
             if (isPerfectClear) {
                 panel.triggerPerfectClear(playerNum);
@@ -1018,14 +1049,14 @@ public class GameEngine {
             return TSpinType.REGULAR;
         }
 
-        // If only 1 front corner is occupied, check if upgraded by a complex wall kick
+        // If only 1 front corner is occupied, check if upgraded by the 5th SRS kick test (Test 5 / index 3)
         if (lastRotationKickOffset != null) {
-            int dr = lastRotationKickOffset[0];
-            int dc = lastRotationKickOffset[1];
-            // Simple kicks are: (0,0), (0, -1), (0, 1), (-1, 0)
-            boolean isSimpleKick = (dr == 0 && Math.abs(dc) <= 1) || (dr == -1 && dc == 0);
-            if (!isSimpleKick) {
-                return TSpinType.REGULAR;
+            int[][] kickOffsets = getSrsKickOffsets(Tetromino.T, lastRotationFromState, lastRotationToState);
+            if (kickOffsets.length >= 4) {
+                int[] lastKick = kickOffsets[3];
+                if (lastRotationKickOffset[0] == lastKick[0] && lastRotationKickOffset[1] == lastKick[1]) {
+                    return TSpinType.REGULAR;
+                }
             }
         }
 
@@ -1087,7 +1118,7 @@ public class GameEngine {
         return count == 0 ? 0 : Math.round(sum / (float) count);
     }
 
-    // Generate a random piece
+    // Generate a random piece using 7-bag system
     private Piece generateRandomPiece() {
         if (gameState == GameState.TUTORIAL) {
             switch (tutorialLevel) {
@@ -1101,9 +1132,13 @@ public class GameEngine {
                     return new Piece(Tetromino.T);
             }
         }
-        Tetromino[] types = Tetromino.values();
-        Tetromino randomType = types[rng.nextInt(types.length)];
-        return new Piece(randomType);
+        if (tetrominoBag.isEmpty()) {
+            for (Tetromino type : Tetromino.values()) {
+                tetrominoBag.add(type);
+            }
+            java.util.Collections.shuffle(tetrominoBag, rng);
+        }
+        return new Piece(tetrominoBag.remove(0));
     }
 
     // Spawn new piece
@@ -1115,6 +1150,8 @@ public class GameEngine {
 
         lastMoveWasRotation = false;
         lastRotationKickOffset = new int[] {0, 0};
+        lastRotationFromState = 0;
+        lastRotationToState = 0;
 
         piecesSpawned++;
         needsAiCalculation = true; // Request AI path recalculation
@@ -1535,6 +1572,8 @@ public class GameEngine {
         if (board.isValidMove(currentPiece)) {
             lastMoveWasRotation = true;
             lastRotationKickOffset = new int[] {0, 0};
+            lastRotationFromState = fromState;
+            lastRotationToState = toState;
             resetLockDelay();
             SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
             panel.repaint();
@@ -1563,6 +1602,8 @@ public class GameEngine {
         if (kickSuccessful) {
             lastMoveWasRotation = true;
             lastRotationKickOffset = successfulOffset;
+            lastRotationFromState = fromState;
+            lastRotationToState = toState;
             resetLockDelay();
             SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
         } else {
@@ -1590,6 +1631,8 @@ public class GameEngine {
         if (board.isValidMove(currentPiece)) {
             lastMoveWasRotation = true;
             lastRotationKickOffset = new int[] {0, 0};
+            lastRotationFromState = fromState;
+            lastRotationToState = toState;
             resetLockDelay();
             SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
             panel.repaint();
@@ -1618,6 +1661,8 @@ public class GameEngine {
         if (kickSuccessful) {
             lastMoveWasRotation = true;
             lastRotationKickOffset = successfulOffset;
+            lastRotationFromState = fromState;
+            lastRotationToState = toState;
             resetLockDelay();
             SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
         } else {
@@ -1632,28 +1677,54 @@ public class GameEngine {
             return new int[0][2];
         }
         
+        boolean isCcw = false;
+        int cwFrom = fromState;
+        int cwTo = toState;
+        
+        // If CCW transition, map it to the inverse of the corresponding CW transition
+        if ((fromState == 1 && toState == 0) || 
+            (fromState == 2 && toState == 1) || 
+            (fromState == 3 && toState == 2) || 
+            (fromState == 0 && toState == 3)) {
+            isCcw = true;
+            cwFrom = toState;
+            cwTo = fromState;
+        }
+        
+        int[][] offsets = new int[0][2];
         if (type == Tetromino.I) {
-            if (fromState == 0 && toState == 1) {
-                return new int[][] { {0, -2}, {0, 1}, {1, -2}, {-2, 1} };
-            } else if (fromState == 1 && toState == 2) {
-                return new int[][] { {0, -1}, {0, 2}, {-2, -1}, {1, 2} };
-            } else if (fromState == 2 && toState == 3) {
-                return new int[][] { {0, 2}, {0, -1}, {-1, 2}, {2, -1} };
-            } else if (fromState == 3 && toState == 0) {
-                return new int[][] { {0, 1}, {0, -2}, {2, 1}, {-1, -2} };
+            if (cwFrom == 0 && cwTo == 1) {
+                offsets = new int[][] { {0, -2}, {0, 1}, {1, -2}, {-2, 1} };
+            } else if (cwFrom == 1 && cwTo == 2) {
+                offsets = new int[][] { {0, -1}, {0, 2}, {-2, -1}, {1, 2} };
+            } else if (cwFrom == 2 && cwTo == 3) {
+                offsets = new int[][] { {0, 2}, {0, -1}, {-1, 2}, {2, -1} };
+            } else if (cwFrom == 3 && cwTo == 0) {
+                offsets = new int[][] { {0, 1}, {0, -2}, {2, 1}, {-1, -2} };
             }
         } else { // J, L, S, T, Z
-            if (fromState == 0 && toState == 1) {
-                return new int[][] { {0, -1}, {-1, -1}, {2, 0}, {2, -1} };
-            } else if (fromState == 1 && toState == 2) {
-                return new int[][] { {0, 1}, {1, 1}, {-2, 0}, {-2, 1} };
-            } else if (fromState == 2 && toState == 3) {
-                return new int[][] { {0, 1}, {-1, 1}, {2, 0}, {2, 1} };
-            } else if (fromState == 3 && toState == 0) {
-                return new int[][] { {0, -1}, {1, -1}, {-2, 0}, {-2, -1} };
+            if (cwFrom == 0 && cwTo == 1) {
+                offsets = new int[][] { {0, -1}, {-1, -1}, {2, 0}, {2, -1} };
+            } else if (cwFrom == 1 && cwTo == 2) {
+                offsets = new int[][] { {0, 1}, {1, 1}, {-2, 0}, {-2, 1} };
+            } else if (cwFrom == 2 && cwTo == 3) {
+                offsets = new int[][] { {0, 1}, {-1, 1}, {2, 0}, {2, 1} };
+            } else if (cwFrom == 3 && cwTo == 0) {
+                offsets = new int[][] { {0, -1}, {1, -1}, {-2, 0}, {-2, -1} };
             }
         }
-        return new int[0][2];
+        
+        if (isCcw) {
+            // Negate the offsets for CCW rotation
+            int[][] ccwOffsets = new int[offsets.length][2];
+            for (int i = 0; i < offsets.length; i++) {
+                ccwOffsets[i][0] = -offsets[i][0];
+                ccwOffsets[i][1] = -offsets[i][1];
+            }
+            return ccwOffsets;
+        }
+        
+        return offsets;
     }
 
     // Drop piece (Hard Drop - queued)
