@@ -5,7 +5,6 @@ import com.tetris.model.LeaderboardEntry;
 import com.tetris.model.Piece;
 import com.tetris.model.Tetromino;
 import com.tetris.view.GamePanel;
-import javax.swing.Timer;
 import java.util.Random;
 import java.util.List;
 import com.tetris.util.SoundManager;
@@ -13,6 +12,11 @@ import com.tetris.util.SaveManager;
 import com.tetris.model.GameMode;
 import java.awt.Color;
 
+/**
+ * Core game engine for Tetris: handles game state, timing, input processing,
+ * piece spawning, scoring, AI autoplay, networking (NET_PVP) and leaderboard
+ * interactions. Runs a fixed-timestep game loop and updates the `GamePanel`.
+ */
 public class GameEngine {
     public enum GameState {
         MENU,
@@ -20,7 +24,8 @@ public class GameEngine {
         LEADERBOARD,
         TUTORIAL,
         TUTORIAL_SELECT,
-        ACHIEVEMENTS
+        ACHIEVEMENTS,
+        NET_LOBBY
     }
 
     public enum Difficulty {
@@ -64,6 +69,8 @@ public class GameEngine {
     private final java.util.List<Piece> nextPieces = new java.util.ArrayList<>();
     private Piece heldPiece = null;
     private boolean canHoldThisTurn = true;
+    private final java.util.List<Tetromino> tetrominoBag = new java.util.ArrayList<>();
+    private boolean isBackToBackActive = false;
     
     // PVP Mode fields
     private GameEngine opponent = null;
@@ -83,9 +90,11 @@ public class GameEngine {
     private boolean leaderboardRecorded = false;
     private int score = 0;
     private int secondsElapsed = 0;
-    private int comboCount = -1; // -1 means no combo, 0+ means consecutive clears
+    private int comboCount = 0; // 0 means no combo, 1+ means consecutive clears
     private boolean lastMoveWasRotation = false;
     private int[] lastRotationKickOffset = {0, 0};
+    private int lastRotationFromState = 0;
+    private int lastRotationToState = 0;
 
     // Tutorial Mode fields
     private int tutorialLevel = 1;
@@ -130,6 +139,8 @@ public class GameEngine {
     private volatile Difficulty difficulty = Difficulty.NORMAL;
     private final LeaderboardManager leaderboardManager;
     private volatile GameState gameState = GameState.MENU;
+    private volatile int netPvpCountdownMs = 0;
+    private volatile int pendingGarbageLines = 0;
     private volatile boolean isEnteringName = false;
     private final StringBuilder nameInputBuffer = new StringBuilder();
 
@@ -232,6 +243,8 @@ public class GameEngine {
         }
     }
 
+    // Main fixed-timestep game loop running on a background thread.
+    // Keeps game logic at a stable 100Hz while aiming for ~60 FPS rendering.
     private void runGameLoop() {
         long lastTime = System.nanoTime();
         double tickTimeNs = 1000000000.0 / 100.0; // 100Hz logic tick
@@ -273,8 +286,22 @@ public class GameEngine {
     }
 
     private void tickLogic(int dt) {
+        if (gameMode == GameMode.NET_PVP && playerNum == 2) {
+            return;
+        }
         // 0. Process queued garbage and inputs from EDT first
         processGarbageQueue();
+
+        if (gameMode == GameMode.NET_PVP && netPvpCountdownMs > 0) {
+            actionQueue.clear();
+            netPvpCountdownMs -= dt;
+            if (netPvpCountdownMs < 0) {
+                netPvpCountdownMs = 0;
+            }
+            panel.repaint();
+            return;
+        }
+
         processInputActions();
 
         // 1. Tick inputs
@@ -326,6 +353,7 @@ public class GameEngine {
         }
     }
 
+    // Handle per-second updates: mode-specific timers and periodic events.
     private void handleSecondsTick() {
         if (gameMode == GameMode.ULTRA && secondsElapsed >= 120) {
             isGameOver = true;
@@ -358,13 +386,13 @@ public class GameEngine {
         }
     }
 
-    // Start a new game session
+    // Initialize and start a new game session (reset state and timers)
     public void startGame() {
         board.clear();
         SaveManager.deleteSave();
         score = 0;
         secondsElapsed = 0;
-        comboCount = -1;
+        comboCount = 0;
         isGameOver = false;
         isVictory = false;
         isPaused = false;
@@ -378,6 +406,8 @@ public class GameEngine {
         tSpins = 0;
         maxCombo = 0;
         pvpWinner = 0;
+        tetrominoBag.clear();
+        isBackToBackActive = false;
         nextPieces.clear();
         for (int i = 0; i < 5; i++) {
             nextPieces.add(generateRandomPiece());
@@ -386,6 +416,14 @@ public class GameEngine {
         spawnNewPiece();
         usedAiThisSession = false;
         gameState = GameState.PLAYING;
+        if (gameMode == GameMode.NET_PVP) {
+            netPvpCountdownMs = 3000;
+        } else {
+            netPvpCountdownMs = 0;
+        }
+        pendingGarbageLines = 0;
+        actionQueue.clear();
+        garbageQueue.clear();
         aiDemoMode = false;
         aiDemoDelayMultiplier = DEFAULT_AI_DEMO_DELAY_MULTIPLIER;
 
@@ -394,7 +432,7 @@ public class GameEngine {
         secondAccumulator = 0;
         aiAccumulator = 0;
 
-        if (gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) {
+        if (gameMode == GameMode.PVP || gameMode == GameMode.VS_AI || gameMode == GameMode.NET_PVP) {
             playerNum = 1;
             if (opponent == null) {
                 Board board2 = new Board();
@@ -414,7 +452,7 @@ public class GameEngine {
             opponent.board.clear();
             opponent.score = 0;
             opponent.secondsElapsed = 0;
-            opponent.comboCount = -1;
+            opponent.comboCount = 0;
             opponent.isGameOver = false;
             opponent.isVictory = false;
             opponent.isPaused = false;
@@ -426,6 +464,11 @@ public class GameEngine {
             opponent.tetrisClears = 0;
             opponent.tSpins = 0;
             opponent.maxCombo = 0;
+            opponent.tetrominoBag.clear();
+            opponent.isBackToBackActive = false;
+            opponent.actionQueue.clear();
+            opponent.garbageQueue.clear();
+            opponent.pendingGarbageLines = 0;
             opponent.nextPieces.clear();
             for (int i = 0; i < 5; i++) {
                 opponent.nextPieces.add(opponent.generateRandomPiece());
@@ -441,7 +484,9 @@ public class GameEngine {
             this.setAiPlay(gameMode == GameMode.VS_AI);
             opponent.setAiPlay(false);
 
-            opponent.start(); // Ensure opponent thread is running
+            if (gameMode != GameMode.NET_PVP) {
+                opponent.start(); // Ensure opponent thread is running
+            }
             opponent.gravityAccumulator = 0;
             opponent.secondAccumulator = 0;
             opponent.aiAccumulator = 0;
@@ -466,34 +511,49 @@ public class GameEngine {
         panel.repaint();
     }
 
-    // Return to main menu
+    // Switch from gameplay back to main menu and reset UI state
     public void returnToMenu() {
         setAiPlay(false); // Stop AI Autoplay
         gameState = GameState.MENU;
         if (playerNum == 1) {
             SoundManager.playBGM("/resources/menu_bgm.wav");
-        } else {
-            SoundManager.stopBGM();
         }
 
-        if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null && opponent.getGameState() != GameState.MENU) {
+        if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI || gameMode == GameMode.NET_PVP) && opponent != null && opponent.getGameState() != GameState.MENU) {
             opponent.returnToMenu();
+        }
+
+        if (gameMode == GameMode.NET_PVP) {
+            if (playerNum == 1) {
+                com.tetris.util.NetworkManager.getInstance().send("QUIT");
+                try {
+                    Thread.sleep(100); // Wait for the quit packet to be flushed to socket
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            com.tetris.util.NetworkManager.getInstance().shutdown();
         }
 
         panel.resetUIState();
         panel.setGameEngine2(null);
+        if (inputHandler != null) {
+            inputHandler.setEngine2(null);
+        }
         panel.updateWindowSize();
         panel.repaint();
     }
 
-    // Go to leaderboard screen
+    // Enter leaderboard view
     public void showLeaderboard() {
         gameState = GameState.LEADERBOARD;
         panel.repaint();
     }
 
-    // Toggle pause
+    // Toggle game pause state (no-op in NET_PVP)
     public void togglePause() {
+        if (gameMode == GameMode.NET_PVP)
+            return;
         if (gameState != GameState.PLAYING && gameState != GameState.TUTORIAL)
             return;
         if (isGameOver)
@@ -505,13 +565,14 @@ public class GameEngine {
             SoundManager.resumeBGM();
             panel.resetUIState();
         }
-        if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null && opponent.isPaused() != isPaused) {
+        if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI || gameMode == GameMode.NET_PVP) && opponent != null && opponent.isPaused() != isPaused) {
             opponent.togglePause();
         }
         panel.repaint();
     }
 
-    // Lock Delay Logic
+    // Lock delay (ARE) mechanism: controls when a piece locks after touching
+    // the ground, with per-move resets and a hard cap to avoid infinite delay.
     private void startLockDelay() {
         if (!isLocking) {
             isLocking = true;
@@ -532,6 +593,8 @@ public class GameEngine {
         }
     }
 
+    // Pause lock delay (piece left the ground). Note: we intentionally do
+    // not reset the `lockMoveResets` counter here so the reset budget persists.
     private void stopLockDelay() {
         isLocking = false;
         // NOTE: do NOT reset lockMoveResets here.
@@ -539,6 +602,8 @@ public class GameEngine {
         // bypass MAX_LOCK_RESETS by briefly lifting the piece and re-landing it.
     }
 
+    // Refresh lock delay when a valid move/rotation occurs while the piece
+    // is on the ground (consumes a reset from the budget).
     private void resetLockDelay() {
         // Check if the piece is actually on the ground
         currentPiece.move(1, 0);
@@ -562,6 +627,8 @@ public class GameEngine {
         }
     }
 
+    // Check lock delay expiry and, if expired and piece still on ground,
+    // lock the piece and spawn the next one.
     public void tickLockDelay() {
         if ((gameState != GameState.PLAYING && gameState != GameState.TUTORIAL) || isGameOver || isPaused)
             return;
@@ -631,10 +698,14 @@ public class GameEngine {
             lastMoveWasRotation = false; 
         }
 
+        if (gameMode == GameMode.NET_PVP && playerNum == 1) {
+            sendNetworkGameState();
+        }
         panel.repaint(); // Repaint
     }
 
-    // Freeze and spawn piece
+    // Freeze current piece into board, handle clears, scoring, garbage,
+    // achievements, effects, and then spawn the next piece.
     private void freezeAndSpawn() {
         int popupCol = getCurrentPieceCenterCol();
         int popupRow = getCurrentPieceCenterRow();
@@ -723,6 +794,19 @@ public class GameEngine {
 
         int lines = board.clearLines(); // Clear lines
         
+        boolean isDifficult = (lines == 4) || (isTSpin && lines > 0);
+        boolean isB2BThisTurn = false;
+        if (lines > 0) {
+            if (isDifficult) {
+                if (isBackToBackActive) {
+                    isB2BThisTurn = true;
+                }
+                isBackToBackActive = true;
+            } else {
+                isBackToBackActive = false;
+            }
+        }
+
         // Update Combo
         if (lines > 0) {
             comboCount++;
@@ -733,34 +817,18 @@ public class GameEngine {
             maxCombo = Math.max(maxCombo, comboCount);
             SoundManager.playSFX("/resources/clear.wav");
         } else {
-            comboCount = -1;
+            comboCount = 0;
             SoundManager.playSynthSound(SoundManager.SoundType.LOCK);
         }
 
         // PVP Garbage Generation
-        if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null && (lines > 0 || isTSpin)) {
-            int garbageToSend = 0;
-            if (isTSpin) {
-                if (tSpinType == TSpinType.REGULAR) {
-                    switch (lines) {
-                        case 0: garbageToSend = 1; break;
-                        case 1: garbageToSend = 2; break;
-                        case 2: garbageToSend = 4; break;
-                        case 3: garbageToSend = 6; break;
-                    }
-                } else if (tSpinType == TSpinType.MINI) {
-                    garbageToSend = (lines >= 1) ? lines : 1;
-                }
-            } else {
-                switch (lines) {
-                    case 2: garbageToSend = 1; break;
-                    case 3: garbageToSend = 2; break;
-                    case 4: garbageToSend = 4; break;
-                }
+        if (gameMode == GameMode.NET_PVP && playerNum == 1 && (lines > 0 || isTSpin)) {
+            int garbageToSend = getGarbageLinesToSend(lines, tSpinType, isB2BThisTurn, comboCount);
+            if (garbageToSend > 0) {
+                com.tetris.util.NetworkManager.getInstance().send("GARBAGE:" + garbageToSend);
             }
-            if (comboCount >= 1) {
-                garbageToSend += comboCount;
-            }
+        } else if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null && (lines > 0 || isTSpin)) {
+            int garbageToSend = getGarbageLinesToSend(lines, tSpinType, isB2BThisTurn, comboCount);
             if (garbageToSend > 0) {
                 opponent.receiveGarbage(garbageToSend);
             }
@@ -817,7 +885,7 @@ public class GameEngine {
                 intensity += 4;
                 duration = Math.max(duration, 180);
             }
-            if (comboCount >= 2) {
+            if (comboCount > 1) {
                 intensity += 2;
                 duration += 50;
             }
@@ -831,11 +899,15 @@ public class GameEngine {
         }
 
         if (lines > 0 || isTSpin) {
-            int points = getLineClearPoints(lines, tSpinType);
+            int basePoints = getLineClearPoints(lines, tSpinType);
+            int points = basePoints;
+            if (isB2BThisTurn) {
+                points += basePoints / 2; // +50% B2B bonus
+            }
             
             // Add Combo Bonus
-            if (comboCount > 0) {
-                points += 50 * comboCount;
+            if (comboCount > 1) {
+                points += 50 * (comboCount - 1);
             }
             
             // Add Perfect Clear Bonus
@@ -844,7 +916,7 @@ public class GameEngine {
             }
             
             updateScore(points);
-            panel.addScorePopup(popupCol, popupRow, points, lines, tSpinType, comboCount, playerNum);
+            panel.addScorePopup(popupCol, popupRow, points, lines, tSpinType, comboCount, playerNum, isB2BThisTurn);
 
             if (isPerfectClear) {
                 panel.triggerPerfectClear(playerNum);
@@ -866,8 +938,24 @@ public class GameEngine {
             return;
         }
 
+        // Apply any accumulated pending garbage lines before spawning the new piece
+        if (pendingGarbageLines > 0) {
+            for (int i = 0; i < pendingGarbageLines; i++) {
+                int holeCol = rng.nextInt(Board.COLS);
+                board.addGarbageLine(holeCol);
+            }
+            pendingGarbageLines = 0;
+            if (gameMode == GameMode.NET_PVP && playerNum == 1) {
+                // Instantly sync the garbage board state to the opponent
+                sendNetworkGameState();
+            }
+        }
+
         spawnNewPiece(); // Spawn
         canHoldThisTurn = true; // Reset hold status for the next turn
+        if (gameMode == GameMode.NET_PVP && playerNum == 1) {
+            sendNetworkGameState();
+        }
     }
 
     public void receiveGarbage(int garbageLinesCount) {
@@ -877,19 +965,9 @@ public class GameEngine {
     private void receiveGarbageInternal(int garbageLinesCount) {
         if (isGameOver || isPaused) return;
 
-        // Generate garbage lines on this board
-        for (int i = 0; i < garbageLinesCount; i++) {
-            int holeCol = rng.nextInt(Board.COLS);
-            board.addGarbageLine(holeCol);
-        }
-
-        // If current piece collides and push it up if possible
-        if (currentPiece != null && !board.isValidMove(currentPiece)) {
-            currentPiece.move(-1, 0); // push up
-            if (!board.isValidMove(currentPiece)) {
-                currentPiece.move(1, 0); // push back if failed
-            }
-        }
+        // Accumulate to pending garbage buffer instead of applying immediately.
+        // This avoids colliding or eating the active falling tetromino.
+        pendingGarbageLines += garbageLinesCount;
 
         // Trigger screenshake on this player's screen!
         if (panel != null) {
@@ -950,14 +1028,14 @@ public class GameEngine {
             return TSpinType.REGULAR;
         }
 
-        // If only 1 front corner is occupied, check if upgraded by a complex wall kick
+        // If only 1 front corner is occupied, check if upgraded by the 5th SRS kick test (Test 5 / index 3)
         if (lastRotationKickOffset != null) {
-            int dr = lastRotationKickOffset[0];
-            int dc = lastRotationKickOffset[1];
-            // Simple kicks are: (0,0), (0, -1), (0, 1), (-1, 0)
-            boolean isSimpleKick = (dr == 0 && Math.abs(dc) <= 1) || (dr == -1 && dc == 0);
-            if (!isSimpleKick) {
-                return TSpinType.REGULAR;
+            int[][] kickOffsets = getSrsKickOffsets(Tetromino.T, lastRotationFromState, lastRotationToState);
+            if (kickOffsets.length >= 4) {
+                int[] lastKick = kickOffsets[3];
+                if (lastRotationKickOffset[0] == lastKick[0] && lastRotationKickOffset[1] == lastKick[1]) {
+                    return TSpinType.REGULAR;
+                }
             }
         }
 
@@ -991,6 +1069,41 @@ public class GameEngine {
         }
     }
 
+    private int getGarbageLinesToSend(int lines, TSpinType tSpinType, boolean isB2BThisTurn, int comboCount) {
+        int garbageToSend = 0;
+
+        if (tSpinType == TSpinType.REGULAR) {
+            switch (lines) {
+                case 1: garbageToSend = 2; break;
+                case 2: garbageToSend = 4; break;
+                case 3: garbageToSend = 6; break;
+                default: garbageToSend = 0; break;
+            }
+        } else if (tSpinType == TSpinType.MINI) {
+            switch (lines) {
+                case 1: garbageToSend = 1; break;
+                case 2: garbageToSend = 2; break;
+                default: garbageToSend = 0; break;
+            }
+        } else {
+            switch (lines) {
+                case 2: garbageToSend = 1; break;
+                case 3: garbageToSend = 2; break;
+                case 4: garbageToSend = 4; break;
+                default: garbageToSend = 0; break;
+            }
+        }
+
+        if (isB2BThisTurn) {
+            garbageToSend += 1;
+        }
+        if (comboCount > 1) {
+            garbageToSend += comboCount - 1;
+        }
+
+        return garbageToSend;
+    }
+
     private void updateScore(int points) {
         score += points;
         panel.setScore(score);
@@ -1019,7 +1132,7 @@ public class GameEngine {
         return count == 0 ? 0 : Math.round(sum / (float) count);
     }
 
-    // Generate a random piece
+    // Generate a new Piece. Uses tutorial overrides or 7-bag RNG otherwise.
     private Piece generateRandomPiece() {
         if (gameState == GameState.TUTORIAL) {
             switch (tutorialLevel) {
@@ -1033,12 +1146,17 @@ public class GameEngine {
                     return new Piece(Tetromino.T);
             }
         }
-        Tetromino[] types = Tetromino.values();
-        Tetromino randomType = types[rng.nextInt(types.length)];
-        return new Piece(randomType);
+        if (tetrominoBag.isEmpty()) {
+            for (Tetromino type : Tetromino.values()) {
+                tetrominoBag.add(type);
+            }
+            java.util.Collections.shuffle(tetrominoBag, rng);
+        }
+        return new Piece(tetrominoBag.remove(0));
     }
 
-    // Spawn new piece
+    // Spawn a new piece, reset per-piece state, and handle spawn-time
+    // collision (game over) and leaderboard entry logic.
     private void spawnNewPiece() {
         // Fully reset all lock-delay state for the incoming piece
         stopLockDelay();
@@ -1047,6 +1165,8 @@ public class GameEngine {
 
         lastMoveWasRotation = false;
         lastRotationKickOffset = new int[] {0, 0};
+        lastRotationFromState = 0;
+        lastRotationToState = 0;
 
         piecesSpawned++;
         needsAiCalculation = true; // Request AI path recalculation
@@ -1072,7 +1192,18 @@ public class GameEngine {
         }
 
         if (isGameOver) {
-            if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null) {
+            if (gameMode == GameMode.NET_PVP && playerNum == 1) {
+                synchronized (panel) {
+                    if (this.pvpWinner == 0 && opponent != null && opponent.getPvpWinner() == 0) {
+                        int winner = 2; // opponent wins
+                        this.pvpWinner = winner;
+                        opponent.setPvpWinner(winner);
+                        opponent.isGameOver = true;
+                        com.tetris.util.NetworkManager.getInstance().send("GAMEOVER");
+                        SoundManager.stopBGM();
+                    }
+                }
+            } else if ((gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) && opponent != null) {
                 synchronized (panel) {
                     if (this.pvpWinner == 0 && opponent.getPvpWinner() == 0) {
                         int winner = (this.playerNum == 1) ? 2 : 1;
@@ -1088,7 +1219,7 @@ public class GameEngine {
             }
 
             // Check if score qualifies for leaderboard
-            if (gameMode != GameMode.PVP && gameMode != GameMode.VS_AI && !usedAiThisSession && leaderboardManager.qualifiesForLeaderboard(score, secondsElapsed, totalLinesCleared, difficulty, gameMode)) {
+            if (gameMode != GameMode.PVP && gameMode != GameMode.VS_AI && gameMode != GameMode.NET_PVP && !usedAiThisSession && leaderboardManager.qualifiesForLeaderboard(score, secondsElapsed, totalLinesCleared, difficulty, gameMode)) {
                 isEnteringName = true;
                 nameInputBuffer.setLength(0);
                 panel.startAnimationTimer();
@@ -1104,7 +1235,7 @@ public class GameEngine {
         }
 
         leaderboardRecorded = true;
-        if (!usedAiThisSession && gameMode != GameMode.PVP && gameMode != GameMode.VS_AI) {
+        if (!usedAiThisSession && gameMode != GameMode.PVP && gameMode != GameMode.VS_AI && gameMode != GameMode.NET_PVP) {
             leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
         }
     }
@@ -1124,16 +1255,16 @@ public class GameEngine {
         return (score / 500) + 1;
     }
 
-    // Save current game state
+    // Save current game state to persistent storage (unless mode prevents saving)
     public void saveGame() {
-        if (gameState != GameState.PLAYING || isGameOver || aiDemoMode || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL || gameMode == GameMode.STAGE || gameMode == GameMode.PVP || gameMode == GameMode.VS_AI) {
+        if (gameState != GameState.PLAYING || isGameOver || aiDemoMode || gameMode == GameMode.SPRINT || gameMode == GameMode.ULTRA || gameMode == GameMode.SURVIVAL || gameMode == GameMode.STAGE || gameMode == GameMode.PVP || gameMode == GameMode.VS_AI || gameMode == GameMode.NET_PVP) {
             return;
         }
         SaveManager.save(score, secondsElapsed, difficulty, canHoldThisTurn, currentPiece, nextPiece, heldPiece, board,
                          piecesSpawned, totalActions, totalLinesCleared, tetrisClears, tSpins, maxCombo);
     }
 
-    // Load game state from save file
+    // Load game state from persistent storage and restore engine state
     public void loadGame() {
         if (!SaveManager.hasSave()) {
             return;
@@ -1163,7 +1294,7 @@ public class GameEngine {
         this.tetrisClears = state.tetrisClears;
         this.tSpins = state.tSpins;
         this.maxCombo = state.maxCombo;
-        this.comboCount = -1;
+        this.comboCount = 0;
         this.isGameOver = false;
         this.isVictory = false;
         this.isPaused = true; // Start paused for safety
@@ -1270,10 +1401,6 @@ public class GameEngine {
         return leaderboardManager.getTopEntries(diff, mode);
     }
 
-    public List<LeaderboardEntry> getGlobalLeaderboardEntriesForDifficultyAndMode(Difficulty diff, GameMode mode) {
-        return leaderboardManager.getGlobalTopEntries(diff, mode);
-    }
-
     public GameMode getGameMode() {
         return gameMode;
     }
@@ -1288,6 +1415,10 @@ public class GameEngine {
 
     public boolean isGameOver() {
         return isGameOver;
+    }
+
+    public void setGameOver(boolean isGameOver) {
+        this.isGameOver = isGameOver;
     }
 
     public boolean isPaused() {
@@ -1305,6 +1436,10 @@ public class GameEngine {
         this.difficulty = difficulty;
         gravityAccumulator = 0; // Reset gravity delay window
         panel.repaint();
+    }
+
+    public int getNetPvpCountdownMs() {
+        return netPvpCountdownMs;
     }
 
     public GameState getGameState() {
@@ -1448,6 +1583,8 @@ public class GameEngine {
         if (board.isValidMove(currentPiece)) {
             lastMoveWasRotation = true;
             lastRotationKickOffset = new int[] {0, 0};
+            lastRotationFromState = fromState;
+            lastRotationToState = toState;
             resetLockDelay();
             SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
             panel.repaint();
@@ -1476,6 +1613,8 @@ public class GameEngine {
         if (kickSuccessful) {
             lastMoveWasRotation = true;
             lastRotationKickOffset = successfulOffset;
+            lastRotationFromState = fromState;
+            lastRotationToState = toState;
             resetLockDelay();
             SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
         } else {
@@ -1503,6 +1642,8 @@ public class GameEngine {
         if (board.isValidMove(currentPiece)) {
             lastMoveWasRotation = true;
             lastRotationKickOffset = new int[] {0, 0};
+            lastRotationFromState = fromState;
+            lastRotationToState = toState;
             resetLockDelay();
             SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
             panel.repaint();
@@ -1531,6 +1672,8 @@ public class GameEngine {
         if (kickSuccessful) {
             lastMoveWasRotation = true;
             lastRotationKickOffset = successfulOffset;
+            lastRotationFromState = fromState;
+            lastRotationToState = toState;
             resetLockDelay();
             SoundManager.playSynthSound(SoundManager.SoundType.ROTATE);
         } else {
@@ -1545,28 +1688,54 @@ public class GameEngine {
             return new int[0][2];
         }
         
+        boolean isCcw = false;
+        int cwFrom = fromState;
+        int cwTo = toState;
+        
+        // If CCW transition, map it to the inverse of the corresponding CW transition
+        if ((fromState == 1 && toState == 0) || 
+            (fromState == 2 && toState == 1) || 
+            (fromState == 3 && toState == 2) || 
+            (fromState == 0 && toState == 3)) {
+            isCcw = true;
+            cwFrom = toState;
+            cwTo = fromState;
+        }
+        
+        int[][] offsets = new int[0][2];
         if (type == Tetromino.I) {
-            if (fromState == 0 && toState == 1) {
-                return new int[][] { {0, -2}, {0, 1}, {1, -2}, {-2, 1} };
-            } else if (fromState == 1 && toState == 2) {
-                return new int[][] { {0, -1}, {0, 2}, {-2, -1}, {1, 2} };
-            } else if (fromState == 2 && toState == 3) {
-                return new int[][] { {0, 2}, {0, -1}, {-1, 2}, {2, -1} };
-            } else if (fromState == 3 && toState == 0) {
-                return new int[][] { {0, 1}, {0, -2}, {2, 1}, {-1, -2} };
+            if (cwFrom == 0 && cwTo == 1) {
+                offsets = new int[][] { {0, -2}, {0, 1}, {1, -2}, {-2, 1} };
+            } else if (cwFrom == 1 && cwTo == 2) {
+                offsets = new int[][] { {0, -1}, {0, 2}, {-2, -1}, {1, 2} };
+            } else if (cwFrom == 2 && cwTo == 3) {
+                offsets = new int[][] { {0, 2}, {0, -1}, {-1, 2}, {2, -1} };
+            } else if (cwFrom == 3 && cwTo == 0) {
+                offsets = new int[][] { {0, 1}, {0, -2}, {2, 1}, {-1, -2} };
             }
         } else { // J, L, S, T, Z
-            if (fromState == 0 && toState == 1) {
-                return new int[][] { {0, -1}, {-1, -1}, {2, 0}, {2, -1} };
-            } else if (fromState == 1 && toState == 2) {
-                return new int[][] { {0, 1}, {1, 1}, {-2, 0}, {-2, 1} };
-            } else if (fromState == 2 && toState == 3) {
-                return new int[][] { {0, 1}, {-1, 1}, {2, 0}, {2, 1} };
-            } else if (fromState == 3 && toState == 0) {
-                return new int[][] { {0, -1}, {1, -1}, {-2, 0}, {-2, -1} };
+            if (cwFrom == 0 && cwTo == 1) {
+                offsets = new int[][] { {0, -1}, {-1, -1}, {2, 0}, {2, -1} };
+            } else if (cwFrom == 1 && cwTo == 2) {
+                offsets = new int[][] { {0, 1}, {1, 1}, {-2, 0}, {-2, 1} };
+            } else if (cwFrom == 2 && cwTo == 3) {
+                offsets = new int[][] { {0, 1}, {-1, 1}, {2, 0}, {2, 1} };
+            } else if (cwFrom == 3 && cwTo == 0) {
+                offsets = new int[][] { {0, -1}, {1, -1}, {-2, 0}, {-2, -1} };
             }
         }
-        return new int[0][2];
+        
+        if (isCcw) {
+            // Negate the offsets for CCW rotation
+            int[][] ccwOffsets = new int[offsets.length][2];
+            for (int i = 0; i < offsets.length; i++) {
+                ccwOffsets[i][0] = -offsets[i][0];
+                ccwOffsets[i][1] = -offsets[i][1];
+            }
+            return ccwOffsets;
+        }
+        
+        return offsets;
     }
 
     // Drop piece (Hard Drop - queued)
@@ -1635,6 +1804,9 @@ public class GameEngine {
         
         canHoldThisTurn = false;
         needsAiCalculation = true; // Request AI path recalculation
+        if (gameMode == GameMode.NET_PVP && playerNum == 1) {
+            sendNetworkGameState();
+        }
         panel.repaint();
     }
 
@@ -1745,7 +1917,7 @@ public class GameEngine {
         return baseDelay;
     }
 
-    // AI step execution
+    // Run one AI decision step: compute best move and queue actions
     private void runAIStep() {
         if (gameState != GameState.PLAYING || isPaused || isGameOver) {
             return;
@@ -1799,13 +1971,18 @@ public class GameEngine {
     }
 
     public void startTutorialLevel(int level) {
+        this.gameMode = GameMode.ENDLESS;
+        panel.setGameEngine2(null);
+        if (inputHandler != null) {
+            inputHandler.setEngine2(null);
+        }
         this.tutorialLevel = level;
         this.isTransitioning = false;
         
         board.clear();
         score = 0;
         secondsElapsed = 0;
-        comboCount = -1;
+        comboCount = 0;
         isGameOver = false;
         isPaused = false;
         heldPiece = null;
@@ -1920,7 +2097,6 @@ public class GameEngine {
             name = "Guest";
         }
         leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, name);
-        leaderboardManager.submitGlobalScoreAsync(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, name);
         isEnteringName = false;
         leaderboardRecorded = true;
         panel.repaint();
@@ -1928,10 +2104,120 @@ public class GameEngine {
 
     public synchronized void submitDefaultName() {
         leaderboardManager.recordScore(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
-        leaderboardManager.submitGlobalScoreAsync(score, secondsElapsed, totalLinesCleared, difficulty, gameMode, "PLAYER");
         isEnteringName = false;
         leaderboardRecorded = true;
         panel.repaint();
+    }
+
+    public void setRandomSeed(long seed) {
+        this.rng.setSeed(seed);
+    }
+
+    public void sendNetworkGameState() {
+        if (gameMode == GameMode.NET_PVP && playerNum == 1) {
+            String stateStr = serializeGameState();
+            com.tetris.util.NetworkManager.getInstance().send("SYNC:" + stateStr);
+        }
+    }
+
+    public String serializeGameState() {
+        String heldType = (heldPiece == null) ? "." : heldPiece.getType().name();
+        String curType = (currentPiece == null) ? "." : currentPiece.getType().name();
+        int curCol = (currentPiece == null) ? 0 : currentPiece.getCol();
+        int curRow = (currentPiece == null) ? 0 : currentPiece.getRow();
+        int curRot = (currentPiece == null) ? 0 : currentPiece.getRotationIndex();
+        
+        StringBuilder gridSb = new StringBuilder();
+        Color[][] grid = board.getGrid();
+        for (int r = 0; r < Board.ROWS; r++) {
+            for (int c = 0; c < Board.COLS; c++) {
+                Color color = grid[r][c];
+                if (color == null) {
+                    gridSb.append('.');
+                } else if (color.equals(Color.RED) || color.equals(new Color(230, 70, 70)) || color.equals(new Color(255, 50, 50))) {
+                    gridSb.append('Z');
+                } else if (color.equals(Color.ORANGE) || color.equals(new Color(230, 130, 40)) || color.equals(new Color(255, 140, 0))) {
+                    gridSb.append('L');
+                } else if (color.equals(Color.YELLOW) || color.equals(new Color(230, 210, 40)) || color.equals(new Color(255, 220, 0))) {
+                    gridSb.append('O');
+                } else if (color.equals(Color.GREEN) || color.equals(new Color(70, 200, 70)) || color.equals(new Color(0, 255, 100))) {
+                    gridSb.append('S');
+                } else if (color.equals(Color.CYAN) || color.equals(new Color(70, 200, 200)) || color.equals(new Color(0, 255, 255))) {
+                    gridSb.append('I');
+                } else if (color.equals(Color.BLUE) || color.equals(new Color(70, 70, 230)) || color.equals(new Color(30, 80, 255))) {
+                    gridSb.append('J');
+                } else if (color.equals(new Color(180, 70, 230)) || color.equals(new Color(180, 50, 255)) || color.equals(Color.MAGENTA)) {
+                    gridSb.append('T');
+                } else if (color.equals(Color.GRAY)) {
+                    gridSb.append('G');
+                } else {
+                    gridSb.append('X');
+                }
+            }
+        }
+        return score + "," + totalLinesCleared + "," + comboCount + "," + (isGameOver ? "1" : "0") + "," + heldType + "," + curType + "," + curCol + "," + curRow + "," + curRot + "," + piecesSpawned + "|" + gridSb.toString();
+    }
+
+    // Deserialize a serialized game state string (used for NET_PVP sync)
+    public void deserializeGameState(String stateStr) {
+        try {
+            int pipeIdx = stateStr.indexOf('|');
+            if (pipeIdx == -1) return;
+            String stats = stateStr.substring(0, pipeIdx);
+            String gridStr = stateStr.substring(pipeIdx + 1);
+            
+            String[] parts = stats.split(",");
+            if (parts.length >= 9) {
+                this.score = Integer.parseInt(parts[0]);
+                this.totalLinesCleared = Integer.parseInt(parts[1]);
+                this.comboCount = Integer.parseInt(parts[2]);
+                this.isGameOver = parts[3].equals("1");
+                
+                String heldType = parts[4];
+                if (heldType.equals(".")) {
+                    this.heldPiece = null;
+                } else {
+                    this.heldPiece = new Piece(Tetromino.valueOf(heldType));
+                }
+                
+                String curType = parts[5];
+                if (curType.equals(".")) {
+                    this.currentPiece = null;
+                } else {
+                    int curCol = Integer.parseInt(parts[6]);
+                    int curRow = Integer.parseInt(parts[7]);
+                    int curRot = Integer.parseInt(parts[8]);
+                    this.currentPiece = new Piece(Tetromino.valueOf(curType), curRow, curCol, curRot);
+                }
+                
+                if (parts.length >= 10) {
+                    this.piecesSpawned = Integer.parseInt(parts[9]);
+                }
+            }
+            
+            Color[][] grid = board.getGrid();
+            int idx = 0;
+            for (int r = 0; r < Board.ROWS; r++) {
+                for (int c = 0; c < Board.COLS; c++) {
+                    if (idx >= gridStr.length()) break;
+                    char ch = gridStr.charAt(idx++);
+                    switch (ch) {
+                        case '.': grid[r][c] = null; break;
+                        case 'Z': grid[r][c] = new Color(230, 70, 70); break;
+                        case 'L': grid[r][c] = new Color(230, 130, 40); break;
+                        case 'O': grid[r][c] = new Color(230, 210, 40); break;
+                        case 'S': grid[r][c] = new Color(70, 200, 70); break;
+                        case 'I': grid[r][c] = new Color(70, 200, 200); break;
+                        case 'J': grid[r][c] = new Color(70, 70, 230); break;
+                        case 'T': grid[r][c] = new Color(180, 70, 230); break;
+                        case 'G': grid[r][c] = Color.GRAY; break;
+                        default: grid[r][c] = Color.LIGHT_GRAY; break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error deserializing game state: " + e.getMessage());
+        }
     }
 
 }

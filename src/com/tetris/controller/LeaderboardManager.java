@@ -16,7 +16,8 @@ public class LeaderboardManager {
     private static final int MAX_ENTRIES = 10;
 
     public LeaderboardManager() {
-        // Perform migration if old single leaderboard file exists
+        // If the game still has the old single leaderboard file, split it into the newer
+        // per-mode files once so existing player scores are not lost after the format change.
         Path oldFile = Paths.get(System.getProperty("user.home"), ".tetris", "leaderboard.csv");
         if (Files.exists(oldFile)) {
             List<LeaderboardEntry> allEntries = loadEntries(oldFile);
@@ -40,6 +41,8 @@ public class LeaderboardManager {
                 Path normalFile = getLeaderboardFile("NORMAL", GameMode.ENDLESS);
                 Path hardFile = getLeaderboardFile("HARD", GameMode.ENDLESS);
 
+                // Only create the new files when they do not already exist, so a later
+                // run does not overwrite a newer leaderboard with older migrated data.
                 if (!Files.exists(easyFile) && !easy.isEmpty()) {
                     easy.sort(entryComparator(GameMode.ENDLESS));
                     saveEntries(easyFile, easy);
@@ -55,6 +58,7 @@ public class LeaderboardManager {
             }
 
             try {
+                // Rename the legacy file after migration to keep a backup for recovery.
                 Files.move(oldFile, oldFile.resolveSibling("leaderboard.csv.bak"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException e) {
                 System.err.println("Failed to backup old leaderboard: " + e.getMessage());
@@ -63,35 +67,18 @@ public class LeaderboardManager {
     }
 
     private Path getLeaderboardFile(String difficultyLabel, GameMode mode) {
-        return getLeaderboardFile(difficultyLabel, mode, false);
-    }
-
-    private Path getLeaderboardFile(String difficultyLabel, GameMode mode, boolean isGlobal) {
+        // Build the file name from the mode and difficulty so each leaderboard stays isolated.
         String prefix;
-        if (isGlobal) {
-            if (mode == GameMode.SPRINT) {
-                prefix = "leaderboard_global_sprint_";
-            } else if (mode == GameMode.ULTRA) {
-                prefix = "leaderboard_global_ultra_";
-            } else if (mode == GameMode.SURVIVAL) {
-                prefix = "leaderboard_global_survival_";
-            } else if (mode == GameMode.STAGE) {
-                prefix = "leaderboard_global_stage_";
-            } else {
-                prefix = "leaderboard_global_";
-            }
+        if (mode == GameMode.SPRINT) {
+            prefix = "leaderboard_sprint_";
+        } else if (mode == GameMode.ULTRA) {
+            prefix = "leaderboard_ultra_";
+        } else if (mode == GameMode.SURVIVAL) {
+            prefix = "leaderboard_survival_";
+        } else if (mode == GameMode.STAGE) {
+            prefix = "leaderboard_stage_";
         } else {
-            if (mode == GameMode.SPRINT) {
-                prefix = "leaderboard_sprint_";
-            } else if (mode == GameMode.ULTRA) {
-                prefix = "leaderboard_ultra_";
-            } else if (mode == GameMode.SURVIVAL) {
-                prefix = "leaderboard_survival_";
-            } else if (mode == GameMode.STAGE) {
-                prefix = "leaderboard_stage_";
-            } else {
-                prefix = "leaderboard_";
-            }
+            prefix = "leaderboard_";
         }
         String fileName = prefix + difficultyLabel.toLowerCase() + ".csv";
         return Paths.get(System.getProperty("user.home"), ".tetris", fileName);
@@ -107,8 +94,10 @@ public class LeaderboardManager {
 
     public synchronized void recordScore(int score, int secondsElapsed, int linesCleared, GameEngine.Difficulty difficulty, GameMode mode, String playerName) {
         String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label, mode, false);
+        Path file = getLeaderboardFile(label, mode);
         List<LeaderboardEntry> entries = loadEntries(file);
+        // Add the new result, re-rank the list, and write back only the top slice.
+        // This keeps the file size bounded and guarantees the saved order matches the UI.
         entries.add(new LeaderboardEntry(score, secondsElapsed, linesCleared, label, System.currentTimeMillis(), playerName));
         entries.sort(entryComparator(mode));
         saveEntries(file, entries);
@@ -116,22 +105,10 @@ public class LeaderboardManager {
 
     public synchronized List<LeaderboardEntry> getTopEntries(GameEngine.Difficulty difficulty, GameMode mode) {
         String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label, mode, false);
+        Path file = getLeaderboardFile(label, mode);
         List<LeaderboardEntry> entries = loadEntries(file);
-        entries.sort(entryComparator(mode));
-        if (entries.size() > MAX_ENTRIES) {
-            return new ArrayList<>(entries.subList(0, MAX_ENTRIES));
-        }
-        return entries;
-    }
-
-    public synchronized List<LeaderboardEntry> getGlobalTopEntries(GameEngine.Difficulty difficulty, GameMode mode) {
-        String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label, mode, true);
-        if (!Files.exists(file)) {
-            initializeGlobalMockFile(file, label, mode);
-        }
-        List<LeaderboardEntry> entries = loadEntries(file);
+        // The caller should always receive a display-ready list, even if the on-disk
+        // order was edited or loaded from an older format.
         entries.sort(entryComparator(mode));
         if (entries.size() > MAX_ENTRIES) {
             return new ArrayList<>(entries.subList(0, MAX_ENTRIES));
@@ -141,92 +118,25 @@ public class LeaderboardManager {
 
     public synchronized boolean qualifiesForLeaderboard(int score, int secondsElapsed, int linesCleared, GameEngine.Difficulty difficulty, GameMode mode) {
         String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label, mode, false);
+        Path file = getLeaderboardFile(label, mode);
         List<LeaderboardEntry> entries = loadEntries(file);
         if (entries.size() < MAX_ENTRIES) {
             return true;
         }
+        // Since the list is already ranked, the last entry is the weakest one currently
+        // saved; if the new score beats it, the player should enter the leaderboard.
         LeaderboardEntry last = entries.get(entries.size() - 1);
         Comparator<LeaderboardEntry> comp = entryComparator(mode);
         LeaderboardEntry temp = new LeaderboardEntry(score, secondsElapsed, linesCleared, label, System.currentTimeMillis(), "TEMP");
         return comp.compare(temp, last) < 0;
     }
 
-    public void submitGlobalScoreAsync(int score, int secondsElapsed, int linesCleared, GameEngine.Difficulty difficulty, GameMode mode, String name) {
-        String label = (difficulty == null ? "NORMAL" : difficulty.name());
-        Path file = getLeaderboardFile(label, mode, true);
-        
-        synchronized (this) {
-            List<LeaderboardEntry> entries = loadEntries(file);
-            entries.add(new LeaderboardEntry(score, secondsElapsed, linesCleared, label, System.currentTimeMillis(), name));
-            entries.sort(entryComparator(mode));
-            saveEntries(file, entries);
-        }
-
-        new Thread(() -> {
-            try {
-                // Background network request mockup
-                String cloudUrl = "https://api.example.com/tetris/leaderboard";
-                Thread.sleep(1000);
-            } catch (Exception e) {
-                // Ignore network exceptions in mock simulation
-            }
-        }).start();
-    }
-
-    private void initializeGlobalMockFile(Path file, String difficultyLabel, GameMode mode) {
-        List<LeaderboardEntry> entries = new ArrayList<>();
-        String[] mockNames = {
-            "[TW] T-Spin大師", "[JP] BlockKing", "[US] PixelZen", 
-            "[KR] DoubleClear", "[TW] 俄羅斯神手", "[US] TetrisPro", 
-            "[DE] SpeedRacer", "[TW] 快樂消方塊"
-        };
-        
-        int baseScore;
-        int baseTime;
-        if ("HARD".equals(difficultyLabel)) {
-            baseScore = 280000;
-            baseTime = 120;
-        } else if ("EASY".equals(difficultyLabel)) {
-            baseScore = 70000;
-            baseTime = 300;
-        } else {
-            baseScore = 150000;
-            baseTime = 200;
-        }
-        
-        java.util.Random rand = new java.util.Random();
-        for (int i = 0; i < mockNames.length; i++) {
-            int score = baseScore - i * 15000 - rand.nextInt(5000);
-            if (score < 0) score = 0;
-            int seconds = baseTime + i * 25 + rand.nextInt(10);
-            int lines = score / 200;
-            if (mode == GameMode.SPRINT) {
-                lines = 40;
-                seconds = 45 + i * 12 + rand.nextInt(5);
-            } else if (mode == GameMode.ULTRA) {
-                seconds = 120;
-            } else if (mode == GameMode.SURVIVAL) {
-                seconds = baseTime - i * 20 + rand.nextInt(5);
-                if (seconds < 10) seconds = 10;
-            } else if (mode == GameMode.STAGE) {
-                seconds = baseTime - i * 15 + rand.nextInt(5);
-                if (seconds < 20) seconds = 20;
-            }
-            
-            entries.add(new LeaderboardEntry(
-                score, seconds, lines, difficultyLabel, 
-                System.currentTimeMillis() - (long)i * 3600000L * 24L - rand.nextInt(3600000), 
-                mockNames[i]
-            ));
-        }
-        
-        entries.sort(entryComparator(mode));
-        saveEntries(file, entries);
-    }
-
     private Comparator<LeaderboardEntry> entryComparator(GameMode mode) {
         if (mode == GameMode.SPRINT) {
+            // Sprint ranking has a special rule set:
+            // 1) completed 40-line runs always outrank incomplete runs,
+            // 2) among completed runs, lower clear time is better,
+            // 3) tie-breakers use score and then recency.
             return (a, b) -> {
                 boolean aCompleted = a.getLinesCleared() >= 40;
                 boolean bCompleted = b.getLinesCleared() >= 40;
@@ -248,10 +158,13 @@ public class LeaderboardManager {
                 return Long.compare(b.getPlayedAt(), a.getPlayedAt());
             };
         } else if (mode == GameMode.SURVIVAL) {
+            // Survival mode is time-based, so longer survival comes first.
+            // Score and playedAt are only used as tie-breakers.
             return Comparator.comparingInt(LeaderboardEntry::getSecondsElapsed).reversed()
                     .thenComparing(Comparator.comparingInt(LeaderboardEntry::getScore).reversed())
                     .thenComparing(Comparator.comparingLong(LeaderboardEntry::getPlayedAt).reversed());
         } else {
+            // Standard ranking is score-first, then faster completion time, then newer runs.
             return Comparator.comparingInt(LeaderboardEntry::getScore).reversed()
                     .thenComparingInt(LeaderboardEntry::getSecondsElapsed)
                     .thenComparing(Comparator.comparingLong(LeaderboardEntry::getPlayedAt).reversed());
@@ -264,6 +177,8 @@ public class LeaderboardManager {
             return entries;
         }
 
+        // Older files may not contain the lines-cleared column, especially legacy sprint
+        // data, so the reader reconstructs the missing value instead of failing.
         boolean isSprint = file.getFileName().toString().contains("sprint");
 
         try {
@@ -284,6 +199,8 @@ public class LeaderboardManager {
         int limit = Math.min(entries.size(), MAX_ENTRIES);
         for (int i = 0; i < limit; i++) {
             LeaderboardEntry entry = entries.get(i);
+            // Write a compact CSV row so the file stays easy to inspect and migrate.
+            // The order matches parseLine(), which keeps read and write behavior aligned.
             lines.add(entry.getScore() + "," + entry.getSecondsElapsed() + "," + escape(entry.getDifficulty()) + ","
                     + entry.getPlayedAt() + "," + entry.getLinesCleared() + "," + escape(entry.getPlayerName()));
         }
@@ -297,6 +214,9 @@ public class LeaderboardManager {
     }
 
     private LeaderboardEntry parseLine(String line, boolean isSprint) {
+        // Parse one saved CSV row.
+        // Invalid or partially broken rows are skipped so a bad line does not block
+        // the rest of the leaderboard from loading.
         String[] parts = line.split(",", -1);
         if (parts.length < 4) {
             return null;

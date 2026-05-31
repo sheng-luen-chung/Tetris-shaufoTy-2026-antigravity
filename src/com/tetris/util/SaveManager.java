@@ -17,9 +17,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class SaveManager {
+    /**
+     * File name used to persist the current game save under the user's
+     * home directory in a hidden `.tetris` folder.
+     */
     private static final String SAVE_FILE_NAME = "savegame.csv";
 
     private static Path getSaveFilePath() {
+        // Return the full path to the save file inside the user's home
+        // `~/.tetris/savegame.csv` so saves persist between runs.
         return Paths.get(System.getProperty("user.home"), ".tetris", SAVE_FILE_NAME);
     }
 
@@ -31,10 +37,16 @@ public class SaveManager {
         try {
             Files.deleteIfExists(getSaveFilePath());
         } catch (IOException e) {
+            // Log delete failures but do not throw to avoid interrupting UI flow.
             System.err.println("Failed to delete save file: " + e.getMessage());
         }
     }
 
+    /**
+     * Persist the current game state to disk. Returns true on success.
+     * The save format is a simple key=value plain text file for easy
+     * inspection and debugging.
+     */
     public static boolean save(int score, int secondsElapsed, GameEngine.Difficulty difficulty,
                                boolean canHoldThisTurn, Piece currentPiece, Piece nextPiece,
                                Piece heldPiece, Board board,
@@ -77,6 +89,7 @@ public class SaveManager {
                 return true;
             }
         } catch (IOException e) {
+            // Log and return false on I/O errors so callers can react.
             System.err.println("Failed to save game: " + e.getMessage());
             return false;
         }
@@ -86,6 +99,7 @@ public class SaveManager {
         if (piece == null) {
             return "null";
         }
+        // Format: TYPE,row,col,rotationIndex
         return piece.getType().name() + "," + piece.getRow() + "," + piece.getCol() + "," + piece.getRotationIndex();
     }
 
@@ -122,6 +136,7 @@ public class SaveManager {
                 }
             }
 
+            // Reconstruct SaveState from the plain key=value file.
             SaveState state = new SaveState();
             state.score = Integer.parseInt(data.getOrDefault("score", "0"));
             state.secondsElapsed = Integer.parseInt(data.getOrDefault("secondsElapsed", "0"));
@@ -160,12 +175,15 @@ public class SaveManager {
             }
             return state;
         } catch (Exception e) {
+            // If load fails, log the reason and return null to indicate
+            // no usable save was found.
             System.err.println("Failed to load save file: " + e.getMessage());
             return null;
         }
     }
 
     public static class SaveState {
+        // Simple data holder for loaded save information.
         public int score;
         public int secondsElapsed;
         public GameEngine.Difficulty difficulty;
@@ -185,9 +203,14 @@ public class SaveManager {
     private static final String SETTINGS_FILE_NAME = "settings.csv";
 
     private static Path getSettingsFilePath() {
+        // Settings are stored next to the save file in the `.tetris` folder.
         return Paths.get(System.getProperty("user.home"), ".tetris", SETTINGS_FILE_NAME);
     }
 
+    /**
+     * Persist user settings to disk. Many values are written as key=value
+     * pairs so they can be reloaded by `loadSettings()` on startup.
+     */
     public static void saveSettings(int das, int arr, int sdr, 
                                     boolean singleCustom, int[] singleKeys, 
                                     boolean pvpP1Custom, int[] pvpP1Keys,
@@ -225,6 +248,7 @@ public class SaveManager {
                 writer.write("language=" + language + "\n");
             }
         } catch (IOException e) {
+            // On failure, print error but do not propagate.
             System.err.println("Failed to save settings: " + e.getMessage());
         }
     }
@@ -240,6 +264,8 @@ public class SaveManager {
             while ((line = reader.readLine()) != null) {
                 int eqIdx = line.indexOf('=');
                 if (eqIdx > 0) {
+                    // Load each key=value pair into a map for the caller to
+                    // interpret. Missing keys can be handled by defaults.
                     data.put(line.substring(0, eqIdx).trim(), line.substring(eqIdx + 1).trim());
                 }
             }

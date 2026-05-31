@@ -3,22 +3,38 @@ package com.tetris.controller;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 
+/**
+ * InputHandler handles keyboard input for the Tetris game.
+ *
+ * It supports single-player, local PvP (two local players),
+ * and network PvP modes. This class converts low-level KeyEvents
+ * into higher-level game commands and implements professional
+ * Tetris tuning features such as DAS (Delayed Auto Shift), ARR
+ * (Auto Repeat Rate) and soft drop timing.
+ *
+ * Threading notes:
+ * - Key event callbacks (keyPressed/keyReleased) may be called
+ *   from the AWT event thread. Movement flags used by the game
+ *   loop are marked `volatile` where needed.
+ */
 public class InputHandler extends KeyAdapter {
+    // Primary game engine (player 1 or single-player)
     private final GameEngine engine;
 
+    // Optional second engine for local PvP or VS_AI opponent
     private GameEngine engine2 = null;
 
-    // Movement state flags for Player 1
+    // Movement state flags for Player 1 (volatile because modified from event thread)
     private volatile boolean p1LeftPressed = false;
     private volatile boolean p1RightPressed = false;
     private volatile boolean p1DownPressed = false;
-    private int p1LeftHoldTime = 0;
+    private int p1LeftHoldTime = 0;      // ms the key has been held
     private int p1RightHoldTime = 0;
     private int p1DownHoldTime = 0;
-    private int p1LeftRepeatCounter = 0;
+    private int p1LeftRepeatCounter = 0; // accumulator for ARR repeats
     private int p1RightRepeatCounter = 0;
 
-    // Movement state flags for Player 2
+    // Movement state flags for Player 2 (volatile because modified from event thread)
     private volatile boolean p2LeftPressed = false;
     private volatile boolean p2RightPressed = false;
     private volatile boolean p2DownPressed = false;
@@ -28,7 +44,7 @@ public class InputHandler extends KeyAdapter {
     private int p2LeftRepeatCounter = 0;
     private int p2RightRepeatCounter = 0;
 
-    // Backward compatibility for single player
+    // Backward-compatible single-player movement flags (volatile for thread-safety)
     private volatile boolean leftPressed = false;
     private volatile boolean rightPressed = false;
     private volatile boolean downPressed = false;
@@ -38,27 +54,26 @@ public class InputHandler extends KeyAdapter {
     private int leftRepeatCounter = 0;
     private int rightRepeatCounter = 0;
 
-    // Tracking flags for Player 1 (only accessed on Game Loop thread)
+    // Tracking flags that are only accessed from the game loop thread
+    // These track whether the key was already considered "pressed" for DAS initial trigger
     private boolean p1LeftWasPressed = false;
     private boolean p1RightWasPressed = false;
     private boolean p1DownWasPressed = false;
 
-    // Tracking flags for Player 2 (only accessed on Game Loop thread)
     private boolean p2LeftWasPressed = false;
     private boolean p2RightWasPressed = false;
     private boolean p2DownWasPressed = false;
 
-    // Tracking flags for Single Player (only accessed on Game Loop thread)
     private boolean leftWasPressed = false;
     private boolean rightWasPressed = false;
     private boolean downWasPressed = false;
 
-    // Professional Tetris Tuning Constants (Configurable)
-    private static volatile int dasDelayMs = 170;
-    private static volatile int arrRateMs = 45;
-    private static volatile int softDropIntervalMs = 30;
+    // Professional Tetris tuning constants (modifiable via settings)
+    private static volatile int dasDelayMs = 170;         // Delayed Auto Shift delay (ms)
+    private static volatile int arrRateMs = 45;           // Auto Repeat Rate interval (ms)
+    private static volatile int softDropIntervalMs = 30;  // Soft drop repeat interval (ms)
 
-    // Single Player Keys
+    // Single-player default key bindings and customization flag
     private static boolean singleCustomized = false;
     private static int singleKeyLeft = KeyEvent.VK_LEFT;
     private static int singleKeyRight = KeyEvent.VK_RIGHT;
@@ -67,7 +82,7 @@ public class InputHandler extends KeyAdapter {
     private static int singleKeyDrop = KeyEvent.VK_SPACE;
     private static int singleKeyHold = KeyEvent.VK_C;
 
-    // PvP Player 1 (Left) Keys
+    // PvP Player 1 (left-side) default keys and customization flag
     private static boolean pvpP1Customized = false;
     private static int pvpP1KeyLeft = KeyEvent.VK_A;
     private static int pvpP1KeyRight = KeyEvent.VK_D;
@@ -76,7 +91,7 @@ public class InputHandler extends KeyAdapter {
     private static int pvpP1KeyDrop = KeyEvent.VK_SPACE;
     private static int pvpP1KeyHold = KeyEvent.VK_C;
 
-    // PvP Player 2 (Right) Keys
+    // PvP Player 2 (right-side) default keys and customization flag
     private static boolean pvpP2Customized = false;
     private static int pvpP2KeyLeft = KeyEvent.VK_LEFT;
     private static int pvpP2KeyRight = KeyEvent.VK_RIGHT;
@@ -287,7 +302,13 @@ public class InputHandler extends KeyAdapter {
         GameEngine.GameState state = engine.getGameState();
         boolean isActiveState = (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL);
         if (isActiveState) {
-            if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
+            if (engine.getGameMode() == com.tetris.model.GameMode.NET_PVP) {
+                if (!engine.isPaused() && !engine.isGameOver()) {
+                    updateInputs(deltaTime);
+                } else {
+                    resetKeyStates();
+                }
+            } else if ((engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) && state != GameEngine.GameState.TUTORIAL) {
                 if (engine2 != null && !engine.isPaused()) {
                     if (engine.getGameMode() == com.tetris.model.GameMode.PVP && !engine.isGameOver()) {
                         updateP1Inputs(deltaTime);
@@ -601,6 +622,27 @@ public class InputHandler extends KeyAdapter {
             return;
         }
 
+        if (state == GameEngine.GameState.NET_LOBBY) {
+            switch (keyCode) {
+                case KeyEvent.VK_UP:
+                case KeyEvent.VK_W:
+                    if (engine.getPanel() != null) engine.getPanel().navigateLobby(-1);
+                    break;
+                case KeyEvent.VK_DOWN:
+                case KeyEvent.VK_S:
+                    if (engine.getPanel() != null) engine.getPanel().navigateLobby(1);
+                    break;
+                case KeyEvent.VK_ENTER:
+                case KeyEvent.VK_SPACE:
+                    if (engine.getPanel() != null) engine.getPanel().selectLobbyOption();
+                    break;
+                case KeyEvent.VK_ESCAPE:
+                    if (engine.getPanel() != null) engine.getPanel().cancelNetwork();
+                    break;
+            }
+            return;
+        }
+
         if (state == GameEngine.GameState.MENU) {
             if (engine.getPanel() != null && engine.getPanel().isShowSettingsInMenu()) {
                 if (engine.getPanel().isShowControlSettings()) {
@@ -710,7 +752,7 @@ public class InputHandler extends KeyAdapter {
             }
 
             boolean bothGameOver = false;
-            if ((engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) && engine2 != null) {
+            if ((engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI || engine.getGameMode() == com.tetris.model.GameMode.NET_PVP) && engine2 != null) {
                 bothGameOver = engine.isGameOver() && engine2.isGameOver();
             } else {
                 bothGameOver = engine.isGameOver();
@@ -753,7 +795,7 @@ public class InputHandler extends KeyAdapter {
                 return;
             }
 
-            if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
+            if (state != GameEngine.GameState.TUTORIAL && (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI)) {
                 // PVP / VS_AI Controls
                 // Resolve dynamic keys
                 int p1Left = pvpP1KeyLeft;
@@ -783,12 +825,13 @@ public class InputHandler extends KeyAdapter {
                 
                 // Player 2 (Arrows) - Human player in both PvP and VS_AI modes
                 if (engine2 != null) {
-                    int p2Left = pvpP2KeyLeft;
-                    int p2Right = pvpP2KeyRight;
-                    int p2Down = pvpP2KeyDown;
-                    int p2Rotate = pvpP2KeyRotate;
-                    int p2Drop = pvpP2KeyDrop;
-                    int p2Hold = pvpP2KeyHold;
+                    boolean useSinglePlayerControls = engine.getGameMode() == com.tetris.model.GameMode.VS_AI;
+                    int p2Left = useSinglePlayerControls ? singleKeyLeft : pvpP2KeyLeft;
+                    int p2Right = useSinglePlayerControls ? singleKeyRight : pvpP2KeyRight;
+                    int p2Down = useSinglePlayerControls ? singleKeyDown : pvpP2KeyDown;
+                    int p2Rotate = useSinglePlayerControls ? singleKeyRotate : pvpP2KeyRotate;
+                    int p2Drop = useSinglePlayerControls ? singleKeyDrop : pvpP2KeyDrop;
+                    int p2Hold = useSinglePlayerControls ? singleKeyHold : pvpP2KeyHold;
 
                     if (keyCode == p2Left) {
                         p2LeftPressed = true;
@@ -806,7 +849,7 @@ public class InputHandler extends KeyAdapter {
                     }
                 }
 
-                // Global PVP pause
+                // Network PVP pause
                 if (keyCode == KeyEvent.VK_P || keyCode == KeyEvent.VK_ESCAPE) {
                     engine.togglePause();
                     resetKeyStates();
@@ -864,7 +907,7 @@ public class InputHandler extends KeyAdapter {
         int keyCode = e.getKeyCode();
         GameEngine.GameState state = engine.getGameState();
         if (state == GameEngine.GameState.PLAYING || state == GameEngine.GameState.TUTORIAL) {
-            if (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI) {
+            if (state != GameEngine.GameState.TUTORIAL && (engine.getGameMode() == com.tetris.model.GameMode.PVP || engine.getGameMode() == com.tetris.model.GameMode.VS_AI)) {
                 int p1Left = pvpP1KeyLeft;
                 int p1Right = pvpP1KeyRight;
                 int p1Down = pvpP1KeyDown;
