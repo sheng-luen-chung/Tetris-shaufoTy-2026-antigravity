@@ -1,0 +1,5 @@
+/bin/
+/src/resources/
+build_and_run.bat
+run_tests.bat
+manifest.txt
