@@ -253,11 +253,9 @@ Issues and pull requests are welcome.
 
 ## Simplified Flowchart
 
-A compact, README-friendly overview of the runtime/gameplay flow.
-
 ```mermaid
 flowchart TD
-  Main[Main.main] --> Bootstrap[Create GUI (Board, GamePanel, GameEngine, InputHandler)]
+  Main[Main.main] --> Bootstrap[Create GUI: Board & components]
   Bootstrap --> Engine[GameEngine]
   Bootstrap --> Panel[GamePanel]
   Bootstrap --> Input[InputHandler]
