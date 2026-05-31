@@ -250,3 +250,82 @@ Tetris/
 No license has been specified yet.
 
 Issues and pull requests are welcome.
+
+## Tetris Project Flow Chart
+
+This diagram shows the main runtime flow of the project, from application startup to gameplay, UI state changes, and persistence-related paths.
+
+```mermaid
+flowchart TD
+    A[Main.main] --> B[SwingUtilities.invokeLater]
+    B --> C[createAndShowGUI]
+
+    subgraph S1[Bootstrap]
+        C --> D[Board]
+        C --> E[GamePanel]
+        C --> F[GameEngine]
+        C --> G[InputHandler]
+        F --> H[Engine start]
+        G --> H
+    end
+
+    H --> I[Background game loop thread]
+    I --> J[runGameLoop and tickLogic]
+
+    subgraph S2[UI State Machine]
+        J --> K{GameState}
+        K -->|MENU| L[Menu navigation in GamePanel]
+        K -->|PLAYING| M[Gameplay input handling]
+        K -->|LEADERBOARD| N[Leaderboard screen]
+        K -->|TUTORIAL / ACHIEVEMENTS| O[Info screens]
+        K -->|NET_LOBBY| P[Network lobby]
+    end
+
+    L --> Q{User action}
+    Q -->|New game / mode select| R[triggerModeSelection]
+    Q -->|Load game| S[loadGame]
+    Q -->|Leaderboard| N
+    Q -->|Exit info/menu| L
+
+    R --> T[startGame]
+    S --> T
+    T --> U[Reset board, score, timers, queues]
+    U --> V[Set GameState.PLAYING]
+    V --> W[spawnNewPiece]
+
+    M --> X[Move / rotate / drop / hold / pause]
+    X --> J
+
+    J --> Y[process input, gravity, lock delay, AI, garbage]
+    Y --> Z[repaint GamePanel]
+    Z --> AA[paintComponent -> drawGameScene]
+
+    T --> AB[SaveManager.deleteSave]
+    S --> AC[SaveManager.load]
+    N --> AD[LeaderboardManager]
+
+    P --> AE[NetworkManager host / join]
+    AE --> AF[SYNC / START / GARBAGE / GAMEOVER / QUIT]
+    AF --> T
+```
+
+```mermaid
+flowchart TD
+    A[Game loop tick] --> B{Action queue}
+    B -->|queued inputs| C[Apply movement / rotation / drop / hold]
+    C --> D[Collision / lock / line clear]
+    D --> E[Score / combo / T-Spin / Back-to-Back]
+    E --> F{Game mode}
+
+    F -->|STAGE| G[Stage speed scaling]
+    F -->|SURVIVAL| H[Garbage line timer]
+    F -->|SPRINT / ULTRA| I[Target-based victory checks]
+    F -->|VS_AI / NET_PVP / PVP| J[Opponent sync]
+    F -->|ENDLESS| K[Normal endless loop]
+
+    G --> L[repaint]
+    H --> L
+    I --> L
+    J --> L
+    K --> L
+```
