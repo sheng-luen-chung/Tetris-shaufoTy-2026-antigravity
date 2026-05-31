@@ -251,6 +251,35 @@ No license has been specified yet.
 
 Issues and pull requests are welcome.
 
+## Simplified Flowchart
+
+A compact, README-friendly overview of the runtime/gameplay flow.
+
+```mermaid
+flowchart TD
+  Main[Main.main] --> Bootstrap[Create GUI (Board, GamePanel, GameEngine, InputHandler)]
+  Bootstrap --> Engine[GameEngine]
+  Bootstrap --> Panel[GamePanel]
+  Bootstrap --> Input[InputHandler]
+
+  Engine --> Loop[Game loop]
+  Loop --> State{GameState}
+  State -->|MENU| Menu[Menu screen]
+  State -->|PLAYING| Play[Gameplay]
+
+  Menu -->|Start| Start[startGame]
+  Start --> Reset[Reset board, score, timers]
+  Reset --> Play
+
+  Play --> Actions[Process input / gravity / lock / garbage]
+  Play --> Render[Render GamePanel]
+  Play --> Save[SaveManager]
+
+  Menu --> Leaderboard[Show leaderboard]
+  Menu --> NetLobby[Network lobby]
+  NetLobby --> Network[NetworkManager]
+```
+
 ## Tetris Project Flow Chart
 
 This diagram shows the main runtime flow of the project, from application startup to gameplay, UI state changes, and persistence-related paths.
