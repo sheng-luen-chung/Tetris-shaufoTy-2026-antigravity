@@ -27,6 +27,7 @@ public class Main {
         gamePanel.setGameEngine(engine); // Link engine to panel for info display
 
         InputHandler inputHandler = new InputHandler(engine);
+        engine.setInputHandler(inputHandler);
 
         // Set JFrame
         JFrame frame = new JFrame("Java Tetris Project");
@@ -40,6 +41,9 @@ public class Main {
         frame.setVisible(true); // Display window
 
         frame.addKeyListener(inputHandler); // Key listener
+        gamePanel.addKeyListener(inputHandler);
+        gamePanel.setFocusable(true);
+        gamePanel.requestFocusInWindow();
 
         engine.start();
     }
