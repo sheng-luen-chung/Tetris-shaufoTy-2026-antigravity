@@ -1,5 +1,5 @@
 /bin/
 /src/resources/
-build_and_run.bat
-run_tests.bat
+*.bat
 manifest.txt
+*.jar
