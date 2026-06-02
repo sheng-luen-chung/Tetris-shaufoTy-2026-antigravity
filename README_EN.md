@@ -80,6 +80,7 @@ Tetris/
 
 - To run `Tetris.jar` directly: `JRE 17` or later
 - To compile the source code yourself: `JDK 17` or later
+- This workspace is configured to prefer `JDK 25` on Windows
 - On Windows, you can use the provided batch files
 - On other platforms, you can compile and run manually with `javac` and `java`
 
@@ -92,6 +93,8 @@ Run the following from the project root:
 ```bat
 build_and_run.bat
 ```
+
+The batch file prefers `C:\Program Files\Eclipse Adoptium\jdk-25.0.2.10-hotspot` when it is available, so `java` and `javac` stay on the same JDK version.
 
 ### Option 2: Compile and run manually
 
