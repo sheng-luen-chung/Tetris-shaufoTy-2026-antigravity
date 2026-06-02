@@ -4,6 +4,10 @@
 
 Java + Swing 實作的俄羅斯方塊專案，提供完整可玩的 Tetris 體驗，並整合遊戲邏輯、UI、音效、存檔、排行榜、成就與多種遊玩模式。
 
+## 遊戲影片 (GAME DEMO)
+
+https://www.youtube.com/watch?v=C8HFk5Iu8Cs
+
 <p align="center">
   <a href="#zh">中文</a> · <a href="#en">English</a>
 </p>
