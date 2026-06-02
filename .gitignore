@@ -1,11 +1,6 @@
 /bin/
-/src/resources/
 /docs/
-*.bat
-manifest.txt
 *.jar
 CLASS_OVERVIEW.md
 NOTE.md
 FLOWCHART.md
-!build_and_run.bat
-!run_tests.bat

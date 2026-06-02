@@ -5,7 +5,61 @@ set "PROJECT_ROOT=%~dp0"
 cd /d "%PROJECT_ROOT%"
 
 call :choose_jdk
+call :configure_java
+if errorlevel 1 exit /b %errorlevel%
 
+echo ===================================================
+echo [0/3] Running Unit Tests (CI Mode)...
+echo ===================================================
+call run_tests.bat
+if errorlevel 1 (
+    echo [ERROR] Unit Tests failed! Aborting build process.
+    pause
+    exit /b %errorlevel%
+)
+
+echo.
+echo ===================================================
+echo [1/3] Compiling Java source files...
+echo ===================================================
+if not exist "bin" mkdir "bin"
+"%JAVAC_CMD%" -encoding UTF-8 -d bin src\com\tetris\main\Main.java src\com\tetris\controller\*.java src\com\tetris\model\*.java src\com\tetris\view\*.java src\com\tetris\util\*.java src\com\tetris\test\*.java
+
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Compilation failed! Please check your source code.
+    pause
+    exit /b %errorlevel%
+)
+
+echo.
+echo ===================================================
+echo [1.5/3] Copying resources to bin...
+echo ===================================================
+if not exist "bin\resources" mkdir "bin\resources"
+xcopy /E /Y /I "src\resources" "bin\resources" >nul
+
+echo.
+echo ===================================================
+echo [2/3] Packaging classes into Tetris.jar...
+echo ===================================================
+jar cvfm Tetris.jar manifest.txt -C bin .
+
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Packaging failed!
+    pause
+    exit /b %errorlevel%
+)
+
+echo.
+echo ===================================================
+echo [3/3] Running Tetris.jar...
+echo ===================================================
+"%JAVA_CMD%" -jar Tetris.jar
+exit /b %errorlevel%
+
+:configure_java
 if defined SELECTED_JDK (
     set "JAVA_HOME=%SELECTED_JDK%"
     set "JAVA_CMD=%SELECTED_JDK%\bin\java.exe"
@@ -30,14 +84,7 @@ echo.
 "%JAVA_CMD%" -version
 "%JAVAC_CMD%" -version
 echo.
-
-if not exist "bin" mkdir "bin"
-
-"%JAVAC_CMD%" -encoding UTF-8 -d bin src\com\tetris\main\Main.java src\com\tetris\controller\*.java src\com\tetris\model\*.java src\com\tetris\view\*.java src\com\tetris\util\*.java src\com\tetris\test\*.java
-if errorlevel 1 exit /b %errorlevel%
-
-"%JAVA_CMD%" -cp bin com.tetris.main.Main
-exit /b %errorlevel%
+exit /b 0
 
 :choose_jdk
 set "SELECTED_JDK="

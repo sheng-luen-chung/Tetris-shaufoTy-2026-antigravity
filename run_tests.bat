@@ -5,7 +5,37 @@ set "PROJECT_ROOT=%~dp0"
 cd /d "%PROJECT_ROOT%"
 
 call :choose_jdk
+call :configure_java
+if errorlevel 1 exit /b %errorlevel%
 
+echo ===================================================
+echo [TEST] Compiling test and source files...
+echo ===================================================
+if not exist "bin" mkdir "bin"
+"%JAVAC_CMD%" -encoding UTF-8 -d bin src\com\tetris\main\Main.java src\com\tetris\controller\*.java src\com\tetris\model\*.java src\com\tetris\view\*.java src\com\tetris\util\*.java src\com\tetris\test\*.java
+
+if errorlevel 1 (
+    echo [ERROR] Test Compilation failed!
+    exit /b %errorlevel%
+)
+
+echo.
+echo ===================================================
+echo [TEST] Running Unit Tests via TestRunner...
+echo ===================================================
+"%JAVA_CMD%" -cp bin com.tetris.test.TestRunner
+
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Unit tests failed! build aborted.
+    exit /b %errorlevel%
+)
+
+echo.
+echo [SUCCESS] All Unit Tests passed!
+exit /b 0
+
+:configure_java
 if defined SELECTED_JDK (
     set "JAVA_HOME=%SELECTED_JDK%"
     set "JAVA_CMD=%SELECTED_JDK%\bin\java.exe"
@@ -30,14 +60,7 @@ echo.
 "%JAVA_CMD%" -version
 "%JAVAC_CMD%" -version
 echo.
-
-if not exist "bin" mkdir "bin"
-
-"%JAVAC_CMD%" -encoding UTF-8 -d bin src\com\tetris\main\Main.java src\com\tetris\controller\*.java src\com\tetris\model\*.java src\com\tetris\view\*.java src\com\tetris\util\*.java src\com\tetris\test\*.java
-if errorlevel 1 exit /b %errorlevel%
-
-"%JAVA_CMD%" -cp bin com.tetris.test.TestRunner
-exit /b %errorlevel%
+exit /b 0
 
 :choose_jdk
 set "SELECTED_JDK="
