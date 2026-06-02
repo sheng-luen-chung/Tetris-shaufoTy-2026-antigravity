@@ -26,3 +26,27 @@
 - All game logic tests passed.
 - `build_and_run.bat` compiled successfully and launched the game process with JDK 25.
 - Remaining sound messages, such as missing `.wav` files, are resource warnings and are unrelated to the JDK/JRE version issue.
+
+## Since merge commit `5a66446` (`Merge remote-tracking branch 'upstream/main' into feature/jdk25-runner-setup`)
+
+### Upstream resources merge
+
+- Merged the latest `upstream/main` changes into `feature/jdk25-runner-setup`.
+- Added the previously ignored audio resources under `src/resources`:
+  1. `bgm.wav`
+  2. `clear.wav`
+  3. `menu_bgm.wav`
+- Updated `.gitignore` so `src/resources` and batch scripts are no longer ignored.
+- Added `manifest.txt` with `Main-Class: com.tetris.main.Main` for jar packaging.
+
+### Resource-aware jar build
+
+- Updated `build_and_run.bat` to keep the portable JDK selection logic from this feature branch.
+- Preserved the upstream build flow that runs tests before packaging.
+- Added resource copying from `src\resources` into `bin\resources` before creating `Tetris.jar`.
+- `build_and_run.bat` now produces a jar containing compiled classes and the copied resources, then launches it with the selected JDK.
+
+### Verification
+
+- `run_tests.bat` passed with JDK 25.
+- Verified that `src/resources/bgm.wav`, `src/resources/clear.wav`, and `src/resources/menu_bgm.wav` exist locally.
